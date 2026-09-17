@@ -10,6 +10,7 @@ Every op prints one JSON result. Nothing here creates a Bot — that is forge.py
 """
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -179,8 +180,6 @@ def op_copy(s: dict, root: Path, settings: dict) -> dict:
     forge.run(root, "profile", "create", new_id, "--clone-from", src.name, "--description", description)
     pdir = root / "profiles" / new_id
     try:
-        if settings.get("share_login"):
-            forge.share_root_login(root, pdir)
         forge.write_bot_meta(pdir, display, description, s.get("avatar_kind") or "")
         soul = (pdir / "SOUL.md").read_text() if (pdir / "SOUL.md").exists() else ""
         old_title = meta.get("title") or src.name
@@ -228,8 +227,6 @@ def op_import(s: dict, root: Path, settings: dict) -> dict:
     pdir = root / "profiles" / new_id
     if not (pdir / "config.yaml").exists():
         return {"ok": False, "error": "import did not produce a usable profile"}
-    if settings.get("share_login"):
-        forge.share_root_login(root, pdir)
     if s.get("display_name"):
         _save_bot_meta(pdir, {"title": display})
     if settings.get("install_gateway", True) and os.name != "nt":
@@ -257,7 +254,51 @@ def op_delete(s: dict, root: Path, settings: dict) -> dict:
             "note": "restore with `hermes profile import <backup>`" if backup else "no backup was made"}
 
 
-OPS = {"update": op_update, "copy": op_copy, "export": op_export, "import": op_import, "delete": op_delete,
+def op_teach(s: dict, root: Path, settings: dict) -> dict:
+    """Save a repeatable procedure as a skill the Bot loads on demand — 'remember how I do X'."""
+    pdir = _require_bot(root, s.get("name"))
+    skill = re.sub(r"-+", "-", re.sub(r"[^a-z0-9]+", "-", (s.get("skill") or "").lower())).strip("-")[:48]
+    if not skill:
+        raise ValueError("need a short skill name, e.g. 'weekly-report'")
+    steps = [str(x).strip() for x in (s.get("steps") or []) if str(x).strip()]
+    body = (s.get("body") or "").strip()
+    if not steps and not body:
+        raise ValueError("need either `steps` or a full `body`")
+    description = (s.get("description") or f"How to {skill.replace('-', ' ')}.").strip()
+    when = (s.get("when") or "").strip()
+    if len(body.encode()) > MAX_SOUL_BYTES:
+        raise ValueError(f"body is larger than {MAX_SOUL_BYTES} bytes")
+
+    doc = body or "\n".join([
+        f"# {skill.replace('-', ' ').title()}", "",
+        "## Overview", description, "",
+        "## When to use", when or f"When the user asks about {skill.replace('-', ' ')}.", "",
+        "## Steps", *[f"{i}. {step}" for i, step in enumerate(steps, 1)], "",
+    ])
+    front = (f"---\nname: {skill}\ndescription: \"{description}\"\nversion: 1.0.0\n"
+             f"metadata:\n  hermes:\n    tags: [taught]\n---\n\n")
+    dest = pdir / "skills" / "taught" / skill
+    dest.mkdir(parents=True, exist_ok=True)
+    existing = (dest / "SKILL.md").exists()
+    if existing:
+        _backup(pdir, f"skills/taught/{skill}/SKILL.md")
+    (dest / "SKILL.md").write_text(front + doc.strip() + "\n")
+
+    # a taught skill is useless if the category sits in the disabled list
+    cfg_path = pdir / "config.yaml"
+    cfg = forge.load_yaml(cfg_path)
+    skills_cfg = cfg.get("skills") if isinstance(cfg.get("skills"), dict) else {}
+    disabled = [d for d in (skills_cfg.get("disabled") or []) if d != skill]
+    if disabled != (skills_cfg.get("disabled") or []):
+        skills_cfg["disabled"] = disabled
+        cfg["skills"] = skills_cfg
+        forge.dump_yaml(cfg_path, cfg)
+    return {"ok": True, "name": pdir.name, "skill": skill, "updated": existing,
+            "path": str(dest / "SKILL.md"),
+            "note": f"{pdir.name} can now load this with skill_view('{skill}') — try asking it to use it"}
+
+
+OPS = {"teach": op_teach, "update": op_update, "copy": op_copy, "export": op_export, "import": op_import, "delete": op_delete,
        "hide": lambda s, r, st: op_hide(s, r, st, True), "show": lambda s, r, st: op_hide(s, r, st, False)}
 
 

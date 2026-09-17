@@ -4,8 +4,8 @@ from pathlib import Path
 
 from . import schemas, tools
 
-_SETTINGS = ("inherit_model", "share_login", "fallback_model", "probe_local_models", "install_gateway",
-             "allow_delete", "backup_before_delete")
+_SETTINGS = ("inherit_model", "fallback_model", "probe_local_models", "install_gateway",
+             "allow_delete", "backup_before_delete", "suggest_connectors")
 
 
 def register(ctx):
@@ -22,6 +22,8 @@ def register(ctx):
                       description="Ask another Hermes Bot something and return its reply")
 
     for name, schema, handler, emoji, blurb in (
+        ("create_team", schemas.CREATE_TEAM, tools.create_team, "🧬", "Build a team of Bots with a lead"),
+        ("teach_agent", schemas.TEACH_AGENT, tools.teach_agent, "🎓", "Teach a Bot a repeatable skill"),
         ("update_agent", schemas.UPDATE_AGENT, tools.update_agent, "✏️", "Edit an existing Bot"),
         ("copy_agent", schemas.COPY_AGENT, tools.copy_agent, "👯", "Duplicate a Bot under a new name"),
         ("share_agent", schemas.SHARE_AGENT, tools.share_agent, "📦", "Export a Bot as a shareable archive"),

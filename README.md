@@ -102,7 +102,7 @@ New Bots inherit the model of the Bot that created them. Whether they can use it
 |---|---|---|
 | **API key** (OpenRouter, OpenAI API, Anthropic API, …) | Works immediately — keys are copied to new profiles | Nothing |
 | **Local model** (llama.cpp, Ollama, LM Studio) | Works immediately | Nothing |
-| **OAuth sign-in** (ChatGPT/Codex, Claude subscription, …) | The Bot is created; the result tells you it needs a sign-in | Run the command it gives you once per Bot, **or** set a `fallback_model`, **or** read about `share_login` below |
+| **OAuth sign-in** (ChatGPT/Codex, Claude subscription, …) | The Bot is created; the result tells you it needs a sign-in | Run the command it gives you once per Bot, **or** set a `fallback_model`, **or** see *share one login* below |
 
 ---
 
@@ -120,6 +120,7 @@ plugins:
         fallback_model: {}
         probe_local_models: false
         install_gateway: true
+        suggest_connectors: true
         allow_delete: false
 ```
 
@@ -131,19 +132,17 @@ plugins:
 | `install_gateway` | `true` | Install and start a gateway service per Bot (skipped on Windows). |
 | `allow_delete` | `false` | Let `delete_agent` work at all. Off by default — an agent should not be able to destroy a Bot on its own. |
 | `backup_before_delete` | `true` | Export the Bot to a `.tar.gz` before deleting it, so it can be restored. |
-| `share_login` | `false` | ⚠️ See below. |
+| `suggest_connectors` | `true` | After building a Bot, suggest matching servers from Hermes' MCP catalog. Suggestion only — connecting an account always needs you. |
 
-### ⚠️ `share_login`
+### Optional: share one login across Bots
 
-With `share_login: true`, each new Bot's `auth.json` and `auth.lock` are **symlinked** to your default profile's, so OAuth models work with zero sign-ins.
+The plugin itself never touches credentials. If you want OAuth models to work in new Bots with no per-Bot sign-in, there is an **unsupported** helper you run yourself:
 
-Hermes deliberately gives every profile its own login. Turning this on means:
+```bash
+python extras/share_login.py <bot-name>
+```
 
-- a logout, re-login or auth change in **any** Bot affects **all** of them
-- all Bots share every provider login in your default profile
-- a future Hermes update may undo or refuse the links
-
-It's POSIX only. Use it on a personal machine where you understand the trade-off.
+It points that Bot's `auth.json`/`auth.lock` at the root profile's. Hermes deliberately gives every profile its own login, so understand the trade-off first: a logout in any linked Bot affects all of them, every linked Bot can use every provider login in your root profile, and a Hermes update may undo the links. POSIX only. Undo with `rm <profile>/auth.json <profile>/auth.lock`.
 
 ---
 
@@ -153,6 +152,8 @@ Nine tools, all driven by plain requests in chat:
 
 | Tool | Say this | What it does |
 |---|---|---|
+| `create_team` | *"set me up a content team"* | Builds a whole team at once: a lead plus up to 6 specialists, each reporting to it. The lead learns the roster and delegates. |
+| `teach_agent` | *"remember how I write my weekly report"* | Saves a procedure as a skill the Bot keeps and loads when the job comes up. |
 | `create_agent` | *"make me a bot that writes X posts"* | Builds a Bot: name, face, SOUL.md, memory, tools, skills, routines, approvals, Bot Chat intro, gateway. |
 | `update_agent` | *"make Inkwell funnier"*, *"give Atlas the browser"* | Edits a Bot in place — persona, name, description, memory, tools, skills, model, face, routines. Backs up what it replaces. |
 | `copy_agent` | *"make another one like Inkwell, for LinkedIn"* | Duplicates a Bot under a new name (no chat history, no routines). |
@@ -162,6 +163,12 @@ Nine tools, all driven by plain requests in chat:
 | `import_agent` | *"import this bot"* | Restores a shared Bot and starts it. |
 | `hide_agent` | *"hide Inkwell from the list"* | Hides or unhides it in the roster. It keeps running. |
 | `delete_agent` | *"delete Inkwell"* | Permanent. **Off unless you enable it**, and it must repeat the Bot's exact name. |
+
+### A team in one sentence
+
+> set me up a content team
+
+builds a lead plus its specialists, each with one job, each reporting to the lead, each introduced in its own Bot Chat. A member that fails is rolled back on its own — the rest of the team stands.
 
 ### Guardrails a new Bot is born with
 
@@ -201,6 +208,9 @@ Any failure after step 2 deletes the profile.
 | Edit by chatting | UI | UI | delegation tool | ✅ `update_agent` |
 | Share / import a Bot | templates | markdown teams | ClawHub | ✅ `share_agent` |
 | Approval checkpoints written in at birth | set later | permission cards | policy | ✅ `approvals` |
+| Whole team from one sentence | — | markdown file | — | ✅ `create_team` |
+| Teach a skill by chatting | ✅ | playbooks | ClawHub | ✅ `teach_agent` |
+| Connector suggestions for the job | ✅ | ✅ | — | ✅ from Hermes' MCP catalog |
 | Runs entirely on your machine | — | ✅ | ✅ | ✅ |
 
 ## Troubleshooting

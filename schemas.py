@@ -204,3 +204,80 @@ DELETE_AGENT = {
         "required": ["name", "confirm"],
     },
 }
+
+
+CREATE_TEAM = {
+    "name": "create_team",
+    "description": (
+        "Build a whole team of Bots in one go — use when the user asks for a team, a crew, a department or "
+        "several Bots at once ('set me up a content team', 'hire me a marketing team'). Design every member "
+        "yourself, one job each, no questions. Give `lead` to build a chief of staff that the others report to, "
+        "or `lead_name` to put an existing Bot in charge; the lead learns the roster so it can delegate "
+        "immediately. Up to 6 members, built one at a time — a member that fails is rolled back alone and the "
+        "rest of the team stands. Takes several minutes; say so before calling."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "team": {"type": "string", "description": "short team label, e.g. 'Content'"},
+            "lead": {
+    "type": "object",
+    "properties": {
+        "display_name": {"type": "string"}, "role": {"type": "string"}, "one_job": {"type": "string"},
+        "description": {"type": "string"}, "soul_md": {"type": "string"},
+        "avatar_kind": {"type": "string", "enum": BLOB_KINDS},
+        "toolsets": {"type": "array", "items": {"type": "string", "enum": TOOLSETS}},
+        "skill_categories": {"type": "array", "items": {"type": "string"}},
+        "approvals": {"type": "array", "items": {"type": "string"}},
+        "memory": {"type": "array", "items": {"type": "string"}},
+        "routines": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"name": {"type": "string"}, "schedule": {"type": "string"}, "prompt": {"type": "string"}},
+            "required": ["schedule", "prompt"]}},
+    },
+    "required": ["display_name", "role", "one_job", "soul_md", "toolsets"],
+},
+            "lead_name": {"type": "string", "description": "profile name of an existing Bot to lead instead"},
+            "members": {"type": "array", "maxItems": 6, "items": {
+    "type": "object",
+    "properties": {
+        "display_name": {"type": "string"}, "role": {"type": "string"}, "one_job": {"type": "string"},
+        "description": {"type": "string"}, "soul_md": {"type": "string"},
+        "avatar_kind": {"type": "string", "enum": BLOB_KINDS},
+        "toolsets": {"type": "array", "items": {"type": "string", "enum": TOOLSETS}},
+        "skill_categories": {"type": "array", "items": {"type": "string"}},
+        "approvals": {"type": "array", "items": {"type": "string"}},
+        "memory": {"type": "array", "items": {"type": "string"}},
+        "routines": {"type": "array", "items": {
+            "type": "object",
+            "properties": {"name": {"type": "string"}, "schedule": {"type": "string"}, "prompt": {"type": "string"}},
+            "required": ["schedule", "prompt"]}},
+    },
+    "required": ["display_name", "role", "one_job", "soul_md", "toolsets"],
+}},
+        },
+        "required": ["members"],
+    },
+}
+
+TEACH_AGENT = {
+    "name": "teach_agent",
+    "description": (
+        "Teach a Bot a repeatable procedure it keeps forever — 'remember how I write my weekly report', "
+        "'this is how we onboard a client'. Saves a skill in the Bot's own skills folder that it loads when the "
+        "job comes up. Use `steps` for a normal how-to; use `body` only when you have full skill markdown. "
+        "Prefer this over stuffing long instructions into its SOUL.md."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "name": {"type": "string", "description": "the Bot to teach"},
+            "skill": {"type": "string", "description": "short kebab-case skill name, e.g. 'weekly-report'"},
+            "description": {"type": "string", "description": "one line: what this skill does"},
+            "when": {"type": "string", "description": "when the Bot should reach for it"},
+            "steps": {"type": "array", "items": {"type": "string"}, "description": "ordered, concrete steps"},
+            "body": {"type": "string", "description": "complete SKILL.md markdown instead of steps"},
+        },
+        "required": ["name", "skill"],
+    },
+}

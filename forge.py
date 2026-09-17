@@ -63,8 +63,8 @@ def default_root() -> Path:
     return Path.home() / ".hermes"
 
 
-DEFAULT_SETTINGS = {"inherit_model": True, "share_login": False, "fallback_model": {},
-                    "probe_local_models": False, "install_gateway": True}
+DEFAULT_SETTINGS = {"inherit_model": True, "fallback_model": {},
+                    "probe_local_models": False, "install_gateway": True, "suggest_connectors": True}
 
 
 # ── hermes cli ───────────────────────────────────────────────────────────────
@@ -245,29 +245,6 @@ def bot_chat(root, profile_id, message):
 
 
 # ── model & login ────────────────────────────────────────────────────────────
-def share_root_login(root: Path, pdir: Path) -> bool:
-    """Opt-in (settings.share_login): point the Bot's auth store at the root profile's, so OAuth models work
-    without a per-Bot sign-in. Hermes treats a symlinked store as shared rather than a forked copy.
-
-    Deliberately conservative: never creates or modifies anything inside the root profile, and the swap is
-    atomic. Upstream's default is one login per profile — see the README before enabling this."""
-    if os.name == "nt":
-        return False
-    src = root / "auth.json"
-    if not src.is_file():
-        return False
-    for fname in ("auth.json", "auth.lock"):
-        target, link = root / fname, pdir / fname
-        if not target.exists():  # never create files in the root profile
-            continue
-        tmp = link.with_name(link.name + ".linking")
-        if tmp.is_symlink() or tmp.exists():
-            tmp.unlink()
-        tmp.symlink_to(target)
-        os.replace(tmp, link)
-    return (pdir / "auth.json").is_symlink()
-
-
 def local_model(endpoints=DEFAULT_LOCAL_ENDPOINTS):
     """First model served by a local OpenAI-compatible server (no login needed)."""
     for base in endpoints:
@@ -280,6 +257,35 @@ def local_model(endpoints=DEFAULT_LOCAL_ENDPOINTS):
         if ids:
             return {"default": ids[0], "provider": "custom", "base_url": base.rstrip("/")}
     return None
+
+
+STOPWORDS = {"the", "and", "for", "with", "that", "this", "your", "from", "into", "user", "users", "bot",
+             "agent", "job", "one", "them", "they", "their", "posts", "post", "work", "help", "manage"}
+
+
+def suggest_connectors(root: Path, text: str, limit: int = 3) -> list:
+    """Match the Bot's job against Hermes' own MCP catalog so the user learns what to connect.
+    Suggestions only — connecting an account always needs the user's own sign-in."""
+    text = (text or "").lower()
+    words = {w for w in re.findall(r"[a-z]{3,}", text) if w not in STOPWORDS}
+    if not words:
+        return []
+    try:
+        listing = run(root, "mcp", "catalog", timeout=60, check=False).stdout
+    except Exception:
+        return []
+    scored = []
+    for line in listing.splitlines():
+        m = re.match(r"\s{2,}([a-z0-9][a-z0-9-]{1,40})\s{2,}(available|configured)\s{2,}(.+)", line)
+        if not m:
+            continue
+        name, _status, desc = m.group(1), m.group(2), m.group(3).strip()
+        haystack = {w for w in re.findall(r"[a-z]{3,}", f"{name} {desc}".lower())} - STOPWORDS
+        score = len(words & haystack) + (3 if name.split("-")[0] in text else 0)
+        if score:
+            scored.append((score, name, desc))
+    scored.sort(key=lambda s: (-s[0], s[1]))
+    return [{"name": n, "what": d, "connect": f"hermes -p {{bot}} mcp install {n}"} for _s, n, d in scored[:limit]]
 
 
 def disabled_skills(skills_dir: Path, keep_categories: set) -> set:
@@ -322,7 +328,6 @@ def forge(s: dict) -> dict:
         created = True
         if not (pdir / "config.yaml").exists():
             raise RuntimeError(f"profile dir {pdir} missing config.yaml after create")
-        shared_login = share_root_login(root, pdir) if settings["share_login"] else False
 
         # 2. Bot Mode identity + SOUL.md
         write_bot_meta(pdir, display, description, s.get("avatar_kind"))
@@ -396,9 +401,15 @@ def forge(s: dict) -> dict:
             gw = run(root, "-p", profile_id, "gateway", "install", "--start-now", "--start-on-login", check=False, timeout=120)
             gateway = "started" if gw.returncode == 0 else f"not started: {clean(gw.stderr or gw.stdout)[-200:]}"
 
+        connect_next = []
+        if settings.get("suggest_connectors", True):
+            connect_next = [{**c, "connect": c["connect"].format(bot=profile_id)}
+                            for c in suggest_connectors(root, f"{s['role']} {s['one_job']} {description}")]
+
         return {"ok": True, "name": profile_id, "display_name": display, "description": description, "model": model,
+                "connect_next": connect_next,
                 "approvals": approvals, "reports_to": reports_to or None,
-                "shared_login": shared_login, "warning": warning, "toolsets": sorted(tools),
+                "warning": warning, "toolsets": sorted(tools),
                 "skills_disabled": len(disabled), "routines": routines, "gateway": gateway, "intro": reply[-600:],
                 "note": "done — it already introduced itself. Do not message, test or change this Bot; just report."}
     except Exception as e:

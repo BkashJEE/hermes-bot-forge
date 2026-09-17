@@ -23,6 +23,11 @@ try:
 except ImportError:  # pragma: no cover
     manage = None
 
+try:
+    import team  # noqa: E402
+except ImportError:  # pragma: no cover
+    team = None
+
 
 def make_root(tmp: Path, profiles=(), titles=None, root_display=None):
     root = tmp / ".hermes"
@@ -264,3 +269,68 @@ class Manage(unittest.TestCase):
             root = make_root(Path(t))
             out = manage.manage({"op": "import", "hermes_root": str(root), "path": str(Path(t) / "nope.tar.gz")})
             self.assertFalse(out["ok"])
+
+
+class Connectors(unittest.TestCase):
+    def test_no_suggestions_without_meaningful_words(self):
+        self.assertEqual(forge.suggest_connectors(Path("/nonexistent"), ""), [])
+
+
+@unittest.skipIf(manage is None, "manage module not importable")
+class Teach(unittest.TestCase):
+    def _bot(self, root):
+        d = root / "profiles" / "quill"
+        (d / "memories").mkdir(parents=True, exist_ok=True)
+        (d / "config.yaml").write_text(yaml.safe_dump({"skills": {"disabled": ["weekly-report", "other"]}}))
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}))
+        (d / "SOUL.md").write_text("# Quill\n\nYou are **Quill**, a writer.\n")
+        return d
+
+    def test_teach_writes_skill_and_enables_it(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            pdir = self._bot(root)
+            out = manage.manage({"op": "teach", "hermes_root": str(root), "name": "quill",
+                                 "skill": "weekly-report", "description": "How we write the weekly report.",
+                                 "steps": ["Collect the week's commits", "Draft three bullets"]})
+            self.assertTrue(out["ok"], out)
+            doc = (pdir / "skills" / "taught" / "weekly-report" / "SKILL.md").read_text()
+            self.assertIn("name: weekly-report", doc)
+            self.assertIn("1. Collect the week's commits", doc)
+            self.assertNotIn("weekly-report", yaml.safe_load((pdir / "config.yaml").read_text())["skills"]["disabled"])
+
+    def test_teach_needs_steps_or_body(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root)
+            out = manage.manage({"op": "teach", "hermes_root": str(root), "name": "quill", "skill": "x"})
+            self.assertFalse(out["ok"])
+            self.assertIn("steps", out["error"])
+
+
+@unittest.skipIf(team is None, "team module not importable")
+class Team(unittest.TestCase):
+    def test_team_needs_members(self):
+        out = team.build_team({"team": "Content", "members": []})
+        self.assertFalse(out["ok"])
+        self.assertIn("at least one member", out["error"])
+
+    def test_unknown_lead_is_refused_before_building(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            out = team.build_team({"hermes_root": str(root), "lead_name": "nobody",
+                                   "members": [{"display_name": "Quill", "role": "Writer", "one_job": "writes",
+                                                "soul_md": "# Quill\n", "toolsets": []}]})
+            self.assertFalse(out["ok"])
+            self.assertIn("nobody", out["error"])
+            self.assertEqual(list((root / "profiles").iterdir()), [])
+
+    def test_lead_learns_the_roster(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t), profiles=["ceo"])
+            (root / "profiles" / "ceo" / "memories").mkdir(parents=True)
+            team._tell_lead(root, "ceo", "Content", [{"name": "quill", "display_name": "Quill",
+                                                      "description": "writes posts"}])
+            mem = (root / "profiles" / "ceo" / "memories" / "MEMORY.md").read_text()
+            self.assertIn("@quill", mem)
+            self.assertIn("Content team", mem)

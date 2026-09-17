@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.2.0
+version: 0.3.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -77,6 +77,12 @@ intro: <first line of intro>
 - **"share X" / "back X up"** → `share_agent`. **"import this bot"** → `import_agent`.
 - **"X is cluttering my list"** → `hide_agent` (not delete).
 - **"delete X"** → `delete_agent` with `confirm` set to X's exact profile name. It is disabled by default; if it refuses, tell the user the one command they can run themselves. Never delete a Bot the user didn't name in this conversation.
+
+## Teams
+"set me up a <kind> team", "hire me a crew" → `create_team`. Design a lead (chief of staff) plus 2-4 specialists, one job each, and pass them in one call — never loop `create_agent`. Use `lead_name` when an obvious boss Bot already exists. Tell the user it takes a few minutes before you call it.
+
+## Teaching
+"remember how I do X", "this is how we handle Y" → `teach_agent` with concrete `steps`. Keep SOUL.md for who the Bot is; put procedures in skills.
 
 ## Guardrails at birth
 Give every new Bot an `approvals` list — the things it must ask about (publish, send, buy, delete) — and `reports_to` when there is an obvious boss Bot (check `list_agents`). Both are written into its SOUL.md and memory.

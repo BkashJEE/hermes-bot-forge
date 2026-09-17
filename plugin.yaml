@@ -1,5 +1,5 @@
 name: bot-forge
-version: 0.2.0
+version: 0.3.0
 description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
 author: Bikash Joshi
 license: MIT
@@ -9,6 +9,8 @@ kind: standalone
 requires_hermes: ">=0.21"
 provides_tools:
   - create_agent
+  - create_team
+  - teach_agent
   - update_agent
   - copy_agent
   - list_agents
@@ -23,13 +25,6 @@ config_schema:
     type: bool
     default: true
     description: New Bots use the model of the profile that asked for them (like Bot Mode's New Agent).
-  share_login:
-    type: bool
-    default: false
-    description: >-
-      OFF by default. Symlink each new Bot's auth.json/auth.lock to the root profile's, so OAuth models
-      (e.g. ChatGPT/Codex) work with no per-Bot sign-in. This goes against Hermes' one-login-per-profile
-      design: a logout or auth change in any Bot affects all of them. POSIX only.
   fallback_model:
     type: dict
     default: {}
@@ -48,6 +43,10 @@ config_schema:
     type: bool
     default: true
     description: Export a Bot to a .tar.gz archive before delete_agent removes it.
+  suggest_connectors:
+    type: bool
+    default: true
+    description: Suggest matching MCP servers from Hermes' own catalog when a Bot is created (suggestion only — connecting an account always needs the user).
   install_gateway:
     type: bool
     default: true

@@ -88,6 +88,26 @@ def _manage(op: str, args: dict, settings: dict | None = None) -> str:
         return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
 
 
+def create_team(args: dict, settings: dict | None = None, **kwargs) -> str:
+    root = hermes_root()
+    spec = {**args, "launch_profile": launch_profile(kwargs.get("session_id"), root),
+            "hermes_root": str(root), "settings": settings or {}}
+    try:
+        p = subprocess.run([sys.executable, str(PLUGIN_DIR / "team.py"), "-"], input=json.dumps(spec),
+                           capture_output=True, text=True, timeout=3600)
+    except subprocess.TimeoutExpired:
+        return json.dumps({"ok": False, "error": "create_team timed out after 60 min"})
+    out = p.stdout.strip()
+    try:
+        return json.dumps(json.loads(out[out.index("{"):]))
+    except ValueError:
+        return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
+
+
+def teach_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
+    return _manage("teach", args, settings)
+
+
 def update_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
     return _manage("update", args, settings)
 

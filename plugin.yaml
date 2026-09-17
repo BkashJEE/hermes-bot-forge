@@ -1,15 +1,22 @@
 name: bot-forge
-version: 0.1.1
+version: 0.2.0
 description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
 author: Bikash Joshi
 license: MIT
 homepage: https://github.com/BkashJEE/hermes-bot-forge
 tags: [bots, bot-mode, profiles, agents, multi-agent, automation]
 kind: standalone
+requires_hermes: ">=0.21"
 provides_tools:
   - create_agent
+  - update_agent
+  - copy_agent
   - list_agents
   - ask_agent
+  - share_agent
+  - import_agent
+  - hide_agent
+  - delete_agent
 provides_hooks: []
 config_schema:
   inherit_model:
@@ -31,6 +38,16 @@ config_schema:
     type: bool
     default: false
     description: If no fallback_model is set, look for a local OpenAI-compatible server (llama.cpp, Ollama, LM Studio) to fall back to.
+  allow_delete:
+    type: bool
+    default: false
+    description: >-
+      Allow the delete_agent tool to permanently delete a Bot. Off by default: an agent should never be able to
+      destroy a Bot and its chats on its own. Even when on, the call must pass the Bot's exact profile name.
+  backup_before_delete:
+    type: bool
+    default: true
+    description: Export a Bot to a .tar.gz archive before delete_agent removes it.
   install_gateway:
     type: bool
     default: true

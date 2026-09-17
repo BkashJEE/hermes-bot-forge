@@ -1,4 +1,8 @@
 <p align="center">
+  <a href="https://github.com/BkashJEE/hermes-bot-forge/actions/workflows/tests.yml"><img src="https://github.com/BkashJEE/hermes-bot-forge/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
+</p>
+
+<p align="center">
   <img src="docs/banner.png" alt="Bot Forge — one sentence to a complete, working Hermes Bot" width="100%">
 </p>
 
@@ -72,7 +76,7 @@ Then quit and reopen **Hermes Desktop**.
 hermes plugins list | grep bot-forge
 ```
 
-Or ask your agent: *"what tools do you have for creating agents?"* — it should name `create_agent`, `list_agents` and `ask_agent`.
+Or ask your agent: *"what tools do you have for creating agents?"* — it should name `create_agent`, `update_agent`, `list_agents` and the rest.
 
 ### 6. Make your first Bot
 
@@ -116,6 +120,7 @@ plugins:
         fallback_model: {}
         probe_local_models: false
         install_gateway: true
+        allow_delete: false
 ```
 
 | Key | Default | Meaning |
@@ -124,6 +129,8 @@ plugins:
 | `fallback_model` | `{}` | Model to switch a Bot to when its inherited model can't sign in, e.g. `{default: qwen3, provider: custom, base_url: http://127.0.0.1:8080/v1}`. |
 | `probe_local_models` | `false` | With no `fallback_model`, look for a local llama.cpp / Ollama / LM Studio server to fall back to. |
 | `install_gateway` | `true` | Install and start a gateway service per Bot (skipped on Windows). |
+| `allow_delete` | `false` | Let `delete_agent` work at all. Off by default — an agent should not be able to destroy a Bot on its own. |
+| `backup_before_delete` | `true` | Export the Bot to a `.tar.gz` before deleting it, so it can be restored. |
 | `share_login` | `false` | ⚠️ See below. |
 
 ### ⚠️ `share_login`
@@ -142,11 +149,28 @@ It's POSIX only. Use it on a personal machine where you understand the trade-off
 
 ## Tools
 
-| Tool | What it does |
-|---|---|
-| `create_agent` | Builds a Bot from your agent's design: name, role, SOUL.md, toolsets, skill categories, routines, face. |
-| `list_agents` | Lists Bots with name, description and model — used to avoid duplicates and name clashes. |
-| `ask_agent` | Asks another Bot something and waits for the reply. In a Bot Chat, Hermes' built-in `message_agent` is the fire-and-forget alternative. |
+Nine tools, all driven by plain requests in chat:
+
+| Tool | Say this | What it does |
+|---|---|---|
+| `create_agent` | *"make me a bot that writes X posts"* | Builds a Bot: name, face, SOUL.md, memory, tools, skills, routines, approvals, Bot Chat intro, gateway. |
+| `update_agent` | *"make Inkwell funnier"*, *"give Atlas the browser"* | Edits a Bot in place — persona, name, description, memory, tools, skills, model, face, routines. Backs up what it replaces. |
+| `copy_agent` | *"make another one like Inkwell, for LinkedIn"* | Duplicates a Bot under a new name (no chat history, no routines). |
+| `list_agents` | *"what bots do I have?"* | Roster with description, model, routine count and hidden state. |
+| `ask_agent` | *"ask Inkwell for 3 post ideas"* | Sends a task to another Bot and returns its reply. |
+| `share_agent` | *"export Inkwell so I can send it to a friend"* | Packs the Bot into a `.tar.gz` — persona, memory, skills, config, routines. **No keys or logins.** |
+| `import_agent` | *"import this bot"* | Restores a shared Bot and starts it. |
+| `hide_agent` | *"hide Inkwell from the list"* | Hides or unhides it in the roster. It keeps running. |
+| `delete_agent` | *"delete Inkwell"* | Permanent. **Off unless you enable it**, and it must repeat the Bot's exact name. |
+
+### Guardrails a new Bot is born with
+
+`create_agent` takes an `approvals` list and a `reports_to` Bot, written into the new Bot's SOUL.md and memory:
+
+> **Ask first** — never do these without the user saying yes: publish or send anything; spend money; delete files.
+> **Escalate to** — @ceo for scope, priorities and final calls.
+
+So a Bot that drafts posts never publishes one, and knows who to escalate to.
 
 Bundled skill: `bot-forge:bot-forge` — role defaults, naming rules and a SOUL.md template your agent follows.
 
@@ -167,6 +191,18 @@ Any failure after step 2 deletes the profile.
 
 > **Note:** step 3 writes Desktop's Bot Mode metadata directly. It isn't a public API and may change between Hermes releases.
 
+## What makes it different
+
+| | Grok Bots | OpenMausBot | OpenClaw | **Bot Forge** |
+|---|---|---|---|---|
+| Build a Bot from one sentence, no dialog | partial | roster UI | config/CLI | ✅ |
+| Tested before you get it, rolled back on failure | — | — | — | ✅ |
+| Persona file you can read and edit | instructions | `SOUL.md` | `SOUL.md` | ✅ `SOUL.md` |
+| Edit by chatting | UI | UI | delegation tool | ✅ `update_agent` |
+| Share / import a Bot | templates | markdown teams | ClawHub | ✅ `share_agent` |
+| Approval checkpoints written in at birth | set later | permission cards | policy | ✅ `approvals` |
+| Runs entirely on your machine | — | ✅ | ✅ | ✅ |
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -177,6 +213,8 @@ Any failure after step 2 deletes the profile.
 | New Bot says it needs a sign-in | See step 7 |
 | New Bot doesn't appear in the roster | Click another Bot and back, or reopen Hermes Desktop |
 | Gateway "not started" | Run `hermes -p <bot> gateway install --start-now` and read its output |
+| An edit didn't take | Changes apply on the Bot's next turn; send it a message. Previous files are in `<profile>/backups/bot-forge/` |
+| `delete_agent` refuses | By design: set `allow_delete: true`, or run `hermes profile delete <name>` yourself |
 
 ## Uninstall
 

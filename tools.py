@@ -1,6 +1,7 @@
 """Tool handlers. Bot creation runs forge.py in a subprocess with a clean environment, so the calling
 agent's per-session overrides (HOME / HERMES_HOME) never leak into the Bot being built or asked."""
 
+import contextlib
 import json
 import os
 import re
@@ -20,6 +21,8 @@ def hermes_root() -> Path:
         from hermes_constants import get_default_hermes_root
         return Path(get_default_hermes_root())
     except Exception:
+        if os.name == "nt":
+            return Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "hermes"
         return Path.home() / ".hermes"
 
 
@@ -46,7 +49,7 @@ def launch_profile(session_id=None, root=None) -> str:
             if not db.exists():
                 continue
             try:
-                with sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=2) as c:
+                with contextlib.closing(sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=2)) as c:
                     if c.execute("select 1 from sessions where id=? limit 1", (session_id,)).fetchone():
                         return name
             except sqlite3.Error:
@@ -70,6 +73,45 @@ def create_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
         return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
 
 
+def _manage(op: str, args: dict, settings: dict | None = None) -> str:
+    root = hermes_root()
+    spec = {**args, "op": op, "hermes_root": str(root), "settings": settings or {}}
+    try:
+        p = subprocess.run([sys.executable, str(PLUGIN_DIR / "manage.py"), "-"], input=json.dumps(spec),
+                           capture_output=True, text=True, timeout=900)
+    except subprocess.TimeoutExpired:
+        return json.dumps({"ok": False, "error": f"{op} timed out after 15 min"})
+    out = p.stdout.strip()
+    try:
+        return json.dumps(json.loads(out[out.index("{"):]))
+    except ValueError:
+        return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
+
+
+def update_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
+    return _manage("update", args, settings)
+
+
+def copy_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
+    return _manage("copy", args, settings)
+
+
+def share_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
+    return _manage("export", args, settings)
+
+
+def import_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
+    return _manage("import", args, settings)
+
+
+def hide_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
+    return _manage("hide" if args.get("hidden", True) else "show", args, settings)
+
+
+def delete_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
+    return _manage("delete", args, settings)
+
+
 def _profile_info(name, home):
     import yaml
     cfg, meta = {}, {}
@@ -79,8 +121,20 @@ def _profile_info(name, home):
         except Exception:
             pass
     bots = (meta.get("ui_meta") or {}).get("hermes-bots") or {}
-    return {"name": name, "display_name": (bots.get("title") if isinstance(bots, dict) else None) or meta.get("display_name") or name,
-            "description": (meta.get("description") or "").strip(), "model": (cfg.get("model") or {}).get("default") or ""}
+    bots = bots if isinstance(bots, dict) else {}
+    info = {"name": name, "display_name": bots.get("title") or meta.get("display_name") or name,
+            "description": (meta.get("description") or "").strip(),
+            "model": (cfg.get("model") or {}).get("default") or ""}
+    if bots.get("hidden"):
+        info["hidden"] = True
+    try:
+        jobs = json.loads((home / "cron" / "jobs.json").read_text())
+        count = len(jobs.get("jobs", jobs) if isinstance(jobs, dict) else jobs)
+        if count:
+            info["routines"] = count
+    except Exception:
+        pass
+    return info
 
 
 def list_agents(args: dict, **kwargs) -> str:

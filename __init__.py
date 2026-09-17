@@ -4,7 +4,8 @@ from pathlib import Path
 
 from . import schemas, tools
 
-_SETTINGS = ("inherit_model", "share_login", "fallback_model", "probe_local_models", "install_gateway")
+_SETTINGS = ("inherit_model", "share_login", "fallback_model", "probe_local_models", "install_gateway",
+             "allow_delete", "backup_before_delete")
 
 
 def register(ctx):
@@ -19,6 +20,18 @@ def register(ctx):
     ctx.register_tool(name="ask_agent", toolset="bot_forge", schema=schemas.ASK_AGENT,
                       handler=tools.ask_agent, emoji="📨",
                       description="Ask another Hermes Bot something and return its reply")
+
+    for name, schema, handler, emoji, blurb in (
+        ("update_agent", schemas.UPDATE_AGENT, tools.update_agent, "✏️", "Edit an existing Bot"),
+        ("copy_agent", schemas.COPY_AGENT, tools.copy_agent, "👯", "Duplicate a Bot under a new name"),
+        ("share_agent", schemas.SHARE_AGENT, tools.share_agent, "📦", "Export a Bot as a shareable archive"),
+        ("import_agent", schemas.IMPORT_AGENT, tools.import_agent, "📥", "Import a Bot from an archive"),
+        ("hide_agent", schemas.HIDE_AGENT, tools.hide_agent, "🙈", "Hide or unhide a Bot in the roster"),
+        ("delete_agent", schemas.DELETE_AGENT, tools.delete_agent, "🗑️", "Delete a Bot (off unless enabled)"),
+    ):
+        ctx.register_tool(name=name, toolset="bot_forge", schema=schema,
+                          handler=(lambda h: lambda args, **kw: h(args, settings=settings(), **kw))(handler),
+                          emoji=emoji, description=blurb)
 
     skills_dir = Path(__file__).parent / "skills"
     for child in sorted(skills_dir.iterdir()):

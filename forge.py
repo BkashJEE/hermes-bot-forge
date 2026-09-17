@@ -55,6 +55,14 @@ COOL_NAMES = ["Nova", "Quill", "Atlas", "Vega", "Orion", "Juno", "Onyx", "Sable"
 NOISE = ("hermes update", "Gateways may", "hermes gateway restart", "tirith security scanner")
 ASSISTANT_NAMING = re.compile(r"\b(call|calls|called|name|names|named)\b.{0,40}\bassistant\b|"
                               r"\bassistant\b.{0,40}\b(name|named|called)\b", re.I)
+def default_root() -> Path:
+    """Hermes root when the caller didn't pass one (Windows keeps it under LOCALAPPDATA)."""
+    if os.name == "nt":
+        base = os.environ.get("LOCALAPPDATA") or str(Path.home())
+        return Path(base) / "hermes"
+    return Path.home() / ".hermes"
+
+
 DEFAULT_SETTINGS = {"inherit_model": True, "share_login": False, "fallback_model": {},
                     "probe_local_models": False, "install_gateway": True}
 
@@ -63,7 +71,7 @@ DEFAULT_SETTINGS = {"inherit_model": True, "share_login": False, "fallback_model
 def cli_env(root: Path):
     """Clean env for `hermes`: drop the calling session's HERMES_* overrides; keep a custom root."""
     env = {k: v for k, v in os.environ.items() if not k.startswith("HERMES_")}
-    if root.resolve() != (Path.home() / ".hermes").resolve():
+    if root.resolve() != default_root().resolve():
         env["HERMES_HOME"] = str(root)
     return env
 
@@ -89,8 +97,15 @@ def load_yaml(path: Path) -> dict:
 
 
 def dump_yaml(path: Path, data: dict):
+    """Atomic write that keeps the original file mode — a cloned config.yaml is 0600 and may hold
+    provider settings, so a default-umask rewrite would make it world-readable."""
+    mode = path.stat().st_mode & 0o777 if path.exists() else 0o600
     tmp = path.with_name(path.name + ".tmp")
-    tmp.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
+    with open(tmp, "w", encoding="utf-8") as fh:
+        yaml.safe_dump(data, fh, sort_keys=False, allow_unicode=True)
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.chmod(tmp, mode)
     tmp.replace(path)
 
 
@@ -146,6 +161,17 @@ def pick_name(requested, taken):
 
 
 # ── identity ─────────────────────────────────────────────────────────────────
+def guardrails_block(approvals, reports_to) -> str:
+    """Explicit approval checkpoints + escalation target, appended when the author's SOUL.md lacks them."""
+    parts = []
+    if approvals:
+        parts.append("## Ask first\nNever do these without the user saying yes in this chat:\n"
+                     + "\n".join(f"- {a}" for a in approvals))
+    if reports_to:
+        parts.append(f"## Escalate to\n- @{reports_to} for scope, priorities and final calls.")
+    return ("\n\n" + "\n\n".join(parts) + "\n") if parts else ""
+
+
 def ensure_identity(soul: str, display: str, role: str, profile_id: str) -> str:
     """The Bot's own name must be explicit in SOUL.md or it borrows one from shared memory."""
     if f"You are **{display}**" in soul:
@@ -220,17 +246,26 @@ def bot_chat(root, profile_id, message):
 
 # ── model & login ────────────────────────────────────────────────────────────
 def share_root_login(root: Path, pdir: Path) -> bool:
-    """Opt-in (settings.share_login): symlink auth.json + auth.lock to the root profile's so OAuth models work
-    without a per-Bot sign-in. Hermes treats a symlinked store as shared rather than a forked copy."""
-    if os.name == "nt" or not (root / "auth.json").exists():
+    """Opt-in (settings.share_login): point the Bot's auth store at the root profile's, so OAuth models work
+    without a per-Bot sign-in. Hermes treats a symlinked store as shared rather than a forked copy.
+
+    Deliberately conservative: never creates or modifies anything inside the root profile, and the swap is
+    atomic. Upstream's default is one login per profile — see the README before enabling this."""
+    if os.name == "nt":
+        return False
+    src = root / "auth.json"
+    if not src.is_file():
         return False
     for fname in ("auth.json", "auth.lock"):
         target, link = root / fname, pdir / fname
-        target.touch(exist_ok=True)
-        if link.is_symlink() or link.exists():
-            link.unlink()
-        link.symlink_to(target)
-    return True
+        if not target.exists():  # never create files in the root profile
+            continue
+        tmp = link.with_name(link.name + ".linking")
+        if tmp.is_symlink() or tmp.exists():
+            tmp.unlink()
+        tmp.symlink_to(target)
+        os.replace(tmp, link)
+    return (pdir / "auth.json").is_symlink()
 
 
 def local_model(endpoints=DEFAULT_LOCAL_ENDPOINTS):
@@ -261,7 +296,7 @@ def disabled_skills(skills_dir: Path, keep_categories: set) -> set:
 
 # ── main ─────────────────────────────────────────────────────────────────────
 def forge(s: dict) -> dict:
-    root = Path(s.get("hermes_root") or Path.home() / ".hermes")
+    root = Path(s.get("hermes_root") or default_root())
     settings = {**DEFAULT_SETTINGS, **{k: v for k, v in (s.get("settings") or {}).items() if v is not None}}
     if not s.get("role"):
         return {"ok": False, "error": "spec needs at least 'role'"}
@@ -272,11 +307,18 @@ def forge(s: dict) -> dict:
     s.setdefault("one_job", f"acts as the user's {s['role']}")
     description = s.get("description") or f"{s['role']}: {s['one_job']}."
     soul = ensure_identity(s.get("soul_md") or render_soul(s, profile_id), display, s["role"], profile_id)
+    approvals = [a for a in (s.get("approvals") or []) if isinstance(a, str)]
+    reports_to = (s.get("reports_to") or "").strip().lstrip("@")
+    if approvals and "## Ask first" not in soul:
+        soul += guardrails_block(approvals, "")
+    if reports_to and "## Escalate to" not in soul:
+        soul += guardrails_block([], reports_to)
     pdir = root / "profiles" / profile_id
     created = False
     try:
         # 1. profile (config, keys, skills from the root profile; messaging channels left behind)
-        run(root, "profile", "create", profile_id, "--clone-from", "default", "--description", description)
+        run(root, "profile", "create", profile_id, "--clone-from", "default", "--description", description,
+            timeout=600)
         created = True
         if not (pdir / "config.yaml").exists():
             raise RuntimeError(f"profile dir {pdir} missing config.yaml after create")
@@ -295,6 +337,10 @@ def forge(s: dict) -> dict:
             (mem / "USER.md").write_text(filter_user_memory(user_md.read_text(), others))
         facts = [f"My name is {display}. I am the {s['role']} (profile `{profile_id}`). I always introduce myself "
                  f"as {display}, never by another Bot's name. My one job: {s['one_job']}."] + list(s.get("memory") or [])
+        if approvals:
+            facts.append("I ask the user before: " + "; ".join(approvals) + ".")
+        if reports_to:
+            facts.append(f"I escalate scope and priority calls to @{reports_to}.")
         (mem / "MEMORY.md").write_text("\n§\n".join(facts) + "\n")
 
         # 4. config: tools, skills, model
@@ -351,16 +397,23 @@ def forge(s: dict) -> dict:
             gateway = "started" if gw.returncode == 0 else f"not started: {clean(gw.stderr or gw.stdout)[-200:]}"
 
         return {"ok": True, "name": profile_id, "display_name": display, "description": description, "model": model,
+                "approvals": approvals, "reports_to": reports_to or None,
                 "shared_login": shared_login, "warning": warning, "toolsets": sorted(tools),
                 "skills_disabled": len(disabled), "routines": routines, "gateway": gateway, "intro": reply[-600:],
                 "note": "done — it already introduced itself. Do not message, test or change this Bot; just report."}
     except Exception as e:
+        rolled_back = False
         if created:
-            run(root, "profile", "delete", "-y", profile_id, check=False)
+            deleted = run(root, "profile", "delete", "-y", profile_id, check=False, timeout=300)
+            rolled_back = deleted.returncode == 0
             if sys.platform.startswith("linux"):
                 subprocess.run(["systemctl", "--user", "reset-failed", f"hermes-gateway-{profile_id}.service"],
                                capture_output=True)
-        return {"ok": False, "name": profile_id, "error": str(e), "rolled_back": created}
+        result = {"ok": False, "name": profile_id, "error": str(e), "rolled_back": rolled_back}
+        if created and not rolled_back:
+            result["warning"] = (f"could not delete the half-built profile — remove it with "
+                                 f"`hermes profile delete {profile_id}`")
+        return result
 
 
 def main():

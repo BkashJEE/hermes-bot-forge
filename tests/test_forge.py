@@ -18,6 +18,11 @@ try:  # the plugin package (tools.py uses relative-free imports, so plain import
 except ImportError:  # pragma: no cover
     tools = None
 
+try:
+    import manage  # noqa: E402
+except ImportError:  # pragma: no cover
+    manage = None
+
 
 def make_root(tmp: Path, profiles=(), titles=None, root_display=None):
     root = tmp / ".hermes"
@@ -155,3 +160,107 @@ class ForgeValidation(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class Guardrails(unittest.TestCase):
+    def test_guardrails_block_renders_approvals_and_escalation(self):
+        out = forge.guardrails_block(["publish anything", "spend money"], "ceo")
+        self.assertIn("## Ask first", out)
+        self.assertIn("- publish anything", out)
+        self.assertIn("@ceo", out)
+
+    def test_guardrails_block_empty_without_input(self):
+        self.assertEqual(forge.guardrails_block([], ""), "")
+
+
+class ConfigWrites(unittest.TestCase):
+    def test_dump_yaml_keeps_file_mode(self):
+        import os
+        with tempfile.TemporaryDirectory() as t:
+            path = Path(t) / "config.yaml"
+            path.write_text("model: {}\n")
+            os.chmod(path, 0o600)
+            forge.dump_yaml(path, {"model": {"default": "m"}})
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(yaml.safe_load(path.read_text())["model"]["default"], "m")
+
+
+@unittest.skipIf(manage is None, "manage module not importable")
+class Manage(unittest.TestCase):
+    def _bot(self, root, name="quill", title="Quill"):
+        d = root / "profiles" / name
+        (d / "memories").mkdir(parents=True, exist_ok=True)
+        (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web", "file"]}}))
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title,
+                                                                                    "shape": "blobatar:abc:sun"}}}))
+        (d / "SOUL.md").write_text(f"# {title} — Writer\n\nYou are **{title}**, a writer.\n")
+        return d
+
+    def test_unknown_op_is_reported(self):
+        self.assertIn("unknown op", manage.manage({"op": "nope"})["error"])
+
+    def test_bot_lookup_by_title_and_refusal_of_root(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root)
+            self.assertEqual(manage._require_bot(root, "Quill").name, "quill")
+            with self.assertRaises(ValueError):
+                manage._require_bot(root, "default")
+
+    def test_update_appends_soul_and_backs_up(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            pdir = self._bot(root)
+            out = manage.manage({"op": "update", "hermes_root": str(root), "name": "quill",
+                                 "soul_append": "## Voice\nterse."})
+            self.assertTrue(out["ok"], out)
+            self.assertIn("soul", out["changed"])
+            self.assertIn("terse.", (pdir / "SOUL.md").read_text())
+            self.assertTrue(out["backups"]["SOUL.md"])
+
+    def test_update_toolsets_keeps_base_and_adds(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            pdir = self._bot(root)
+            out = manage.manage({"op": "update", "hermes_root": str(root), "name": "quill",
+                                 "add_toolsets": ["image_gen"], "remove_toolsets": ["web"]})
+            self.assertTrue(out["ok"], out)
+            tools_now = yaml.safe_load((pdir / "config.yaml").read_text())["platform_toolsets"]["cli"]
+            self.assertIn("image_gen", tools_now)
+            self.assertIn("web", tools_now)  # base toolsets can't be removed
+
+    def test_update_without_changes_is_refused(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root)
+            self.assertFalse(manage.manage({"op": "update", "hermes_root": str(root), "name": "quill"})["ok"])
+
+    def test_hide_and_show_roundtrip(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            pdir = self._bot(root)
+            manage.manage({"op": "hide", "hermes_root": str(root), "name": "quill"})
+            meta = yaml.safe_load((pdir / "profile.yaml").read_text())
+            self.assertTrue(meta["ui_meta"]["hermes-bots"]["hidden"])
+            self.assertEqual(meta["_ui_meta_revisions"]["hermes-bots"], 1)
+            manage.manage({"op": "show", "hermes_root": str(root), "name": "quill"})
+            self.assertFalse(yaml.safe_load((pdir / "profile.yaml").read_text())["ui_meta"]["hermes-bots"]["hidden"])
+
+    def test_delete_is_off_by_default_and_needs_exact_confirm(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root)
+            off = manage.manage({"op": "delete", "hermes_root": str(root), "name": "quill", "confirm": "quill"})
+            self.assertFalse(off["ok"])
+            self.assertIn("disabled", off["error"])
+            wrong = manage.manage({"op": "delete", "hermes_root": str(root), "name": "quill",
+                                   "confirm": "nope", "settings": {"allow_delete": True}})
+            self.assertFalse(wrong["ok"])
+            self.assertIn("confirm", wrong["error"])
+            self.assertTrue((root / "profiles" / "quill").exists())
+
+    def test_import_rejects_missing_archive(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            out = manage.manage({"op": "import", "hermes_root": str(root), "path": str(Path(t) / "nope.tar.gz")})
+            self.assertFalse(out["ok"])

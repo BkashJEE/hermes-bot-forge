@@ -64,6 +64,17 @@ class Names(unittest.TestCase):
             self.assertTrue({"quill", "maia"} <= names)
 
 
+    def test_deleted_profiles_do_not_block_names(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t), profiles=["kairo"])
+            (root / "profiles" / "quill").mkdir()  # leftover dir without config
+            (root / "profiles" / ".deleted").mkdir()
+            (root / "profiles" / ".deleted" / "kairo").write_text("deleted")
+            names = forge.existing_bot_names(root)
+            self.assertNotIn("quill", names)
+            self.assertNotIn("kairo", names)
+
+
 class Identity(unittest.TestCase):
     def test_identity_inserted_after_heading(self):
         soul = "# Quill — Writer\n\n## Your one job\nWrite."

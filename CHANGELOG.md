@@ -3,6 +3,29 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-09-17
+
+### Added
+- `update_agent` — edit a Bot by chatting: persona (append or replace), name, description, memory, toolsets, skill categories, model, face and routines. Replaced files are backed up under `<profile>/backups/bot-forge/`.
+- `copy_agent` — duplicate a Bot under a new name.
+- `share_agent` / `import_agent` — export a Bot to a `.tar.gz` and import it back. Credentials are never included.
+- `hide_agent` — hide or unhide a Bot in the Desktop roster without touching it.
+- `delete_agent` — permanent delete, disabled unless `allow_delete` is set, requiring the Bot's exact name and backing it up first.
+- `create_agent` now takes `approvals` (checkpoints written into SOUL.md and memory) and `reports_to` (its chief of staff).
+- `list_agents` also reports display name, hidden state and routine count.
+- CI: unit tests on Python 3.11 and 3.12.
+
+### Fixed
+- Rewriting a Bot's `config.yaml` kept the default umask, which could widen the file's permissions; the original mode is now preserved and the write is flushed to disk.
+- Sharing the root login no longer creates or modifies any file inside the root profile, and swaps the link atomically.
+- Rollback now reports whether the half-built profile was really deleted, and tells the user the cleanup command if not.
+- Windows: the fallback Hermes root is `%LOCALAPPDATA%\hermes`.
+- SQLite connections used to find the calling profile are closed (they blocked profile deletion on Windows).
+- `profile create` gets a longer timeout, since it copies the whole skills tree.
+
+### Changed
+- `plugin.yaml` declares `requires_hermes: ">=0.21"`.
+
 ## [0.1.1] - 2026-09-17
 
 ### Fixed

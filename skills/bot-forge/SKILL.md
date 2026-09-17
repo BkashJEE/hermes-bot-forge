@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.1.1
+version: 0.2.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -71,5 +71,15 @@ intro: <first line of intro>
 ```
 - If `warning` is set, add it as one line.
 
+## Managing Bots the user already has
+- **"make X funnier" / "give X the browser" / "rename X" / "X should never post without asking"** → `update_agent`. Send only what changes; prefer `soul_append` over rewriting `soul_md`.
+- **"another one like X"** → `copy_agent`, then `update_agent` to specialise it.
+- **"share X" / "back X up"** → `share_agent`. **"import this bot"** → `import_agent`.
+- **"X is cluttering my list"** → `hide_agent` (not delete).
+- **"delete X"** → `delete_agent` with `confirm` set to X's exact profile name. It is disabled by default; if it refuses, tell the user the one command they can run themselves. Never delete a Bot the user didn't name in this conversation.
+
+## Guardrails at birth
+Give every new Bot an `approvals` list — the things it must ask about (publish, send, buy, delete) — and `reports_to` when there is an obvious boss Bot (check `list_agents`). Both are written into its SOUL.md and memory.
+
 ## Not this skill's job
-Editing Bots (edit their SOUL.md), deleting Bots (`hermes profile delete <name>` — the user runs it), messaging-platform tokens (need the user's token).
+Messaging-platform tokens (need the user's own token), and anything about the user's own main profile — never edit or delete that.

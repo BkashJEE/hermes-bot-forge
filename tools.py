@@ -1,0 +1,114 @@
+"""Tool handlers. Bot creation runs forge.py in a subprocess with a clean environment, so the calling
+agent's per-session overrides (HOME / HERMES_HOME) never leak into the Bot being built or asked."""
+
+import json
+import os
+import re
+import sqlite3
+import subprocess
+import sys
+from pathlib import Path
+
+PLUGIN_DIR = Path(__file__).resolve().parent
+NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
+NOISE = ("hermes update", "Gateways may", "hermes gateway restart", "tirith security scanner")
+
+
+def hermes_root() -> Path:
+    """Root Hermes dir (``<root>/profiles/<name>`` layout), honoring custom HERMES_HOME roots."""
+    try:
+        from hermes_constants import get_default_hermes_root
+        return Path(get_default_hermes_root())
+    except Exception:
+        return Path.home() / ".hermes"
+
+
+def _clean(text):
+    return "\n".join(l for l in (text or "").splitlines() if not any(n in l for n in NOISE)).strip()
+
+
+def launch_profile(session_id=None, root=None) -> str:
+    """Profile of the agent calling the tool. Desktop serves every Bot from one backend process, so
+    prefer the context-local home override, then the profile whose state.db owns the calling session."""
+    root = Path(root or hermes_root())
+    try:
+        from hermes_constants import get_hermes_home_override
+        override = get_hermes_home_override()
+        if override and Path(override).resolve().parent == (root / "profiles").resolve():
+            return Path(override).resolve().name
+    except Exception:
+        pass
+    if session_id:
+        profiles = root / "profiles"
+        homes = [("default", root)] + (sorted((d.name, d) for d in profiles.iterdir() if d.is_dir()) if profiles.is_dir() else [])
+        for name, home in homes:
+            db = home / "state.db"
+            if not db.exists():
+                continue
+            try:
+                with sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=2) as c:
+                    if c.execute("select 1 from sessions where id=? limit 1", (session_id,)).fetchone():
+                        return name
+            except sqlite3.Error:
+                continue
+    return "default"
+
+
+def create_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
+    root = hermes_root()
+    spec = {**args, "launch_profile": launch_profile(kwargs.get("session_id"), root),
+            "hermes_root": str(root), "settings": settings or {}}
+    try:
+        p = subprocess.run([sys.executable, str(PLUGIN_DIR / "forge.py"), "-"], input=json.dumps(spec),
+                           capture_output=True, text=True, timeout=900)
+    except subprocess.TimeoutExpired:
+        return json.dumps({"ok": False, "error": "create_agent timed out after 15 min"})
+    out = p.stdout.strip()
+    try:
+        return json.dumps(json.loads(out[out.index("{"):]))
+    except ValueError:
+        return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
+
+
+def _profile_info(name, home):
+    import yaml
+    cfg, meta = {}, {}
+    for fname, target in (("config.yaml", cfg), ("profile.yaml", meta)):
+        try:
+            target.update(yaml.safe_load((home / fname).read_text()) or {})
+        except Exception:
+            pass
+    bots = (meta.get("ui_meta") or {}).get("hermes-bots") or {}
+    return {"name": name, "display_name": (bots.get("title") if isinstance(bots, dict) else None) or meta.get("display_name") or name,
+            "description": (meta.get("description") or "").strip(), "model": (cfg.get("model") or {}).get("default") or ""}
+
+
+def list_agents(args: dict, **kwargs) -> str:
+    root = hermes_root()
+    agents = [_profile_info("default", root)]
+    profiles = root / "profiles"
+    if profiles.is_dir():
+        agents += [_profile_info(d.name, d) for d in sorted(profiles.iterdir()) if (d / "config.yaml").exists()]
+    return json.dumps({"agents": agents})
+
+
+def ask_agent(args: dict, **kwargs) -> str:
+    root = hermes_root()
+    name = (args.get("name") or "").strip().lower()
+    message = (args.get("message") or "").strip()
+    if not NAME_RE.match(name) or not message:
+        return json.dumps({"ok": False, "error": "need a valid profile name and a message"})
+    if name != "default" and not (root / "profiles" / name / "config.yaml").exists():
+        return json.dumps({"ok": False, "error": f"no Bot named '{name}' (see list_agents)"})
+    env = {k: v for k, v in os.environ.items() if k != "HERMES_HOME"}
+    try:
+        p = subprocess.run(["hermes", "-p", name, "chat", "-Q", "--max-turns", "30", "-q", message],
+                           capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=900, env=env)
+    except subprocess.TimeoutExpired:
+        return json.dumps({"ok": False, "error": f"{name} did not answer within 15 min"})
+    except FileNotFoundError:
+        return json.dumps({"ok": False, "error": "hermes CLI not found on PATH"})
+    reply = _clean(p.stdout)
+    if p.returncode != 0 or not reply:
+        return json.dumps({"ok": False, "error": _clean(p.stderr or p.stdout)[-1500:]})
+    return json.dumps({"ok": True, "name": name, "reply": reply[-6000:]})

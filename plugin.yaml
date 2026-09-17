@@ -1,0 +1,39 @@
+name: bot-forge
+version: 0.1.0
+manifest_version: 2
+api_version: 1
+description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
+author: Bikash Joshi
+license: MIT
+homepage: https://github.com/BkashJEE/hermes-bot-forge
+tags: [bots, bot-mode, profiles, agents, multi-agent, automation]
+kind: standalone
+provides_tools:
+  - create_agent
+  - list_agents
+  - ask_agent
+provides_hooks: []
+config_schema:
+  inherit_model:
+    type: bool
+    default: true
+    description: New Bots use the model of the profile that asked for them (like Bot Mode's New Agent).
+  share_login:
+    type: bool
+    default: false
+    description: >-
+      OFF by default. Symlink each new Bot's auth.json/auth.lock to the root profile's, so OAuth models
+      (e.g. ChatGPT/Codex) work with no per-Bot sign-in. This goes against Hermes' one-login-per-profile
+      design: a logout or auth change in any Bot affects all of them. POSIX only.
+  fallback_model:
+    type: dict
+    default: {}
+    description: "Model block ({default, provider, base_url}) to switch a Bot to when its inherited model can't sign in."
+  probe_local_models:
+    type: bool
+    default: false
+    description: If no fallback_model is set, look for a local OpenAI-compatible server (llama.cpp, Ollama, LM Studio) to fall back to.
+  install_gateway:
+    type: bool
+    default: true
+    description: Install and start a background gateway service for each new Bot (systemd/launchd; skipped on Windows).

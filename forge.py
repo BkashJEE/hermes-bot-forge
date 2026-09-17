@@ -104,11 +104,17 @@ def slug(name):
     return re.sub(r"[^a-z0-9]", "", name.lower())[:24]
 
 
+def is_live_profile(d: Path) -> bool:
+    """A real, not-deleted profile. `hermes profile delete` can leave an empty dir plus a tombstone in .deleted/."""
+    return (d.is_dir() and not d.name.startswith(".") and (d / "config.yaml").exists()
+            and not (d.parent / ".deleted" / d.name).exists())
+
+
 def existing_bot_names(root: Path) -> set:
     """Lowercased profile ids, display names and Bot Mode titles already in use (root profile included)."""
     names = set()
     profiles = root / "profiles"
-    homes = [root] + ([d for d in profiles.iterdir() if d.is_dir() and not d.name.startswith(".")] if profiles.is_dir() else [])
+    homes = [root] + ([d for d in profiles.iterdir() if is_live_profile(d)] if profiles.is_dir() else [])
     for home in homes:
         if home != root:
             names.add(home.name.lower())

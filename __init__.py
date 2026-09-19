@@ -17,6 +17,8 @@ def register(ctx):
                       emoji="🧪", description="Spawn a complete, working Hermes Bot from a design")
     ctx.register_tool(name="list_agents", toolset="bot_forge", schema=schemas.LIST_AGENTS,
                       handler=tools.list_agents, emoji="📋", description="List Hermes Bots on this machine")
+    ctx.register_tool(name="check_agents", toolset="bot_forge", schema=schemas.CHECK_AGENTS,
+                      handler=tools.check_agents, emoji="🩺", description="Health check for all Bots (read-only)")
     ctx.register_tool(name="ask_agent", toolset="bot_forge", schema=schemas.ASK_AGENT,
                       handler=tools.ask_agent, emoji="📨",
                       description="Ask another Hermes Bot something and return its reply")

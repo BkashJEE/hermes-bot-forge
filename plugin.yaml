@@ -1,5 +1,5 @@
 name: bot-forge
-version: 0.3.0
+version: 0.4.0
 description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
 author: Bikash Joshi
 license: MIT
@@ -14,6 +14,7 @@ provides_tools:
   - update_agent
   - copy_agent
   - list_agents
+  - check_agents
   - ask_agent
   - share_agent
   - import_agent

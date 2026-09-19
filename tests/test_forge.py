@@ -96,6 +96,19 @@ class Identity(unittest.TestCase):
         soul = "# Quill\n\nYou are **Quill**, a writer."
         self.assertEqual(forge.ensure_identity(soul, "Quill", "Writer", "quill"), soul)
 
+    def test_rename_replaces_identity_instead_of_stacking(self):
+        soul = ("# Dawn — Morning Brief Writer\n\nYou are **Dawn**, the Morning Brief Writer. "
+                "Always introduce yourself as Dawn.\n\n## Your one job\nBrief.")
+        out = forge.ensure_identity(soul, "Zeta Echo", "Bot", "zetaecho")
+        self.assertEqual(out.count("You are **"), 1)
+        self.assertNotIn("Dawn", out.split("## Your one job")[0])
+        self.assertTrue(out.startswith("# Zeta Echo — Morning Brief Writer"))
+        self.assertIn("## Your one job", out)
+
+    def test_role_comes_from_heading(self):
+        self.assertEqual(forge.soul_role("# Dawn — Morning Brief Writer\n\nbody"), "Morning Brief Writer")
+        self.assertEqual(forge.soul_role("no heading"), "")
+
     def test_user_memory_drops_assistant_naming_only(self):
         text = "User likes short posts.\n§\nUser calls the assistant Maia and wants it to use that name.\n§\nUser is in IST."
         out = forge.filter_user_memory(text, {"maia"})
@@ -162,9 +175,6 @@ class ForgeValidation(unittest.TestCase):
             self.assertFalse(out["rolled_back"])
             self.assertEqual([p.name for p in (root / "profiles").iterdir()], ["quill"])
 
-
-if __name__ == "__main__":
-    unittest.main()
 
 
 class Guardrails(unittest.TestCase):
@@ -334,3 +344,90 @@ class Team(unittest.TestCase):
             mem = (root / "profiles" / "ceo" / "memories" / "MEMORY.md").read_text()
             self.assertIn("@quill", mem)
             self.assertIn("Content team", mem)
+
+
+class Health(unittest.TestCase):
+    def _bot(self, root, name, title, soul):
+        d = root / "profiles" / name
+        (d / "cron").mkdir(parents=True)
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}))
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}))
+        (d / "SOUL.md").write_text(soul)
+        return d
+
+    def test_single_bot_filter_returns_only_that_bot(self):
+        import health
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root, "alpha", "Alpha", "# Alpha\n\nYou are **Alpha**.\n\n## Ask first\n- x")
+            self._bot(root, "zeta", "Zeta", "# Zeta\n\nYou are **Zeta**.")
+            health._gateways = lambda root: {}
+            out = health.check({"hermes_root": str(root), "name": "Zeta"})
+            self.assertEqual([b["name"] for b in out["report"]], ["zeta"])
+
+    def test_frequent_routine_is_flagged(self):
+        import json as _json
+        import health
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root, "alpha", "Alpha", "# Alpha\n\nYou are **Alpha**.\n\n## Ask first\n- x")
+            (d / "cron" / "jobs.json").write_text(_json.dumps({"jobs": [
+                {"id": "j1", "name": "poll", "schedule": {"kind": "interval", "minutes": 10}, "enabled": True}]}))
+            bot = health.check_bot(d, {}, 0)
+            self.assertEqual(bot["routines"][0]["runs_per_day"], 144.0)
+            self.assertTrue(any("144" in f for f in bot["flags"]))
+
+    def test_runs_per_day_estimates(self):
+        self.assertEqual(forge.runs_per_day("every 15m"), 96)
+        self.assertAlmostEqual(forge.runs_per_day("0 9 * * 1-5"), 5 / 7)
+        self.assertEqual(forge.runs_per_day("0 7,18 * * *"), 2)
+        self.assertTrue(forge.check_routine({"schedule": "*/5 * * * *"}))
+        self.assertFalse(forge.check_routine({"schedule": "*/5 * * * *", "allow_frequent": True}))
+
+
+class Portable(unittest.TestCase):
+    def test_scanner_blocks_keys_and_never_echoes_them(self):
+        import portable
+        fake = "sk-proj-" + "A" * 30
+        out = portable.scan_text(f"memory: use {fake}")
+        self.assertEqual(out["verdict"], "BLOCK")
+        self.assertNotIn(fake, str(out))
+
+    def test_scanner_warns_on_generic_assignment_and_passes_clean_text(self):
+        import portable
+        self.assertEqual(portable.scan_text("password: hunter2hunter2hunter2")["verdict"], "WARN")
+        self.assertEqual(portable.scan_text("Write three bullets every Friday.")["verdict"], "CLEAN")
+
+    def test_bundled_templates_are_valid_clean_and_affordable(self):
+        import json as _json
+        import portable
+        found = portable.bundled_templates()
+        self.assertGreaterEqual(len(found), 5)
+        for name, path in found.items():
+            tpl = portable.load_template(path)
+            self.assertEqual(portable.scan_text(_json.dumps(tpl))["verdict"], "CLEAN", name)
+            self.assertIn(f"You are **{tpl['display_name']}**", tpl["soul_md"], name)
+            for r in tpl["routines"]:
+                self.assertFalse(forge.check_routine(r), f"{name}: {r['schedule']}")
+
+    def test_template_never_contains_history_or_user_facts(self):
+        import portable
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = root / "profiles" / "quill"
+            (d / "memories").mkdir(parents=True)
+            (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web"]}}))
+            (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**.")
+            (d / "memories" / "MEMORY.md").write_text("My name is Quill.\n§\nDrafts go out Fridays.")
+            (d / "memories" / "USER.md").write_text("User lives in Pune.")
+            (d / "state.db").write_text("chat history")
+            tpl = portable.build_template(d, root)
+            blob = str(tpl)
+            self.assertNotIn("Pune", blob)
+            self.assertNotIn("chat history", blob)
+            self.assertEqual(tpl["memory"], ["Drafts go out Fridays."])
+            self.assertEqual(tpl["role"], "Writer")
+
+
+if __name__ == "__main__":
+    unittest.main()

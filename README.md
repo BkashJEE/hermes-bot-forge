@@ -116,7 +116,6 @@ plugins:
     bot-forge:
       settings:
         inherit_model: true
-        share_login: false
         fallback_model: {}
         probe_local_models: false
         install_gateway: true
@@ -148,7 +147,7 @@ It points that Bot's `auth.json`/`auth.lock` at the root profile's. Hermes delib
 
 ## Tools
 
-Nine tools, all driven by plain requests in chat:
+Twelve tools, all driven by plain requests in chat:
 
 | Tool | Say this | What it does |
 |---|---|---|
@@ -158,17 +157,41 @@ Nine tools, all driven by plain requests in chat:
 | `update_agent` | *"make Inkwell funnier"*, *"give Atlas the browser"* | Edits a Bot in place — persona, name, description, memory, tools, skills, model, face, routines. Backs up what it replaces. |
 | `copy_agent` | *"make another one like Inkwell, for LinkedIn"* | Duplicates a Bot under a new name (no chat history, no routines). |
 | `list_agents` | *"what bots do I have?"* | Roster with description, model, routine count and hidden state. |
+| `check_agents` | *"how are my bots doing?"* | Read-only health check: routines that run too often (and their cost in runs/day), paused or never-run routines, unused Bots, stopped gateways, a persona missing its name or approvals. |
 | `ask_agent` | *"ask Inkwell for 3 post ideas"* | Sends a task to another Bot and returns its reply. |
-| `share_agent` | *"export Inkwell so I can send it to a friend"* | Packs the Bot into a `.tar.gz` — persona, memory, skills, config, routines. **No keys or logins.** |
-| `import_agent` | *"import this bot"* | Restores a shared Bot and starts it. |
+| `share_agent` | *"share Inkwell with a friend"* | Writes a readable `.botforge.json` template — persona, its own memory, tools, skills, routines. **Never chat history, facts about you, or keys**, and secret-scanned (CLEAN / WARN / BLOCK). `mode: backup` makes a full private backup instead. |
+| `import_agent` | *"import this bot"* | Builds a Bot from a `.botforge.json` template (scanned again), or restores a backup. |
 | `hide_agent` | *"hide Inkwell from the list"* | Hides or unhides it in the roster. It keeps running. |
 | `delete_agent` | *"delete Inkwell"* | Permanent. **Off unless you enable it**, and it must repeat the Bot's exact name. |
+
+### Start from a proven template
+
+Five starters, modelled on the most-used Grok Bot patterns:
+
+| Template | Bot | What it does | Routine |
+|---|---|---|---|
+| `chief-of-staff` | Marshal | Routes work to specialists, keeps open loops, pings you only when you must act | 7:00 brief, 18:00 handoff (weekdays), Friday 16:00 review |
+| `morning-brief` | Dawn | Calendar, what's waiting on you, 3 headlines — drafts only | 7:30 weekdays |
+| `research-digest` | Scout | What changed on your topics in the last 24 hours, sourced | 8:00 daily |
+| `competitor-watcher` | Lookout | Reports real changes on competitors' pricing, product and hiring pages | 9:00 weekdays |
+| `engineering-outer-loop` | Foreman | Failing checks, stuck PRs, new issues → small tasks. Never writes or merges code | 9:30 weekdays |
+
+> make me a chief of staff from the template
+
+Any field you give overrides the template's, so *"a morning brief bot called Sol that also covers crypto"* works.
 
 ### A team in one sentence
 
 > set me up a content team
 
 builds a lead plus its specialists, each with one job, each reporting to the lead, each introduced in its own Bot Chat. A member that fails is rolled back on its own — the rest of the team stands.
+
+### Cost and safety built in
+
+- **Draft-first by default.** Every Bot is born with approval checkpoints — sending/publishing, spending money, deleting data — unless you explicitly ask for none.
+- **No runaway routines.** Schedules faster than every 30 minutes are refused unless you explicitly ask (every run is a model call; every 15 minutes is 96 runs a day).
+- **Nothing private leaves in a share.** Templates carry the Bot's design, never your chats, your facts or your keys — and they're scanned for secrets on the way out and on the way in.
+- **One identity per Bot.** Renaming, copying or importing rewrites the persona's name instead of stacking a second one, so a Bot never introduces itself as another.
 
 ### Guardrails a new Bot is born with
 
@@ -211,6 +234,9 @@ Any failure after step 2 deletes the profile.
 | Whole team from one sentence | — | markdown file | — | ✅ `create_team` |
 | Teach a skill by chatting | ✅ | playbooks | ClawHub | ✅ `teach_agent` |
 | Connector suggestions for the job | ✅ | ✅ | — | ✅ from Hermes' MCP catalog |
+| Routine cost health check | community bots | — | — | ✅ `check_agents` |
+| Secret scan on shared templates | community bots (Bouncer, Vet) | — | — | ✅ built in |
+| Chat history excluded from shares | ✅ | — | — | ✅ |
 | Runs entirely on your machine | — | ✅ | ✅ | ✅ |
 
 ## Troubleshooting

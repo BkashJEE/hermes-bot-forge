@@ -172,14 +172,33 @@ def guardrails_block(approvals, reports_to) -> str:
     return ("\n\n" + "\n\n".join(parts) + "\n") if parts else ""
 
 
+IDENTITY_LINE = re.compile(r"^You are \*\*[^*\n]+\*\*.*$\n?", re.M)
+
+
+def soul_role(soul: str) -> str:
+    """Role from a '# Name — Role' heading, if the persona has one."""
+    first = (soul or "").lstrip().split("\n", 1)[0]
+    m = re.match(r"#\s*[^—\-\n]+\s[—-]\s+(.+)$", first)
+    return m.group(1).strip() if m else ""
+
+
 def ensure_identity(soul: str, display: str, role: str, profile_id: str) -> str:
-    """The Bot's own name must be explicit in SOUL.md or it borrows one from shared memory."""
-    if f"You are **{display}**" in soul:
-        return soul
+    """Give the persona exactly one identity: the heading and a single 'You are **Name**' line.
+    Earlier identity lines (from a template, a copy or a rename) are replaced, never stacked — two names in
+    one SOUL.md is how a Bot ends up introducing itself as someone else."""
+    lines = IDENTITY_LINE.findall(soul or "")
+    heading = (soul or "").lstrip().split("\n", 1)[0]
+    heading_ok = not heading.startswith("#") or re.match(rf"#\s*{re.escape(display)}\b", heading)
+    if len(lines) == 1 and lines[0].startswith(f"You are **{display}**") and heading_ok:
+        return soul  # already exactly one, correct identity — keep the author's wording
+    role = soul_role(soul) or role
+    body = IDENTITY_LINE.sub("", soul or "")
     identity = (f"You are **{display}**, the {role} of this Hermes deployment (profile `{profile_id}`). "
                 f"Always introduce yourself as {display}.\n")
-    head, _, rest = soul.partition("\n")
-    return f"{head}\n\n{identity}{rest}" if head.startswith("#") else f"{identity}\n{soul}"
+    head, _, rest = body.lstrip().partition("\n")
+    if head.startswith("#"):
+        return f"# {display} — {role}\n\n{identity}\n{rest.lstrip()}"
+    return f"{identity}\n{body.lstrip()}"
 
 
 def filter_user_memory(text: str, other_names: set) -> str:
@@ -216,6 +235,59 @@ You are **{s['display_name']}**, the {s['role']} of this Hermes deployment (prof
 ## Never
 {bullets(never)}
 """
+
+
+# ── routines ─────────────────────────────────────────────────────────────────
+MIN_ROUTINE_MINUTES = 30
+DEFAULT_APPROVALS = ["send, post or publish anything", "spend money or buy anything", "delete files or data"]
+
+
+def _field_count(field: str, lo: int, hi: int) -> int:
+    """How many values a single cron field matches (handles *, */n, a-b, a-b/n, lists)."""
+    total = 0
+    for part in field.split(","):
+        step = 1
+        if "/" in part:
+            part, step_s = part.split("/", 1)
+            step = max(1, int(step_s)) if step_s.isdigit() else 1
+        if part in ("*", ""):
+            a, b = lo, hi
+        elif "-" in part:
+            a_s, b_s = part.split("-", 1)
+            a, b = (int(a_s), int(b_s)) if a_s.isdigit() and b_s.isdigit() else (lo, hi)
+        elif part.isdigit():
+            a = b = int(part)
+        else:  # names like MON — count once
+            a = b = lo
+        total += len(range(a, b + 1, step))
+    return max(total, 1)
+
+
+def runs_per_day(schedule: str) -> float:
+    """Rough runs/day for 'every 15m' / '2h' / a 5-field cron expression. 0 when unknown or one-off."""
+    s = (schedule or "").strip().lower()
+    m = re.fullmatch(r"(?:every\s+)?(\d+)\s*(m|min|mins|minutes?|h|hr|hrs|hours?|d|days?)", s)
+    if m:
+        n, unit = int(m.group(1)), m.group(2)[0]
+        minutes = n * {"m": 1, "h": 60, "d": 1440}[unit]
+        return 1440 / minutes if minutes else 0
+    parts = s.split()
+    if len(parts) == 5:
+        minute, hour, _dom, _mon, dow = parts
+        per_day = _field_count(minute, 0, 59) * _field_count(hour, 0, 23)
+        days = 7 if dow in ("*", "?") else min(_field_count(dow, 0, 6), 7)
+        return per_day * days / 7
+    return 0
+
+
+def check_routine(r: dict) -> str:
+    """Error message when a routine would fire more often than every MIN_ROUTINE_MINUTES."""
+    rate = runs_per_day(r.get("schedule", ""))
+    if rate > 1440 / MIN_ROUTINE_MINUTES and not r.get("allow_frequent"):
+        return (f"routine '{r.get('name') or r.get('schedule')}' would run ~{int(rate)} times a day. Every run "
+                f"costs a model call — use {MIN_ROUTINE_MINUTES} minutes or slower, or set allow_frequent: true "
+                f"if the user explicitly asked for it")
+    return ""
 
 
 # ── bot mode ─────────────────────────────────────────────────────────────────
@@ -304,6 +376,21 @@ def disabled_skills(skills_dir: Path, keep_categories: set) -> set:
 def forge(s: dict) -> dict:
     root = Path(s.get("hermes_root") or default_root())
     settings = {**DEFAULT_SETTINGS, **{k: v for k, v in (s.get("settings") or {}).items() if v is not None}}
+    if s.get("template"):
+        import portable
+        ref = str(s["template"]).strip()
+        path = portable.bundled_templates().get(ref.lower()) or Path(ref).expanduser()
+        try:
+            tpl = portable.load_template(Path(path))
+        except (OSError, ValueError) as exc:
+            names = ", ".join(portable.bundled_templates())
+            return {"ok": False, "error": f"template '{ref}': {exc}. Bundled templates: {names}", "rolled_back": False}
+        scan = portable.scan_text(json.dumps(tpl))
+        if scan["verdict"] == "BLOCK" and not s.get("allow_secrets"):
+            return {"ok": False, "error": "template contains what looks like a credential — refusing to import it",
+                    "scan": scan, "rolled_back": False}
+        s = {**{k: v for k, v in tpl.items() if k not in ("format", "version")},
+             **{k: v for k, v in s.items() if v not in (None, "", [])}}
     if not s.get("role"):
         return {"ok": False, "error": "spec needs at least 'role'"}
     display, profile_id, err = pick_name(s.get("display_name") or s.get("name"), existing_bot_names(root))
@@ -313,12 +400,15 @@ def forge(s: dict) -> dict:
     s.setdefault("one_job", f"acts as the user's {s['role']}")
     description = s.get("description") or f"{s['role']}: {s['one_job']}."
     soul = ensure_identity(s.get("soul_md") or render_soul(s, profile_id), display, s["role"], profile_id)
-    approvals = [a for a in (s.get("approvals") or []) if isinstance(a, str)]
+    approvals = s.get("approvals")
+    approvals = list(DEFAULT_APPROVALS) if approvals is None else [a for a in approvals if isinstance(a, str)]
     reports_to = (s.get("reports_to") or "").strip().lstrip("@")
-    if approvals and "## Ask first" not in soul:
-        soul += guardrails_block(approvals, "")
-    if reports_to and "## Escalate to" not in soul:
-        soul += guardrails_block([], reports_to)
+    soul = soul.rstrip() + "\n" + guardrails_block(approvals if "## Ask first" not in soul else [],
+                                                   reports_to if "## Escalate to" not in soul else "")
+    for r in s.get("routines") or []:
+        problem = check_routine(r)
+        if problem:
+            return {"ok": False, "error": problem, "rolled_back": False}
     pdir = root / "profiles" / profile_id
     created = False
     try:
@@ -340,6 +430,11 @@ def forge(s: dict) -> dict:
         if user_md.exists():
             others = {n for n in existing_bot_names(root) if n not in GENERIC_NAMES and n != profile_id}
             (mem / "USER.md").write_text(filter_user_memory(user_md.read_text(), others))
+        for skill, doc in (s.get("taught_skills") or {}).items():
+            skill_id = re.sub(r"[^a-z0-9-]+", "-", str(skill).lower()).strip("-")[:48]
+            if skill_id and isinstance(doc, str) and doc.strip():
+                (pdir / "skills" / "taught" / skill_id).mkdir(parents=True, exist_ok=True)
+                (pdir / "skills" / "taught" / skill_id / "SKILL.md").write_text(doc)
         facts = [f"My name is {display}. I am the {s['role']} (profile `{profile_id}`). I always introduce myself "
                  f"as {display}, never by another Bot's name. My one job: {s['one_job']}."] + list(s.get("memory") or [])
         if approvals:
@@ -356,6 +451,8 @@ def forge(s: dict) -> dict:
         disabled = set()
         if s.get("skill_categories"):
             disabled = disabled_skills(pdir / "skills", set(s["skill_categories"]) | ALWAYS_KEEP_CATEGORIES)
+        elif s.get("disabled_skills"):
+            disabled = {str(x) for x in s["disabled_skills"]} - set((s.get("taught_skills") or {}).keys())
         if disabled:
             skills_cfg = cfg.get("skills") if isinstance(cfg.get("skills"), dict) else {}
             skills_cfg["disabled"] = sorted(set(skills_cfg.get("disabled") or []) | disabled)

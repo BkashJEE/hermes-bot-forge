@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.3.0
+version: 0.4.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -74,9 +74,15 @@ intro: <first line of intro>
 ## Managing Bots the user already has
 - **"make X funnier" / "give X the browser" / "rename X" / "X should never post without asking"** → `update_agent`. Send only what changes; prefer `soul_append` over rewriting `soul_md`.
 - **"another one like X"** → `copy_agent`, then `update_agent` to specialise it.
-- **"share X" / "back X up"** → `share_agent`. **"import this bot"** → `import_agent`.
+- **"share X"** → `share_agent` (a template: no chats, no user facts, no keys). **"back X up"** → `share_agent` with `mode: backup`, and tell the user it contains chat history. **"import this bot"** → read the template's persona and routines, tell the user what it will do, then `import_agent`.
 - **"X is cluttering my list"** → `hide_agent` (not delete).
 - **"delete X"** → `delete_agent` with `confirm` set to X's exact profile name. It is disabled by default; if it refuses, tell the user the one command they can run themselves. Never delete a Bot the user didn't name in this conversation.
+
+## Templates
+If the ask matches a starter, pass `template` and override only what differs: chief of staff → `chief-of-staff`, morning/daily brief → `morning-brief`, "keep me updated on <topic>" → `research-digest`, competitor tracking → `competitor-watcher`, repo/CI triage → `engineering-outer-loop`.
+
+## Health
+"how are my bots doing" or a weekly review → `check_agents`. Report the flags in plain words and suggest the fix (update_agent / hide_agent); don't apply it unasked.
 
 ## Teams
 "set me up a <kind> team", "hire me a crew" → `create_team`. Design a lead (chief of staff) plus 2-4 specialists, one job each, and pass them in one call — never loop `create_agent`. Use `lead_name` when an obvious boss Bot already exists. Tell the user it takes a few minutes before you call it.

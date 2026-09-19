@@ -16,11 +16,16 @@ CREATE_AGENT = {
         "and memories, sets tools and skills, adds routines, opens its Bot Chat with a self-introduction, starts "
         "its gateway, and rolls everything back on failure. The Bot appears in Desktop Bot Mode with its name "
         "and face. Takes 1-3 minutes. After it succeeds, do not message, test or change the new Bot — just "
-        "report. Load skill 'bot-forge:bot-forge' for role defaults if unsure."
+        "report. Pass `template` to start from a proven design. Load skill 'bot-forge:bot-forge' for role "
+        "defaults if unsure."
     ),
     "parameters": {
         "type": "object",
         "properties": {
+            "template": {"type": "string", "description": (
+                "start from a template instead of designing from scratch: a bundled one — 'chief-of-staff', "
+                "'morning-brief', 'research-digest', 'competitor-watcher', 'engineering-outer-loop' — or a path to a "
+                ".botforge.json file. Any other field you pass overrides the template's.")},
             "display_name": {"type": "string", "description": (
                 "a cool, unique, Proper Case name for the Bot, e.g. 'Quill', 'Nova', 'Kairo' — never a generic "
                 "role word like 'Writer' or 'Social'. Check list_agents first; if the tool says it's taken, pick another.")},
@@ -37,8 +42,9 @@ CREATE_AGENT = {
                 "skill category folders to keep enabled, e.g. ['social-media','creative']; research and web stay "
                 "on, others are disabled (not deleted)")},
             "approvals": {"type": "array", "items": {"type": "string"}, "description": (
-                "things this Bot must ask the user before doing, e.g. ['publish or send anything', 'spend money', "
-                "'delete files']. Written into its SOUL.md and memory as hard checkpoints.")},
+                "things this Bot must ask the user before doing. Defaults to sending/publishing, spending money and "
+                "deleting data when omitted; pass [] only if the user explicitly wants none. Written into its SOUL.md "
+                "and memory as hard checkpoints.")},
             "reports_to": {"type": "string", "description": (
                 "profile name of the Bot it escalates scope and priority calls to (its chief of staff), e.g. 'ceo'")},
             "routines": {
@@ -50,12 +56,14 @@ CREATE_AGENT = {
                         "name": {"type": "string"},
                         "schedule": {"type": "string", "description": "cron expression like '0 9 * * 1' or 'every 2h'"},
                         "prompt": {"type": "string", "description": "self-contained instruction the Bot runs each time"},
+                        "allow_frequent": {"type": "boolean", "description": (
+                            "only when the user explicitly asked for a schedule faster than every 30 minutes")},
                     },
                     "required": ["schedule", "prompt"],
                 },
             },
         },
-        "required": ["display_name", "role", "one_job", "soul_md", "toolsets"],
+        "required": [],
     },
 }
 
@@ -143,14 +151,17 @@ COPY_AGENT = {
 SHARE_AGENT = {
     "name": "share_agent",
     "description": (
-        "Export a Bot to a .tar.gz archive the user can share — persona, memory, skills, config and routines. "
-        "API keys and logins are NOT included. Use when the user asks to share, back up or move a Bot."
+        "Share a Bot as a portable .botforge.json template: persona, its own memory, tools, skill choices, taught "
+        "skills and routines — never chat history, facts about the user, or credentials. The file is scanned for "
+        "secrets (CLEAN / WARN / BLOCK) and not written on BLOCK. Use mode='backup' only when the user wants a "
+        "full private backup of their own Bot (that one includes chat history — tell them)."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "name": {"type": "string", "description": "the Bot to export"},
-            "path": {"type": "string", "description": "optional output path for the .tar.gz"},
+            "name": {"type": "string", "description": "the Bot to share"},
+            "mode": {"type": "string", "enum": ["template", "backup"], "description": "template (default) or backup"},
+            "path": {"type": "string", "description": "optional output path"},
         },
         "required": ["name"],
     },
@@ -159,13 +170,14 @@ SHARE_AGENT = {
 IMPORT_AGENT = {
     "name": "import_agent",
     "description": (
-        "Import a Bot from a .tar.gz archive made by share_agent (or `hermes profile export`) and start it. "
-        "Read the archive's SOUL.md afterwards if the user wants to know what it does."
+        "Import a Bot from a .botforge.json template (built fresh, secret-scanned, like create_agent) or restore a "
+        ".tar.gz backup made with share_agent mode='backup'. Before importing a template from someone else, read "
+        "its soul_md and routines and tell the user what the Bot will do."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "path": {"type": "string", "description": "path to the .tar.gz archive"},
+            "path": {"type": "string", "description": "path to a .botforge.json template or a .tar.gz backup"},
             "display_name": {"type": "string", "description": "optional new Proper Case name for the imported Bot"},
         },
         "required": ["path"],
@@ -279,5 +291,21 @@ TEACH_AGENT = {
             "body": {"type": "string", "description": "complete SKILL.md markdown instead of steps"},
         },
         "required": ["name", "skill"],
+    },
+}
+
+
+CHECK_AGENTS = {
+    "name": "check_agents",
+    "description": (
+        "Health check for the user's Bots — read-only. Reports each Bot's model, gateway, routines with estimated "
+        "runs per day, days since last used, and flags: routines that run too often (every run costs a model "
+        "call), paused or never-run routines, unused Bots, a SOUL.md missing the Bot's own name or approval "
+        "checkpoints. Use when the user asks 'how are my bots doing', during a weekly review, or before adding "
+        "more routines. Suggest fixes; don't apply them without asking."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {"name": {"type": "string", "description": "optional: check one Bot only"}},
     },
 }

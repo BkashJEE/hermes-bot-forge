@@ -130,7 +130,8 @@ plugins:
 | `probe_local_models` | `false` | With no `fallback_model`, look for a local llama.cpp / Ollama / LM Studio server to fall back to. |
 | `install_gateway` | `true` | Install and start a gateway service per Bot (skipped on Windows). |
 | `allow_delete` | `false` | Let `delete_agent` work at all. Off by default — an agent should not be able to destroy a Bot on its own. |
-| `backup_before_delete` | `true` | Export the Bot to a `.tar.gz` before deleting it, so it can be restored. |
+| `backup_before_delete` | `true` | Export the Bot to a `.tar.gz` before deleting it, so it can be restored. If the backup fails, the delete is refused. |
+| `allow_secrets` | `false` | Let `share_agent` write / `import_agent` accept a template the secret scanner marked BLOCK. Operator-only; the model cannot pass it as an argument. |
 | `suggest_connectors` | `true` | After building a Bot, suggest matching servers from Hermes' MCP catalog. Suggestion only — connecting an account always needs you. |
 
 ### Optional: share one login across Bots

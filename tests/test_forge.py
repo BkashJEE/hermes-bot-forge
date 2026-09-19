@@ -274,6 +274,82 @@ class Manage(unittest.TestCase):
             self.assertIn("confirm", wrong["error"])
             self.assertTrue((root / "profiles" / "quill").exists())
 
+    def test_delete_takes_a_real_backup_and_refuses_when_it_fails(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root)
+            spec = {"op": "delete", "hermes_root": str(root), "name": "quill", "confirm": "quill",
+                    "settings": {"allow_delete": True}}
+            calls = []
+            with mock.patch.object(manage, "op_export", side_effect=lambda s, r, st: (calls.append(s), {"ok": True, "path": "/x.tar.gz"})[1]), \
+                    mock.patch.object(manage.forge, "run", side_effect=lambda root, *a, **k: calls.append(a)):
+                out = manage.manage(spec)
+            self.assertTrue(out["ok"])
+            self.assertEqual(calls[0]["mode"], "backup")
+            self.assertEqual(calls[1][:2], ("profile", "delete"))
+            self.assertEqual(out["backup"], "/x.tar.gz")
+            for failing in (lambda s, r, st: {"ok": False, "error": "scan BLOCK"},
+                            mock.Mock(side_effect=RuntimeError("hermes died"))):
+                with mock.patch.object(manage, "op_export", side_effect=failing), \
+                        mock.patch.object(manage.forge, "run") as run:
+                    out = manage.manage(spec)
+                self.assertFalse(out["ok"])
+                self.assertIn("NOT deleted", out["error"])
+                self.assertIn("backup_before_delete", out["error"])
+                run.assert_not_called()
+            self.assertTrue((root / "profiles" / "quill").exists())
+
+    def test_allow_secrets_is_operator_only(self):
+        from unittest import mock
+        fake = "sk-proj-" + "B" * 30
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root)
+            (d / "SOUL.md").write_text(f"# Quill — Writer\n\nYou are **Quill**. Use {fake} for the API.\n")
+            spec = {"op": "export", "hermes_root": str(root), "name": "quill", "allow_secrets": True}
+            out = manage.manage(spec)
+            self.assertFalse(out["ok"])
+            self.assertIn("credential", out["error"])
+            self.assertEqual(list((root / "profile-exports").glob("*")) if (root / "profile-exports").exists() else [], [])
+            out = manage.manage({**spec, "settings": {"allow_secrets": True}})
+            self.assertTrue(out["ok"])
+            self.assertTrue(Path(out["path"]).exists())
+            # the tool layer drops the argument before it reaches manage.py
+            if tools is not None:
+                with mock.patch.object(tools, "_manage", side_effect=lambda op, args, st: "{}") as m:
+                    tools.share_agent({"name": "quill", "allow_secrets": True}, settings={})
+                    tools.import_agent({"path": "x.json", "allow_secrets": True}, settings={})
+                for call in m.call_args_list:
+                    self.assertNotIn("allow_secrets", call.args[1])
+            # importing a BLOCK template: the model argument is ignored, the setting is honoured
+            tpl = Path(t) / "leaky.botforge.json"
+            tpl.write_text(f'{{"format": "bot-forge/template", "version": 1, "role": "writer", "soul_md": "use {fake}"}}')
+            out = manage.manage({"op": "import", "hermes_root": str(root), "path": str(tpl), "allow_secrets": True,
+                                 "display_name": "Writer"})
+            self.assertIn("credential", out["error"])
+            out = manage.manage({"op": "import", "hermes_root": str(root), "path": str(tpl), "display_name": "Writer",
+                                 "settings": {"allow_secrets": True}})
+            self.assertNotIn("credential", out["error"])  # got past the scan (then refused for the generic name)
+
+    def test_export_path_stays_under_profile_exports(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root)
+            base = {"op": "export", "hermes_root": str(root), "name": "quill"}
+            for bad in (str(root / "config.yaml"), str(Path(t) / "elsewhere.json"), "../config.yaml"):
+                out = manage.manage({**base, "path": bad})
+                self.assertFalse(out["ok"], bad)
+                self.assertIn("profile-exports", out["error"])
+            self.assertIn("root-model", (root / "config.yaml").read_text())
+            out = manage.manage({**base, "path": "quill-copy.json"})
+            self.assertTrue(out["ok"])
+            self.assertEqual(Path(out["path"]).parent, (root / "profile-exports").resolve())
+            again = manage.manage({**base, "path": out["path"]})
+            self.assertFalse(again["ok"])
+            self.assertIn("already exists", again["error"])
+            self.assertTrue(manage.manage(base)["ok"])  # default name still works
+
     def test_import_rejects_missing_archive(self):
         with tempfile.TemporaryDirectory() as t:
             root = make_root(Path(t))

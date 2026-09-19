@@ -208,6 +208,21 @@ def op_hide(s: dict, root: Path, settings: dict, hidden=True) -> dict:
             "note": "roster only — the Bot keeps running, and its routines keep firing"}
 
 
+def _export_target(root: Path, requested, default_name: str):
+    """Resolve an export path: always under <root>/profile-exports, never over an existing file.
+    Returns (path, None) or (None, error)."""
+    allowed = (root / "profile-exports").resolve()
+    out = (allowed / default_name) if not requested else Path(requested).expanduser()
+    if not out.is_absolute():
+        out = allowed / out
+    out = out.resolve()
+    if not out.is_relative_to(allowed):
+        return None, f"exports must stay under {allowed} — pass a file name or a path inside that directory"
+    if out.exists():
+        return None, f"{out} already exists — pick another name (nothing was overwritten)"
+    return out, None
+
+
 def op_export(s: dict, root: Path, settings: dict) -> dict:
     """Share a Bot. Default: a portable .botforge.json template (design only, secret-scanned).
     mode=backup: a full `hermes profile export` for the user's own safekeeping — includes chat history."""
@@ -215,7 +230,9 @@ def op_export(s: dict, root: Path, settings: dict) -> dict:
     pdir = _require_bot(root, s.get("name"))
     stamp = time.strftime("%Y%m%d-%H%M%S")
     if (s.get("mode") or "template") == "backup":
-        out = Path(s.get("path") or (root / "profile-exports" / f"{pdir.name}-{stamp}.tar.gz")).expanduser()
+        out, err = _export_target(root, s.get("path"), f"{pdir.name}-{stamp}.tar.gz")
+        if err:
+            return {"ok": False, "name": pdir.name, "error": err}
         out.parent.mkdir(parents=True, exist_ok=True)
         forge.run(root, "profile", "export", pdir.name, "-o", str(out), timeout=600)
         if not out.exists():
@@ -228,11 +245,13 @@ def op_export(s: dict, root: Path, settings: dict) -> dict:
     tpl = portable.build_template(pdir, root)
     text = json.dumps(tpl, indent=2, ensure_ascii=False)
     scan = portable.scan_text(text)
-    if scan["verdict"] == "BLOCK" and not s.get("allow_secrets"):
+    if scan["verdict"] == "BLOCK" and not settings.get("allow_secrets"):
         return {"ok": False, "name": pdir.name, "scan": scan,
                 "error": "the Bot's persona, memory or skills contain what looks like a credential — nothing was "
                          "written. Remove it with update_agent, then share again."}
-    out = Path(s.get("path") or (root / "profile-exports" / f"{pdir.name}.botforge.json")).expanduser()
+    out, err = _export_target(root, s.get("path"), f"{pdir.name}.botforge.json")
+    if err:
+        return {"ok": False, "name": pdir.name, "error": err}
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text + "\n")
     return {"ok": True, "name": pdir.name, "mode": "template", "path": str(out), "scan": scan,
@@ -251,8 +270,7 @@ def op_import(s: dict, root: Path, settings: dict) -> dict:
         return {"ok": False, "error": f"no file at {path}"}
     if path.name.endswith(".json"):
         spec = {"template": str(path), "display_name": s.get("display_name"), "hermes_root": str(root),
-                "settings": settings, "launch_profile": s.get("launch_profile") or "default",
-                "allow_secrets": s.get("allow_secrets")}
+                "settings": settings, "launch_profile": s.get("launch_profile") or "default"}
         return forge.forge(spec)
 
     taken = forge.existing_bot_names(root)
@@ -282,9 +300,15 @@ def op_delete(s: dict, root: Path, settings: dict) -> dict:
     backup = None
     if settings.get("backup_before_delete", True):
         try:
-            backup = op_export({"name": pdir.name}, root, settings).get("path")
-        except Exception:
-            backup = None
+            res = op_export({"name": pdir.name, "mode": "backup"}, root, settings)
+        except Exception as exc:
+            res = {"ok": False, "error": str(exc)}
+        if not res.get("ok"):
+            return {"ok": False, "name": pdir.name, "deleted": False,
+                    "error": f"backup failed, so {pdir.name} was NOT deleted: {res.get('error')}. Fix the export, "
+                             "turn off plugins.entries.bot-forge.settings.backup_before_delete, or run "
+                             f"`hermes profile delete {pdir.name}` by hand."}
+        backup = res.get("path")
     forge.run(root, "profile", "delete", "-y", pdir.name, timeout=300)
     return {"ok": True, "name": pdir.name, "deleted": True, "backup": backup,
             "note": "restore with `hermes profile import <backup>`" if backup else "no backup was made"}

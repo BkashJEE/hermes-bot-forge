@@ -43,7 +43,11 @@ config_schema:
   backup_before_delete:
     type: bool
     default: true
-    description: Export a Bot to a .tar.gz archive before delete_agent removes it.
+    description: Export a Bot to a .tar.gz archive before delete_agent removes it. If that backup fails, the delete is refused.
+  allow_secrets:
+    type: bool
+    default: false
+    description: Let share_agent write, and import_agent accept, a template the secret scanner marked BLOCK. Operator-only — the model cannot pass it.
   suggest_connectors:
     type: bool
     default: true

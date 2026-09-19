@@ -111,6 +111,10 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
     if meta_changes:
         _save_bot_meta(pdir, meta_changes)
         changed.append("identity")
+        if meta_changes.get("title") and soul_path.exists():
+            backups.setdefault("SOUL.md", _backup(pdir, "SOUL.md"))
+            soul_path.write_text(forge.ensure_identity(soul_path.read_text(), meta_changes["title"],
+                                                       s.get("role") or "Bot", name))
 
     # memory
     if s.get("memory"):
@@ -150,6 +154,10 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
     # routines
     routines_added, routines_removed = [], []
     for r in s.get("add_routines") or []:
+        problem = forge.check_routine(r)
+        if problem:
+            raise ValueError(problem)
+    for r in s.get("add_routines") or []:
         forge.run(root, "-p", name, "cron", "create", r["schedule"], r["prompt"],
                   "--name", r.get("name") or "routine", "--deliver", r.get("deliver") or f"bot-chat:{name}")
         routines_added.append(r.get("name") or r["schedule"])
@@ -182,9 +190,7 @@ def op_copy(s: dict, root: Path, settings: dict) -> dict:
     try:
         forge.write_bot_meta(pdir, display, description, s.get("avatar_kind") or "")
         soul = (pdir / "SOUL.md").read_text() if (pdir / "SOUL.md").exists() else ""
-        old_title = meta.get("title") or src.name
-        (pdir / "SOUL.md").write_text(forge.ensure_identity(soul.replace(old_title, display), display,
-                                                            s.get("role") or "Bot", new_id))
+        (pdir / "SOUL.md").write_text(forge.ensure_identity(soul, display, s.get("role") or "Bot", new_id))
         if settings.get("install_gateway", True) and os.name != "nt":
             forge.run(root, "-p", new_id, "gateway", "install", "--start-now", "--start-on-login", check=False, timeout=120)
         return {"ok": True, "name": new_id, "display_name": display, "copied_from": src.name,
@@ -203,27 +209,57 @@ def op_hide(s: dict, root: Path, settings: dict, hidden=True) -> dict:
 
 
 def op_export(s: dict, root: Path, settings: dict) -> dict:
-    """Export a Bot to a .tar.gz archive someone else can import (credentials are not included)."""
+    """Share a Bot. Default: a portable .botforge.json template (design only, secret-scanned).
+    mode=backup: a full `hermes profile export` for the user's own safekeeping — includes chat history."""
+    import portable
     pdir = _require_bot(root, s.get("name"))
-    out = Path(s.get("path") or (root / "profile-exports" / f"{pdir.name}-{time.strftime('%Y%m%d-%H%M%S')}.tar.gz")).expanduser()
+    stamp = time.strftime("%Y%m%d-%H%M%S")
+    if (s.get("mode") or "template") == "backup":
+        out = Path(s.get("path") or (root / "profile-exports" / f"{pdir.name}-{stamp}.tar.gz")).expanduser()
+        out.parent.mkdir(parents=True, exist_ok=True)
+        forge.run(root, "profile", "export", pdir.name, "-o", str(out), timeout=600)
+        if not out.exists():
+            raise RuntimeError("export produced no archive")
+        return {"ok": True, "name": pdir.name, "mode": "backup", "path": str(out),
+                "size_mb": round(out.stat().st_size / 1e6, 1),
+                "note": "full backup INCLUDING chat history and facts about the user — keep it private; "
+                        "use the default template mode to share a Bot with someone"}
+
+    tpl = portable.build_template(pdir, root)
+    text = json.dumps(tpl, indent=2, ensure_ascii=False)
+    scan = portable.scan_text(text)
+    if scan["verdict"] == "BLOCK" and not s.get("allow_secrets"):
+        return {"ok": False, "name": pdir.name, "scan": scan,
+                "error": "the Bot's persona, memory or skills contain what looks like a credential — nothing was "
+                         "written. Remove it with update_agent, then share again."}
+    out = Path(s.get("path") or (root / "profile-exports" / f"{pdir.name}.botforge.json")).expanduser()
     out.parent.mkdir(parents=True, exist_ok=True)
-    forge.run(root, "profile", "export", pdir.name, "-o", str(out), timeout=600)
-    if not out.exists():
-        raise RuntimeError("export produced no archive")
-    return {"ok": True, "name": pdir.name, "path": str(out), "size_mb": round(out.stat().st_size / 1e6, 1),
-            "note": "shareable: SOUL.md, memory, skills, config and routines. API keys and logins are not included."}
+    out.write_text(text + "\n")
+    return {"ok": True, "name": pdir.name, "mode": "template", "path": str(out), "scan": scan,
+            "size_kb": round(out.stat().st_size / 1000, 1),
+            "contains": ["persona", "its own memory", "tools", "skill choices",
+                         f"{len(tpl['taught_skills'])} taught skill(s)", f"{len(tpl['routines'])} routine(s)"],
+            "never_contains": ["chat history", "facts about the user", "API keys or logins"],
+            "note": "a readable JSON file — safe to post as a gist or commit to a repo"
+                    + (" (review the WARN findings first)" if scan["verdict"] == "WARN" else "")}
 
 
 def op_import(s: dict, root: Path, settings: dict) -> dict:
-    """Import a Bot from a .tar.gz archive produced by export."""
-    archive = Path(s.get("path") or "").expanduser()
-    if not archive.is_file():
-        return {"ok": False, "error": f"no archive at {archive}"}
+    """Import a Bot: a .botforge.json template (built fresh, like create_agent) or a .tar.gz backup (restored)."""
+    path = Path(s.get("path") or "").expanduser()
+    if not path.is_file():
+        return {"ok": False, "error": f"no file at {path}"}
+    if path.name.endswith(".json"):
+        spec = {"template": str(path), "display_name": s.get("display_name"), "hermes_root": str(root),
+                "settings": settings, "launch_profile": s.get("launch_profile") or "default",
+                "allow_secrets": s.get("allow_secrets")}
+        return forge.forge(spec)
+
     taken = forge.existing_bot_names(root)
-    display, new_id, err = forge.pick_name(s.get("display_name") or archive.stem.split("-")[0], taken)
+    display, new_id, err = forge.pick_name(s.get("display_name") or path.stem.split("-")[0], taken)
     if err:
         return {"ok": False, "error": err}
-    forge.run(root, "profile", "import", str(archive), "--name", new_id, timeout=600)
+    forge.run(root, "profile", "import", str(path), "--name", new_id, timeout=600)
     pdir = root / "profiles" / new_id
     if not (pdir / "config.yaml").exists():
         return {"ok": False, "error": "import did not produce a usable profile"}
@@ -231,8 +267,8 @@ def op_import(s: dict, root: Path, settings: dict) -> dict:
         _save_bot_meta(pdir, {"title": display})
     if settings.get("install_gateway", True) and os.name != "nt":
         forge.run(root, "-p", new_id, "gateway", "install", "--start-now", "--start-on-login", check=False, timeout=120)
-    return {"ok": True, "name": new_id, "display_name": _bot_meta(pdir).get("title") or display,
-            "note": "imported. It has no credentials of its own — check its model before relying on it."}
+    return {"ok": True, "name": new_id, "display_name": _bot_meta(pdir).get("title") or display, "mode": "backup",
+            "note": "restored from a full backup, including its chat history"}
 
 
 def op_delete(s: dict, root: Path, settings: dict) -> dict:

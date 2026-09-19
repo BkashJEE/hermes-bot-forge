@@ -83,8 +83,8 @@ def build_team(s: dict) -> dict:
         except OSError:
             pass
 
-    made = [{"name": m["name"], "display_name": m["display_name"], "model": m.get("model"),
-             "routines": m.get("routines") or []} for m in built if m.get("ok")]
+    made = [{k: m.get(k) for k in ("name", "display_name", "model", "routines", "warning", "connect_next")
+             if m.get(k)} for m in built if m.get("ok")]
     out = {"ok": bool(made), "team": s.get("team") or None,
            "lead": (lead or {}).get("name"), "members": made,
            "failed": [{"name": f.get("name"), "error": f.get("error")} for f in failed],

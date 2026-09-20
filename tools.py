@@ -132,11 +132,13 @@ def copy_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
 
 
 def share_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
-    return _manage("export", args, settings)
+    # allow_secrets is an operator setting, never a tool argument
+    return _manage("export", {k: v for k, v in args.items() if k != "allow_secrets"}, settings)
 
 
 def import_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
-    return _manage("import", {**args, "launch_profile": launch_profile(kwargs.get("session_id"))}, settings)
+    return _manage("import", {**{k: v for k, v in args.items() if k != "allow_secrets"},
+                              "launch_profile": launch_profile(kwargs.get("session_id"))}, settings)
 
 
 def hide_agent(args: dict, settings: dict | None = None, **kwargs) -> str:

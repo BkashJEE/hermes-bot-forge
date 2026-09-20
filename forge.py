@@ -386,7 +386,7 @@ def forge(s: dict) -> dict:
             names = ", ".join(portable.bundled_templates())
             return {"ok": False, "error": f"template '{ref}': {exc}. Bundled templates: {names}", "rolled_back": False}
         scan = portable.scan_text(json.dumps(tpl))
-        if scan["verdict"] == "BLOCK" and not s.get("allow_secrets"):
+        if scan["verdict"] == "BLOCK" and not settings.get("allow_secrets"):
             return {"ok": False, "error": "template contains what looks like a credential — refusing to import it",
                     "scan": scan, "rolled_back": False}
         s = {**{k: v for k, v in tpl.items() if k not in ("format", "version")},

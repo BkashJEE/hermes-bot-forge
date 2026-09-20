@@ -161,7 +161,7 @@ SHARE_AGENT = {
         "properties": {
             "name": {"type": "string", "description": "the Bot to share"},
             "mode": {"type": "string", "enum": ["template", "backup"], "description": "template (default) or backup"},
-            "path": {"type": "string", "description": "optional output path"},
+            "path": {"type": "string", "description": "optional file name/path under <hermes>/profile-exports (never overwrites)"},
         },
         "required": ["name"],
     },

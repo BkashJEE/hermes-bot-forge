@@ -330,3 +330,35 @@ CHECK_INSTALL = {
     ),
     "parameters": {"type": "object", "properties": {}},
 }
+
+
+AGENT_JOURNAL = {
+    "name": "agent_journal",
+    "description": (
+        "Maintain a Bot's append-only work journal. New Bot Forge Bots have journaling enabled by default. "
+        "Use action='add' after meaningful work to record observable outcomes, evidence, blockers and next steps; "
+        "skip routine conversation. Use action='read' when the user asks what a Bot has done, or action='enable' "
+        "once for an older Bot. When called inside a Bot's own chat, `name` can be omitted; otherwise pass a Bot "
+        "name from list_agents. Never journal credentials, authentication material, facts unrelated to the Bot's "
+        "job, private reasoning, or hidden chain-of-thought."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "action": {"type": "string", "enum": ["enable", "add", "read"]},
+            "name": {"type": "string", "description": "Bot profile name or title; omit only from that Bot's own chat"},
+            "title": {"type": "string", "description": "short factual entry title; required for add"},
+            "summary": {"type": "string", "description": "what happened and why it matters; required for add"},
+            "status": {"type": "string", "enum": ["planned", "progress", "completed", "blocked", "failed"],
+                       "description": "entry outcome; defaults to progress"},
+            "evidence": {"type": "array", "items": {"type": "string"},
+                         "description": "commands, links, files, measurements, or other user-visible proof"},
+            "next_steps": {"type": "array", "items": {"type": "string"}},
+            "tags": {"type": "array", "items": {"type": "string"}},
+            "date": {"type": "string", "description": "read only: YYYY-MM-DD; omit for newest entries"},
+            "query": {"type": "string", "description": "read only: case-insensitive text filter"},
+            "limit": {"type": "integer", "minimum": 1, "maximum": 50, "description": "read only; default 10"},
+        },
+        "required": ["action"],
+    },
+}

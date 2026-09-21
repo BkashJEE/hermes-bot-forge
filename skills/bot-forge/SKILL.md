@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.5.0
+version: 0.6.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -86,6 +86,12 @@ Any Bot you give `terminal` or `code_execution` should get `sandbox: "docker"` s
 
 ## Health
 "how are my bots doing" or a weekly review → `check_agents`. "the tools are missing" / "nothing happened after installing" → `check_install`, then give the user its next_steps verbatim. Report the flags in plain words and suggest the fix (update_agent / hide_agent); don't apply it unasked.
+
+## Journal
+- New Bots have a factual work journal by default. After meaningful work, use `agent_journal` with `action: add` to record the outcome, evidence, blockers and next step.
+- Skip routine conversation. Never journal credentials, authentication material, facts unrelated to the job, private reasoning, or hidden chain-of-thought.
+- "what did X do?" / "show X's journal" → `agent_journal` with `action: read` and the Bot name.
+- A Bot created before journaling existed → `agent_journal` with `action: enable` once. This appends the journal policy without replacing its persona.
 
 ## Teams
 "set me up a <kind> team", "hire me a crew" → `create_team`. Design a lead (chief of staff) plus 2-4 specialists, one job each, and pass them in one call — never loop `create_agent`. Use `lead_name` when an obvious boss Bot already exists. Tell the user it takes a few minutes before you call it.

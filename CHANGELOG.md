@@ -3,13 +3,23 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-09-24
+
+### Added
+- `agent_journal` — enable, append to, and read a Bot's private dated work journal. Entries capture outcomes, evidence, blockers and next steps while refusing credential-shaped content.
+- New Bots receive concise journaling guidance by default (`journal_enabled: true`); older Bots can be enabled without replacing their persona.
+
+### Changed
+- Shareable `.botforge.json` templates continue to exclude activity history, now explicitly including Bot work journals. Full private backups retain them.
+- The doctor no longer warns about profiles that deliberately don't have Bot Forge enabled, and says plainly on Windows that the platform is untested.
+- README states which platforms are tested.
+
 ## [0.5.0] - 2026-09-23
 
 ### Added
 - `hermes bot-forge-doctor` (and the `check_install` tool) — checks the install itself: which profiles have Bot Forge enabled, whether each gateway is running the current plugin code (the usual reason the tools never appear), Desktop Bot Mode, whether a new Bot's inherited model can sign in, usable sandbox backends, bundled templates, and version drift between profiles. Read-only, and it prints the exact next commands.
 - `create_agent(sandbox=...)` — give a Bot its own computer: `docker`, `singularity` or `apptainer` put its shell in a container instead of on the user's machine. The call is refused before anything is created when the backend is not usable here. Also available per member in `create_team`.
 - `check_agents` reports each Bot's sandbox and flags Bots with `terminal` / `code_execution` / `computer_use` that run directly on the real machine.
-
 ## [0.4.1] - 2026-09-19
 
 ### Fixed

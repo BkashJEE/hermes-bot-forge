@@ -1,5 +1,6 @@
 """Unit tests for the pure parts of bot-forge. Run: python -m unittest discover -s tests"""
 
+import json
 import sqlite3
 import sys
 import tempfile
@@ -28,6 +29,11 @@ try:
     import team  # noqa: E402
 except ImportError:  # pragma: no cover
     team = None
+
+try:
+    import journal  # noqa: E402
+except ImportError:  # pragma: no cover
+    journal = None
 
 
 def make_root(tmp: Path, profiles=(), titles=None, root_display=None):
@@ -152,9 +158,13 @@ class LaunchProfile(unittest.TestCase):
     def test_session_owner_is_found(self):
         with tempfile.TemporaryDirectory() as t:
             root = make_root(Path(t), profiles=["ceo"])
-            with sqlite3.connect(root / "profiles" / "ceo" / "state.db") as c:
+            c = sqlite3.connect(root / "profiles" / "ceo" / "state.db")
+            try:
                 c.execute("create table sessions (id text)")
                 c.execute("insert into sessions values ('s1')")
+                c.commit()
+            finally:
+                c.close()
             self.assertEqual(tools.launch_profile("s1", root), "ceo")
             self.assertEqual(tools.launch_profile("nope", root), "default")
             self.assertEqual(tools.launch_profile(None, root), "default")
@@ -462,6 +472,77 @@ class Health(unittest.TestCase):
         self.assertFalse(forge.check_routine({"schedule": "*/5 * * * *", "allow_frequent": True}))
 
 
+@unittest.skipIf(journal is None, "journal module not importable")
+class Journal(unittest.TestCase):
+    def _bot(self, root, name="quill"):
+        d = root / "profiles" / name
+        d.mkdir(exist_ok=True)
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}))
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}))
+        (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**, a writer.\n")
+        return d
+
+    def test_enable_is_idempotent_and_preserves_persona(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            pdir = self._bot(root)
+            first = journal.operate({"action": "enable", "name": "quill", "hermes_root": str(root)})
+            second = journal.operate({"action": "enable", "name": "quill", "hermes_root": str(root)})
+            self.assertTrue(first["ok"], first)
+            self.assertTrue(first["changed"])
+            self.assertFalse(second["changed"])
+            soul = (pdir / "SOUL.md").read_text()
+            self.assertEqual(soul.count(journal.JOURNAL_MARKER), 1)
+            self.assertIn("You are **Quill**", soul)
+            self.assertTrue((pdir / "journal" / "README.md").exists())
+
+    def test_add_and_read_factual_entry(self):
+        from datetime import datetime, timezone
+
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            pdir = self._bot(root)
+            journal.enable_journal(pdir)
+            out = journal.add_entry(pdir, {"title": "Prepared launch draft", "summary": "Drafted three posts.",
+                                                   "status": "completed", "evidence": ["drafts/x-launch.md"],
+                                                   "next_steps": ["Owner reviews the hooks"], "tags": ["X", "launch"]},
+                                    now=datetime(2026, 9, 20, 20, 30, tzinfo=timezone.utc))
+            self.assertTrue(out["written"])
+            read = journal.read_entries(pdir, {"query": "three posts", "limit": 5})
+            self.assertEqual(read["count"], 1)
+            self.assertIn("completed", read["entries"][0]["entry"])
+            self.assertIn("drafts/x-launch.md", read["entries"][0]["entry"])
+
+    def test_secret_is_refused_without_echoing_value(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            pdir = self._bot(root)
+            journal.enable_journal(pdir)
+            fake = "sk-proj-" + "Z" * 30
+            out = journal.operate({"action": "add", "name": "quill", "hermes_root": str(root),
+                                   "title": "Configured API", "summary": f"Used {fake}"})
+            self.assertFalse(out["ok"])
+            self.assertNotIn(fake, str(out))
+            self.assertEqual(list((pdir / "journal").glob("????-??-??.md")), [])
+
+    def test_reading_disabled_journal_is_non_mutating(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            pdir = self._bot(root)
+            out = journal.operate({"action": "read", "name": "quill", "hermes_root": str(root)})
+            self.assertTrue(out["ok"], out)
+            self.assertFalse(out["enabled"])
+            self.assertEqual(out["entries"], [])
+            self.assertFalse((pdir / "journal").exists())
+
+    def test_root_profile_cannot_be_targeted(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            out = journal.operate({"action": "enable", "name": "default", "hermes_root": str(root)})
+            self.assertFalse(out["ok"])
+            self.assertIn("Bot name", out["error"])
+
+
 class Portable(unittest.TestCase):
     def test_scanner_blocks_keys_and_never_echoes_them(self):
         import portable
@@ -498,10 +579,13 @@ class Portable(unittest.TestCase):
             (d / "memories" / "MEMORY.md").write_text("My name is Quill.\n§\nDrafts go out Fridays.")
             (d / "memories" / "USER.md").write_text("User lives in Pune.")
             (d / "state.db").write_text("chat history")
+            (d / "journal").mkdir()
+            (d / "journal" / "2026-09-20.md").write_text("secret work journal entry")
             tpl = portable.build_template(d, root)
             blob = str(tpl)
             self.assertNotIn("Pune", blob)
             self.assertNotIn("chat history", blob)
+            self.assertNotIn("secret work journal entry", blob)
             self.assertEqual(tpl["memory"], ["Drafts go out Fridays."])
             self.assertEqual(tpl["role"], "Writer")
 
@@ -626,6 +710,90 @@ class Doctor(unittest.TestCase):
         self.assertEqual(out["next_steps"], [])
         self.assertIn("docker", next(c for c in out["checks"] if c["check"] == "sandboxes")["detail"])
         self.assertIn("Bot Forge doctor", doctor.render(out))
+
+
+
+class JournalPrivacy(unittest.TestCase):
+    """A journal is the Bot's private record: it must never ride along in something shareable."""
+
+    def _journaling_bot(self, root):
+        import journal
+        d = root / "profiles" / "quill"
+        (d / "memories").mkdir(parents=True)
+        (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web"]}}))
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}))
+        (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**.\n")
+        (d / "memories" / "MEMORY.md").write_text("Drafts go out Fridays.")
+        journal.enable_journal(d)
+        journal.add_entry(d, {"title": "Wrote the Q3 launch thread", "status": "completed",
+                              "summary": "Drafted eight posts about the internal pricing change.",
+                              "evidence": ["posts saved to drafts/q3.md"]})
+        return d
+
+    def test_shared_template_carries_no_journal_entries(self):
+        import portable
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._journaling_bot(root)
+            blob = json.dumps(portable.build_template(d, root))
+            self.assertNotIn("Q3 launch thread", blob)
+            self.assertNotIn("internal pricing", blob)
+            self.assertNotIn("drafts/q3.md", blob)
+
+    def test_journal_files_live_only_inside_the_profile(self):
+        import journal
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._journaling_bot(root)
+            written = list((d / "journal").glob("????-??-??.md"))
+            self.assertTrue(written)
+            for f in written:
+                self.assertTrue(f.resolve().is_relative_to(d.resolve()))
+                self.assertEqual(f.stat().st_mode & 0o777, 0o600)
+            self.assertEqual((d / "journal").stat().st_mode & 0o777, 0o700)
+            self.assertTrue(journal.journaling_enabled(d))
+
+    def test_a_symlinked_journal_directory_is_refused(self):
+        import journal
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = root / "profiles" / "quill"
+            d.mkdir(parents=True)
+            elsewhere = Path(t) / "outside"
+            elsewhere.mkdir()
+            (d / "journal").symlink_to(elsewhere)
+            with self.assertRaises(ValueError):
+                journal.ensure_journal(d)
+
+
+
+class Manifest(unittest.TestCase):
+    """The plugin files must import and agree with each other — a broken schemas.py used to pass CI."""
+
+    def test_every_schema_is_wellformed(self):
+        import schemas
+        found = {v["name"]: v for v in vars(schemas).values()
+                 if isinstance(v, dict) and "name" in v and "parameters" in v}
+        self.assertGreaterEqual(len(found), 14)
+        for name, schema in found.items():
+            self.assertTrue(schema["description"].strip(), name)
+            self.assertEqual(schema["parameters"]["type"], "object", name)
+            for field, spec in (schema["parameters"].get("properties") or {}).items():
+                self.assertIn("type", spec, f"{name}.{field}")
+
+    def test_manifest_declares_exactly_the_registered_tools(self):
+        import schemas
+        manifest = yaml.safe_load(Path(ROOT / "plugin.yaml").read_text())
+        registered = {v["name"] for v in vars(schemas).values()
+                      if isinstance(v, dict) and "name" in v and "parameters" in v}
+        self.assertEqual(set(manifest["provides_tools"]), registered)
+
+    def test_versions_agree(self):
+        manifest = yaml.safe_load(Path(ROOT / "plugin.yaml").read_text())
+        skill = (ROOT / "skills" / "bot-forge" / "SKILL.md").read_text()
+        changelog = (ROOT / "CHANGELOG.md").read_text()
+        self.assertIn(f"version: {manifest['version']}", skill)
+        self.assertIn(f"## [{manifest['version']}]", changelog)
 
 
 if __name__ == "__main__":

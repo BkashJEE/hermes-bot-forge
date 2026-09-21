@@ -5,7 +5,7 @@ from pathlib import Path
 from . import schemas, tools
 
 _SETTINGS = ("inherit_model", "fallback_model", "probe_local_models", "install_gateway",
-             "allow_delete", "backup_before_delete", "suggest_connectors", "allow_secrets")
+             "allow_delete", "backup_before_delete", "suggest_connectors", "allow_secrets", "journal_enabled")
 
 
 def register(ctx):
@@ -22,6 +22,9 @@ def register(ctx):
                       description="Check that Bot Forge itself is set up correctly (read-only)")
     ctx.register_tool(name="check_agents", toolset="bot_forge", schema=schemas.CHECK_AGENTS,
                       handler=tools.check_agents, emoji="🩺", description="Health check for all Bots (read-only)")
+    ctx.register_tool(name="agent_journal", toolset="bot_forge", schema=schemas.AGENT_JOURNAL,
+                      handler=tools.agent_journal, emoji="📓",
+                      description="Enable, write, or read a Bot's factual work journal")
     ctx.register_tool(name="ask_agent", toolset="bot_forge", schema=schemas.ASK_AGENT,
                       handler=tools.ask_agent, emoji="📨",
                       description="Ask another Hermes Bot something and return its reply")

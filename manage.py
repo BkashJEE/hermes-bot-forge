@@ -188,9 +188,16 @@ def op_copy(s: dict, root: Path, settings: dict) -> dict:
     forge.run(root, "profile", "create", new_id, "--clone-from", src.name, "--description", description)
     pdir = root / "profiles" / new_id
     try:
+        # A copy gets a fresh work history. Private backups, not copies/templates,
+        # are the mechanism for preserving a Bot's journal.
+        shutil.rmtree(pdir / "journal", ignore_errors=True)
         forge.write_bot_meta(pdir, display, description, s.get("avatar_kind") or "")
         soul = (pdir / "SOUL.md").read_text() if (pdir / "SOUL.md").exists() else ""
         (pdir / "SOUL.md").write_text(forge.ensure_identity(soul, display, s.get("role") or "Bot", new_id))
+        if settings.get("journal_enabled", True):
+            import journal
+
+            journal.enable_journal(pdir)
         if settings.get("install_gateway", True) and os.name != "nt":
             forge.run(root, "-p", new_id, "gateway", "install", "--start-now", "--start-on-login", check=False, timeout=120)
         return {"ok": True, "name": new_id, "display_name": display, "copied_from": src.name,
@@ -258,7 +265,7 @@ def op_export(s: dict, root: Path, settings: dict) -> dict:
             "size_kb": round(out.stat().st_size / 1000, 1),
             "contains": ["persona", "its own memory", "tools", "skill choices",
                          f"{len(tpl['taught_skills'])} taught skill(s)", f"{len(tpl['routines'])} routine(s)"],
-            "never_contains": ["chat history", "facts about the user", "API keys or logins"],
+            "never_contains": ["chat history", "work journal", "facts about the user", "API keys or logins"],
             "note": "a readable JSON file — safe to post as a gist or commit to a repo"
                     + (" (review the WARN findings first)" if scan["verdict"] == "WARN" else "")}
 

@@ -1,5 +1,5 @@
 name: bot-forge
-version: 0.5.0
+version: 0.6.0
 description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
 author: Bikash Joshi
 license: MIT
@@ -16,6 +16,7 @@ provides_tools:
   - list_agents
   - check_agents
   - check_install
+  - agent_journal
   - ask_agent
   - share_agent
   - import_agent
@@ -57,3 +58,7 @@ config_schema:
     type: bool
     default: true
     description: Install and start a background gateway service for each new Bot (systemd/launchd; skipped on Windows).
+  journal_enabled:
+    type: bool
+    default: true
+    description: Give new Bots an append-only work journal and instructions to record meaningful outcomes, evidence and next steps.

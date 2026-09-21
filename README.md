@@ -42,7 +42,7 @@ Every step is checked, and the whole Bot is rolled back if one fails.
 
 - Hermes Agent **0.21+** with the `hermes` CLI on your `PATH`
 - Hermes Desktop for Bot Mode (the CLI works too — Bots are profiles)
-- Linux or macOS for gateway services (on Windows, Bots are created without a gateway)
+- **Linux and macOS are tested.** Windows is not: Bots are still created and work from the CLI, but gateway services and sandboxes are skipped there
 
 ### 2. Install
 
@@ -125,6 +125,7 @@ plugins:
         fallback_model: {}
         probe_local_models: false
         install_gateway: true
+        journal_enabled: true
         suggest_connectors: true
         allow_delete: false
 ```
@@ -135,6 +136,7 @@ plugins:
 | `fallback_model` | `{}` | Model to switch a Bot to when its inherited model can't sign in, e.g. `{default: qwen3, provider: custom, base_url: http://127.0.0.1:8080/v1}`. |
 | `probe_local_models` | `false` | With no `fallback_model`, look for a local llama.cpp / Ollama / LM Studio server to fall back to. |
 | `install_gateway` | `true` | Install and start a gateway service per Bot (skipped on Windows). |
+| `journal_enabled` | `true` | Give new Bots a private, append-only work journal for outcomes, evidence and next steps. |
 | `allow_delete` | `false` | Let `delete_agent` work at all. Off by default — an agent should not be able to destroy a Bot on its own. |
 | `backup_before_delete` | `true` | Export the Bot to a `.tar.gz` before deleting it, so it can be restored. If the backup fails, the delete is refused. |
 | `allow_secrets` | `false` | Let `share_agent` write / `import_agent` accept a template the secret scanner marked BLOCK. Operator-only; the model cannot pass it as an argument. |
@@ -166,6 +168,7 @@ Thirteen tools, all driven by plain requests in chat:
 | `list_agents` | *"what bots do I have?"* | Roster with description, model, routine count and hidden state. |
 | `check_install` | *"the tools aren't showing up"* | Checks the install itself: enabled profiles, whether each gateway runs the current code, Bot Mode, model sign-in, sandbox backends. |
 | `check_agents` | *"how are my bots doing?"* | Read-only health check: routines that run too often (and their cost in runs/day), paused or never-run routines, unused Bots, stopped gateways, a persona missing its name or approvals. |
+| `agent_journal` | *"what did Inkwell work on this week?"* | Enables, appends to, and reads a Bot's dated work journal. Entries capture outcomes and evidence, never credentials or private reasoning. |
 | `ask_agent` | *"ask Inkwell for 3 post ideas"* | Sends a task to another Bot and returns its reply. |
 | `share_agent` | *"share Inkwell with a friend"* | Writes a readable `.botforge.json` template — persona, its own memory, tools, skills, routines. **Never chat history, facts about you, or keys**, and secret-scanned (CLEAN / WARN / BLOCK). `mode: backup` makes a full private backup instead. |
 | `import_agent` | *"import this bot"* | Builds a Bot from a `.botforge.json` template (scanned again), or restores a backup. |
@@ -201,6 +204,21 @@ A Bot with `terminal` or `code_execution` runs commands on **your** machine by d
 > make me a coding bot, sandboxed
 
 `create_agent(sandbox="docker")` puts that Bot's shell in its own container: it cannot read your files and cannot block the other Bots. `singularity` and `apptainer` work too. If the backend is not usable on this machine, the call is **refused before any Bot is created**, with the reason. `check_agents` reports each Bot's sandbox and flags shell-capable Bots that run on the real machine.
+### A journal for work that survives the chat
+
+Every new Bot gets a private `journal/YYYY-MM-DD.md` log. After meaningful work it records a short factual entry:
+
+- what it tried and the observable outcome
+- evidence such as a file, command, link or measurement
+- blockers and the next step
+
+Routine conversation is skipped. Credentials, facts unrelated to the Bot's job, private reasoning and hidden chain-of-thought are refused. Journals stay local, are excluded from shareable `.botforge.json` templates, and are included only in explicit private backups.
+
+For a Bot created before this feature:
+
+> enable journaling for Inkwell
+
+Then ask *"what did Inkwell work on this week?"* to read recent entries.
 
 ### Cost and safety built in
 
@@ -228,10 +246,11 @@ Bundled skill: `bot-forge:bot-forge` — role defaults, naming rules and a SOUL.
 2. `hermes profile create <id> --clone-from default` — messaging channels are left behind
 3. **Bot Mode metadata** in `profile.yaml` (`ui_meta.hermes-bots`: title, description, blob face) — the same shape Desktop's New Agent dialog saves
 4. **SOUL.md** (guaranteed to state the Bot's own name), `memories/MEMORY.md`, and `memories/USER.md` minus entries that name the assistant — otherwise the new Bot adopts another Bot's name
-5. **Config** — `platform_toolsets.cli`, unrelated skill categories disabled (not deleted), inherited model
-6. **Routines** — `hermes cron create … --deliver bot-chat:<id>`
-7. **Smoke test** — the kickoff message in its `Bot Chat`
-8. **Gateway** — `hermes -p <id> gateway install --start-now --start-on-login`
+5. **Journal** — private, dated Markdown entries plus a concise factual journaling policy
+6. **Config** — `platform_toolsets.cli`, unrelated skill categories disabled (not deleted), inherited model
+7. **Routines** — `hermes cron create … --deliver bot-chat:<id>`
+8. **Smoke test** — the kickoff message in its `Bot Chat`
+9. **Gateway** — `hermes -p <id> gateway install --start-now --start-on-login`
 
 Any failure after step 2 deletes the profile.
 

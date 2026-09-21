@@ -1,7 +1,7 @@
 """Portable Bot templates (.botforge.json): what gets shared, what never does, and the secret scan.
 
 A template carries the Bot's design — persona, its own memory, tools, skill choices, taught skills, routines,
-face. It never carries chat history, facts about the user (USER.md), credentials, logs or caches. Every
+face. It never carries chat history, work journals, facts about the user (USER.md), credentials, logs or caches. Every
 template is scanned for secrets on export and on import.
 """
 import json

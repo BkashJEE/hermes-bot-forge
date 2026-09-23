@@ -237,6 +237,27 @@ You are **{s['display_name']}**, the {s['role']} of this Hermes deployment (prof
 """
 
 
+# ── sandboxes ────────────────────────────────────────────────────────────────
+SANDBOXES = ("local", "docker", "singularity", "apptainer")
+
+
+def sandbox_error(sandbox: str) -> str:
+    """Refuse a sandbox this machine cannot actually run, before a half-usable Bot exists."""
+    sandbox = (sandbox or "local").strip().lower()
+    if sandbox in ("", "local"):
+        return ""
+    if sandbox not in SANDBOXES:
+        return f"unknown sandbox '{sandbox}' — use one of: {', '.join(SANDBOXES)}"
+    import doctor
+    found = doctor.sandbox_backends().get(sandbox)
+    if not found:
+        return (f"{sandbox} is not installed on this machine, so the Bot would have no computer of its own. "
+                f"Install it, or create the Bot with sandbox 'local' (it then shares this machine's shell).")
+    if not found["usable"]:
+        return found["hint"] or f"{sandbox} is installed but not reachable"
+    return ""
+
+
 # ── routines ─────────────────────────────────────────────────────────────────
 MIN_ROUTINE_MINUTES = 30
 DEFAULT_APPROVALS = ["send, post or publish anything", "spend money or buy anything", "delete files or data"]
@@ -400,6 +421,10 @@ def forge(s: dict) -> dict:
     s.setdefault("one_job", f"acts as the user's {s['role']}")
     description = s.get("description") or f"{s['role']}: {s['one_job']}."
     soul = ensure_identity(s.get("soul_md") or render_soul(s, profile_id), display, s["role"], profile_id)
+    sandbox = (s.get("sandbox") or "local").strip().lower()
+    problem = sandbox_error(sandbox)
+    if problem:
+        return {"ok": False, "error": problem, "rolled_back": False}
     approvals = s.get("approvals")
     approvals = list(DEFAULT_APPROVALS) if approvals is None else [a for a in approvals if isinstance(a, str)]
     reports_to = (s.get("reports_to") or "").strip().lstrip("@")
@@ -464,6 +489,10 @@ def forge(s: dict) -> dict:
             launch_model = load_yaml((root if launch == "default" else root / "profiles" / launch) / "config.yaml").get("model")
             if isinstance(launch_model, dict) and launch_model.get("default"):
                 cfg["model"] = launch_model
+        if sandbox not in ("", "local"):  # the Bot's shell runs in its own container, not on this machine
+            terminal = cfg.get("terminal") if isinstance(cfg.get("terminal"), dict) else {}
+            terminal["backend"] = sandbox
+            cfg["terminal"] = terminal
         dump_yaml(cfg_path, cfg)
 
         # 5. routines
@@ -504,7 +533,7 @@ def forge(s: dict) -> dict:
                             for c in suggest_connectors(root, f"{s['role']} {s['one_job']} {description}")]
 
         return {"ok": True, "name": profile_id, "display_name": display, "description": description, "model": model,
-                "connect_next": connect_next,
+                "connect_next": connect_next, "sandbox": sandbox,
                 "approvals": approvals, "reports_to": reports_to or None,
                 "warning": warning, "toolsets": sorted(tools),
                 "skills_disabled": len(disabled), "routines": routines, "gateway": gateway, "intro": reply[-600:],

@@ -104,6 +104,12 @@ def check_bot(pdir: Path, gateways: dict, now: float) -> dict:
         elif not last and _ts(job.get("created_at")) and now - _ts(job.get("created_at")) > 2 * 86400:
             flags.append(f"{label} has never run")
 
+    backend = ((cfg.get("terminal") or {}).get("backend") or "local").lower()
+    shell_tools = {"terminal", "code_execution", "computer_use"} & set((cfg.get("platform_toolsets") or {}).get("cli") or [])
+    if shell_tools and backend in ("", "local"):
+        flags.append(f"runs {'/'.join(sorted(shell_tools))} directly on this machine — create it with a sandbox "
+                     f"(docker) if you want it isolated")
+
     active = _last_active(pdir)
     idle_days = int((now - active) / 86400) if active else None
     if routines and idle_days is not None and idle_days >= STALE_DAYS:
@@ -120,6 +126,7 @@ def check_bot(pdir: Path, gateways: dict, now: float) -> dict:
     return {"name": name, "display_name": title, "model": (cfg.get("model") or {}).get("default", ""),
             "gateway": {True: "running", False: "stopped"}.get(gateways.get(name), "unknown"),
             "routines": routines, "runs_per_day": round(total_runs, 1),
+            "sandbox": backend,
             "idle_days": idle_days, "hidden": bool(isinstance(bots, dict) and bots.get("hidden")),
             "flags": flags, "status": "attention" if flags else "ok"}
 

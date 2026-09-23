@@ -3,6 +3,7 @@
 import sqlite3
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -503,6 +504,128 @@ class Portable(unittest.TestCase):
             self.assertNotIn("chat history", blob)
             self.assertEqual(tpl["memory"], ["Drafts go out Fridays."])
             self.assertEqual(tpl["role"], "Writer")
+
+
+
+class Sandbox(unittest.TestCase):
+    def test_unknown_sandbox_is_rejected(self):
+        self.assertIn("unknown sandbox", forge.sandbox_error("vm"))
+        self.assertEqual(forge.sandbox_error("local"), "")
+        self.assertEqual(forge.sandbox_error(""), "")
+
+    def test_missing_backend_is_refused_with_a_way_out(self):
+        import doctor
+        from unittest import mock
+        with mock.patch.object(doctor, "sandbox_backends", return_value={}):
+            msg = forge.sandbox_error("docker")
+        self.assertIn("not installed", msg)
+        self.assertIn("local", msg)
+
+    def test_unusable_backend_reports_its_hint(self):
+        import doctor
+        from unittest import mock
+        with mock.patch.object(doctor, "sandbox_backends",
+                               return_value={"docker": {"usable": False, "hint": "daemon is down"}}):
+            self.assertEqual(forge.sandbox_error("docker"), "daemon is down")
+        with mock.patch.object(doctor, "sandbox_backends", return_value={"docker": {"usable": True, "hint": ""}}):
+            self.assertEqual(forge.sandbox_error("docker"), "")
+
+    def test_forge_refuses_before_creating_the_profile(self):
+        import doctor
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            with mock.patch.object(doctor, "sandbox_backends", return_value={}):
+                out = forge.forge({"hermes_root": str(root), "role": "Coder", "display_name": "Kairo",
+                                   "one_job": "writes code", "soul_md": "# Kairo\n", "sandbox": "docker"})
+            self.assertFalse(out["ok"])
+            self.assertFalse(out["rolled_back"])
+            self.assertEqual(list((root / "profiles").iterdir()), [])
+
+
+class HealthSandbox(unittest.TestCase):
+    def _bot(self, root, cfg):
+        import yaml as y
+        d = root / "profiles" / "alpha"
+        (d / "cron").mkdir(parents=True)
+        (d / "config.yaml").write_text(y.safe_dump(cfg))
+        (d / "profile.yaml").write_text(y.safe_dump({"ui_meta": {"hermes-bots": {"title": "Alpha"}}}))
+        (d / "SOUL.md").write_text("# Alpha\n\nYou are **Alpha**.\n\n## Ask first\n- x")
+        return d
+
+    def test_shell_bot_without_a_sandbox_is_flagged(self):
+        import health
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root, {"platform_toolsets": {"cli": ["terminal", "web"]}})
+            bot = health.check_bot(d, {}, 0)
+            self.assertEqual(bot["sandbox"], "local")
+            self.assertTrue(any("directly on this machine" in f for f in bot["flags"]))
+
+    def test_sandboxed_bot_is_not_flagged(self):
+        import health
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root, {"platform_toolsets": {"cli": ["terminal"]}, "terminal": {"backend": "docker"}})
+            bot = health.check_bot(d, {}, 0)
+            self.assertEqual(bot["sandbox"], "docker")
+            self.assertEqual(bot["flags"], [])
+
+    def test_bot_without_shell_tools_is_not_flagged(self):
+        import health
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root, {"platform_toolsets": {"cli": ["web", "file"]}})
+            self.assertEqual(health.check_bot(d, {}, 0)["flags"], [])
+
+
+class Doctor(unittest.TestCase):
+    def _root(self, enabled: bool):
+        import yaml as y
+        t = tempfile.mkdtemp()
+        root = make_root(Path(t))
+        cfg = {"model": {"default": "m", "provider": "custom"}}
+        if enabled:
+            cfg["plugins"] = {"enabled": ["bot-forge"]}
+        (root / "config.yaml").write_text(y.safe_dump(cfg))
+        return root
+
+    def test_not_enabled_anywhere_fails_with_the_enable_command(self):
+        import doctor
+        from unittest import mock
+        with mock.patch.object(doctor, "_gateway_pids", return_value={}), \
+                mock.patch.object(doctor, "sandbox_backends", return_value={}):
+            out = doctor.check(self._root(enabled=False))
+        self.assertFalse(out["ok"])
+        self.assertEqual(out["status"], "fail")
+        self.assertTrue(any("plugins enable bot-forge" in s for s in out["next_steps"]))
+
+    def test_stale_gateway_is_reported_with_a_restart_step(self):
+        import doctor
+        from unittest import mock
+        root = self._root(enabled=True)
+        with mock.patch.object(doctor, "_gateway_pids", return_value={"default": 123}), \
+                mock.patch.object(doctor, "_proc_start", return_value=0.0), \
+                mock.patch.object(doctor, "_code_mtime", return_value=time.time()), \
+                mock.patch.object(doctor, "sandbox_backends", return_value={}):
+            out = doctor.check(root)
+        gateway = next(c for c in out["checks"] if c["check"] == "gateway")
+        self.assertEqual(gateway["status"], "fail")
+        self.assertIn("hermes gateway restart", out["next_steps"])
+
+    def test_healthy_install_passes(self):
+        import doctor
+        from unittest import mock
+        root = self._root(enabled=True)
+        with mock.patch.object(doctor, "_gateway_pids", return_value={"default": 123}), \
+                mock.patch.object(doctor, "_proc_start", return_value=time.time()), \
+                mock.patch.object(doctor, "_code_mtime", return_value=0.0), \
+                mock.patch.object(doctor, "sandbox_backends", return_value={"docker": {"usable": True, "hint": ""}}):
+            out = doctor.check(root)
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["next_steps"], [])
+        self.assertIn("docker", next(c for c in out["checks"] if c["check"] == "sandboxes")["detail"])
+        self.assertIn("Bot Forge doctor", doctor.render(out))
 
 
 if __name__ == "__main__":

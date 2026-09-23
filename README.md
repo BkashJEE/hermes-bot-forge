@@ -73,6 +73,12 @@ Then quit and reopen **Hermes Desktop**.
 ### 5. Check it's loaded
 
 ```bash
+hermes bot-forge-doctor
+```
+
+It tells you exactly what is missing — a profile you forgot to enable, a gateway still running the old code (the usual reason the tools never appear), a model that needs a per-Bot sign-in, and which sandbox backends this machine can run. Or, the long way:
+
+```bash
 hermes plugins list | grep bot-forge
 ```
 
@@ -148,7 +154,7 @@ It points that Bot's `auth.json`/`auth.lock` at the root profile's. Hermes delib
 
 ## Tools
 
-Twelve tools, all driven by plain requests in chat:
+Thirteen tools, all driven by plain requests in chat:
 
 | Tool | Say this | What it does |
 |---|---|---|
@@ -158,6 +164,7 @@ Twelve tools, all driven by plain requests in chat:
 | `update_agent` | *"make Inkwell funnier"*, *"give Atlas the browser"* | Edits a Bot in place — persona, name, description, memory, tools, skills, model, face, routines. Backs up what it replaces. |
 | `copy_agent` | *"make another one like Inkwell, for LinkedIn"* | Duplicates a Bot under a new name (no chat history, no routines). |
 | `list_agents` | *"what bots do I have?"* | Roster with description, model, routine count and hidden state. |
+| `check_install` | *"the tools aren't showing up"* | Checks the install itself: enabled profiles, whether each gateway runs the current code, Bot Mode, model sign-in, sandbox backends. |
 | `check_agents` | *"how are my bots doing?"* | Read-only health check: routines that run too often (and their cost in runs/day), paused or never-run routines, unused Bots, stopped gateways, a persona missing its name or approvals. |
 | `ask_agent` | *"ask Inkwell for 3 post ideas"* | Sends a task to another Bot and returns its reply. |
 | `share_agent` | *"share Inkwell with a friend"* | Writes a readable `.botforge.json` template — persona, its own memory, tools, skills, routines. **Never chat history, facts about you, or keys**, and secret-scanned (CLEAN / WARN / BLOCK). `mode: backup` makes a full private backup instead. |
@@ -186,6 +193,14 @@ Any field you give overrides the template's, so *"a morning brief bot called Sol
 > set me up a content team
 
 builds a lead plus its specialists, each with one job, each reporting to the lead, each introduced in its own Bot Chat. A member that fails is rolled back on its own — the rest of the team stands.
+
+### Give a Bot its own computer
+
+A Bot with `terminal` or `code_execution` runs commands on **your** machine by default — the same weakness people hit with other bot platforms, where every Bot shares one computer and one set of logins. Ask for a sandbox instead:
+
+> make me a coding bot, sandboxed
+
+`create_agent(sandbox="docker")` puts that Bot's shell in its own container: it cannot read your files and cannot block the other Bots. `singularity` and `apptainer` work too. If the backend is not usable on this machine, the call is **refused before any Bot is created**, with the reason. `check_agents` reports each Bot's sandbox and flags shell-capable Bots that run on the real machine.
 
 ### Cost and safety built in
 
@@ -239,13 +254,15 @@ Any failure after step 2 deletes the profile.
 | Secret scan on shared templates | community bots (Bouncer, Vet) | — | — | ✅ built in |
 | Chat history excluded from shares | ✅ | — | — | ✅ |
 | Runs entirely on your machine | — | ✅ | ✅ | ✅ |
+| Per-Bot sandbox chosen at creation | — (one shared computer) | — | — | ✅ `sandbox` |
+| Install doctor | — | — | — | ✅ `hermes bot-forge-doctor` |
 
 ## Troubleshooting
 
 | Symptom | Fix |
 |---|---|
 | Agent asks questions instead of building | Say "bot" or "agent" in the request, e.g. *"make me a bot that…"* |
-| Agent doesn't know `create_agent` | Plugin not enabled on **that** profile, or Hermes not restarted (steps 3–4) |
+| Agent doesn't know `create_agent` | Run `hermes bot-forge-doctor` — usually the profile isn't enabled or the gateway still runs the old code |
 | "name … is taken" | Expected — your agent picks another name automatically |
 | New Bot says it needs a sign-in | See step 7 |
 | New Bot doesn't appear in the roster | Click another Bot and back, or reopen Hermes Desktop |

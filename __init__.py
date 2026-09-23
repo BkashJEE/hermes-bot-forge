@@ -17,6 +17,9 @@ def register(ctx):
                       emoji="🧪", description="Spawn a complete, working Hermes Bot from a design")
     ctx.register_tool(name="list_agents", toolset="bot_forge", schema=schemas.LIST_AGENTS,
                       handler=tools.list_agents, emoji="📋", description="List Hermes Bots on this machine")
+    ctx.register_tool(name="check_install", toolset="bot_forge", schema=schemas.CHECK_INSTALL,
+                      handler=tools.check_install, emoji="🩹",
+                      description="Check that Bot Forge itself is set up correctly (read-only)")
     ctx.register_tool(name="check_agents", toolset="bot_forge", schema=schemas.CHECK_AGENTS,
                       handler=tools.check_agents, emoji="🩺", description="Health check for all Bots (read-only)")
     ctx.register_tool(name="ask_agent", toolset="bot_forge", schema=schemas.ASK_AGENT,
@@ -36,6 +39,21 @@ def register(ctx):
         ctx.register_tool(name=name, toolset="bot_forge", schema=schema,
                           handler=(lambda h: lambda args, **kw: h(args, settings=settings(), **kw))(handler),
                           emoji=emoji, description=blurb)
+
+    def _doctor_setup(parser):
+        parser.add_argument("--json", action="store_true", help="machine-readable output")
+
+    def _doctor_handler(args):
+        import doctor
+        return doctor.cli(args)
+
+    try:
+        ctx.register_cli_command(name="bot-forge-doctor", help="Check that Bot Forge is set up correctly",
+                                 setup_fn=_doctor_setup, handler_fn=_doctor_handler,
+                                 description="Report which profiles have Bot Forge enabled, whether their gateways "
+                                             "run the current code, model sign-in, sandbox backends and templates.")
+    except Exception:  # older Hermes without plugin CLI commands: the tool and `python doctor.py` still work
+        pass
 
     skills_dir = Path(__file__).parent / "skills"
     for child in sorted(skills_dir.iterdir()):

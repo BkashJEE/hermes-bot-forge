@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.4.1
+version: 0.5.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -81,8 +81,11 @@ intro: <first line of intro>
 ## Templates
 If the ask matches a starter, pass `template` and override only what differs: chief of staff → `chief-of-staff`, morning/daily brief → `morning-brief`, "keep me updated on <topic>" → `research-digest`, competitor tracking → `competitor-watcher`, repo/CI triage → `engineering-outer-loop`.
 
+## Sandboxes
+Any Bot you give `terminal` or `code_execution` should get `sandbox: "docker"` so its shell runs in a container instead of on the user's machine — say so in your reply. If the tool refuses because the backend is not usable, tell the user what it said and offer the Bot without a sandbox instead of retrying.
+
 ## Health
-"how are my bots doing" or a weekly review → `check_agents`. Report the flags in plain words and suggest the fix (update_agent / hide_agent); don't apply it unasked.
+"how are my bots doing" or a weekly review → `check_agents`. "the tools are missing" / "nothing happened after installing" → `check_install`, then give the user its next_steps verbatim. Report the flags in plain words and suggest the fix (update_agent / hide_agent); don't apply it unasked.
 
 ## Teams
 "set me up a <kind> team", "hire me a crew" → `create_team`. Design a lead (chief of staff) plus 2-4 specialists, one job each, and pass them in one call — never loop `create_agent`. Use `lead_name` when an obvious boss Bot already exists. Tell the user it takes a few minutes before you call it.

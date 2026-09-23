@@ -30,6 +30,11 @@ CREATE_AGENT = {
                 "a cool, unique, Proper Case name for the Bot, e.g. 'Quill', 'Nova', 'Kairo' — never a generic "
                 "role word like 'Writer' or 'Social'. Check list_agents first; if the tool says it's taken, pick another.")},
             "avatar_kind": {"type": "string", "enum": BLOB_KINDS, "description": "blob face silhouette that fits the Bot's vibe"},
+            "sandbox": {"type": "string", "enum": ["local", "docker", "singularity", "apptainer"], "description": (
+                "where this Bot's shell runs. 'local' (default) shares this machine; 'docker' gives the Bot its own "
+                "container, so it cannot touch the user's files and cannot block other Bots. Use a sandbox for any "
+                "Bot you give terminal or code_execution, and say so when you report back. The call is refused if "
+                "the backend is not usable on this machine.")},
             "role": {"type": "string", "description": "role title, e.g. 'Social Media Manager'"},
             "description": {"type": "string", "description": "1-2 sentences on what it is good at (used for routing)"},
             "one_job": {"type": "string", "description": "the Bot's single job in one sentence"},
@@ -238,6 +243,7 @@ CREATE_TEAM = {
         "display_name": {"type": "string"}, "role": {"type": "string"}, "one_job": {"type": "string"},
         "description": {"type": "string"}, "soul_md": {"type": "string"},
         "avatar_kind": {"type": "string", "enum": BLOB_KINDS},
+        "sandbox": {"type": "string", "enum": ["local", "docker", "singularity", "apptainer"]},
         "toolsets": {"type": "array", "items": {"type": "string", "enum": TOOLSETS}},
         "skill_categories": {"type": "array", "items": {"type": "string"}},
         "approvals": {"type": "array", "items": {"type": "string"}},
@@ -256,6 +262,7 @@ CREATE_TEAM = {
         "display_name": {"type": "string"}, "role": {"type": "string"}, "one_job": {"type": "string"},
         "description": {"type": "string"}, "soul_md": {"type": "string"},
         "avatar_kind": {"type": "string", "enum": BLOB_KINDS},
+        "sandbox": {"type": "string", "enum": ["local", "docker", "singularity", "apptainer"]},
         "toolsets": {"type": "array", "items": {"type": "string", "enum": TOOLSETS}},
         "skill_categories": {"type": "array", "items": {"type": "string"}},
         "approvals": {"type": "array", "items": {"type": "string"}},
@@ -308,4 +315,18 @@ CHECK_AGENTS = {
         "type": "object",
         "properties": {"name": {"type": "string", "description": "optional: check one Bot only"}},
     },
+}
+
+
+CHECK_INSTALL = {
+    "name": "check_install",
+    "description": (
+        "Check whether Bot Forge itself is set up correctly on this machine — read-only. Reports which profiles "
+        "have it enabled, whether each gateway is running the current plugin code (if not, its tools are invisible "
+        "and a restart is needed), whether Desktop Bot Mode was detected, whether a new Bot's inherited model can "
+        "sign in, which sandbox backends are usable, and the bundled templates. Use when the user says the tools "
+        "are missing or a new Bot did not work, or right after installing. Report the failing checks and the exact "
+        "next commands."
+    ),
+    "parameters": {"type": "object", "properties": {}},
 }

@@ -104,6 +104,19 @@ def create_team(args: dict, settings: dict | None = None, **kwargs) -> str:
         return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
 
 
+def check_install(args: dict, **kwargs) -> str:
+    try:
+        p = subprocess.run([sys.executable, str(PLUGIN_DIR / "doctor.py"), "--json"],
+                           capture_output=True, text=True, timeout=300)
+    except subprocess.TimeoutExpired:
+        return json.dumps({"ok": False, "error": "check_install timed out"})
+    out = p.stdout.strip()
+    try:
+        return json.dumps(json.loads(out[out.index("{"):]))
+    except ValueError:
+        return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
+
+
 def check_agents(args: dict, **kwargs) -> str:
     root = hermes_root()
     try:

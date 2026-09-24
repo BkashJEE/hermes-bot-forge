@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-09-24
+
+### Added
+- Acknowledgement reactions — a Bot taps back on the message it picked up: 👀 started, 💬 answering now, ✅ done, ✋ needs your approval, ⚠️ blocked, ⏳ scheduled. Once on pickup, once on the outcome, and never instead of a reply. On by default (`ack_reactions`); `update_agent(ack_reactions: true)` adds it to a Bot created earlier.
+
 ## [0.6.0] - 2026-09-24
 
 ### Added
@@ -20,6 +25,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `hermes bot-forge-doctor` (and the `check_install` tool) — checks the install itself: which profiles have Bot Forge enabled, whether each gateway is running the current plugin code (the usual reason the tools never appear), Desktop Bot Mode, whether a new Bot's inherited model can sign in, usable sandbox backends, bundled templates, and version drift between profiles. Read-only, and it prints the exact next commands.
 - `create_agent(sandbox=...)` — give a Bot its own computer: `docker`, `singularity` or `apptainer` put its shell in a container instead of on the user's machine. The call is refused before anything is created when the backend is not usable here. Also available per member in `create_team`.
 - `check_agents` reports each Bot's sandbox and flags Bots with `terminal` / `code_execution` / `computer_use` that run directly on the real machine.
+
 ## [0.4.1] - 2026-09-19
 
 ### Fixed

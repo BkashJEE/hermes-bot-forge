@@ -1,5 +1,5 @@
 name: bot-forge
-version: 0.6.0
+version: 0.7.0
 description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
 author: Bikash Joshi
 license: MIT
@@ -58,6 +58,12 @@ config_schema:
     type: bool
     default: true
     description: Install and start a background gateway service for each new Bot (systemd/launchd; skipped on Windows).
+  ack_reactions:
+    type: bool
+    default: true
+    description: >-
+      New Bots acknowledge a request by reacting to the user's message — 👀 picked up, 💬 answering, ✅ done,
+      ✋ needs approval, ⚠️ blocked, ⏳ scheduled. Once on pickup and once on the outcome, never instead of a reply.
   journal_enabled:
     type: bool
     default: true

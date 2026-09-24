@@ -197,6 +197,25 @@ Any field you give overrides the template's, so *"a morning brief bot called Sol
 
 builds a lead plus its specialists, each with one job, each reporting to the lead, each introduced in its own Bot Chat. A member that fails is rolled back on its own — the rest of the team stands.
 
+### A Bot that tells you where your request stands
+
+Every new Bot reacts to the message it just picked up, the way a person taps back in a chat:
+
+| | |
+|---|---|
+| 👀 | picked it up, working on it |
+| 💬 | answering now |
+| ✅ | done |
+| ✋ | needs your approval before going further |
+| ⚠️ | blocked, or something failed |
+| ⏳ | scheduled for later |
+
+Once when it starts, once when it ends — and never *instead* of a reply. In Hermes Desktop this uses the built-in `react_to_message`; on messaging platforms, the adapter's own reactions. Where reactions don't exist (CLI, cron), the Bot simply replies.
+
+Turn it off for a Bot with `create_agent(ack_reactions=false)`, or on for an older Bot:
+
+> turn on acknowledgements for Inkwell
+
 ### Give a Bot its own computer
 
 A Bot with `terminal` or `code_execution` runs commands on **your** machine by default — the same weakness people hit with other bot platforms, where every Bot shares one computer and one set of logins. Ask for a sandbox instead:
@@ -274,6 +293,7 @@ Any failure after step 2 deletes the profile.
 | Chat history excluded from shares | ✅ | — | — | ✅ |
 | Runs entirely on your machine | — | ✅ | ✅ | ✅ |
 | Per-Bot sandbox chosen at creation | — (one shared computer) | — | — | ✅ `sandbox` |
+| Tapback acknowledgements on your message | — | — | — | ✅ built into every Bot |
 | Install doctor | — | — | — | ✅ `hermes bot-forge-doctor` |
 
 ## Troubleshooting

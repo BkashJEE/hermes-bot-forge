@@ -46,6 +46,9 @@ CREATE_AGENT = {
             "skill_categories": {"type": "array", "items": {"type": "string"}, "description": (
                 "skill category folders to keep enabled, e.g. ['social-media','creative']; research and web stay "
                 "on, others are disabled (not deleted)")},
+            "ack_reactions": {"type": "boolean", "description": (
+                "react to the user's message to show where a request stands (👀 picked up, ✅ done, ✋ needs "
+                "approval, ⚠️ blocked). On by default; pass false only if the user wants a silent Bot.")},
             "approvals": {"type": "array", "items": {"type": "string"}, "description": (
                 "things this Bot must ask the user before doing. Defaults to sending/publishing, spending money and "
                 "deleting data when omitted; pass [] only if the user explicitly wants none. Written into its SOUL.md "
@@ -122,6 +125,9 @@ UPDATE_AGENT = {
             "skill_categories": {"type": "array", "items": {"type": "string"},
                                  "description": "replacement set of enabled skill categories"},
             "avatar_kind": {"type": "string", "enum": BLOB_KINDS},
+            "ack_reactions": {"type": "boolean", "description": (
+                "true turns on reaction acknowledgements for a Bot created before this feature; it is added to "
+                "the persona without replacing it")},
             "model": {"type": "object", "description": "model block {default, provider, base_url} — only when asked"},
             "add_routines": {"type": "array", "items": {
                 "type": "object",

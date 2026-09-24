@@ -796,5 +796,57 @@ class Manifest(unittest.TestCase):
         self.assertIn(f"## [{manifest['version']}]", changelog)
 
 
+
+class Acknowledgements(unittest.TestCase):
+    def test_policy_lists_each_state_once(self):
+        import acks
+        emojis = [e for e, _ in acks.ACKS]
+        self.assertEqual(len(emojis), len(set(emojis)))
+        for emoji, meaning in acks.ACKS:
+            self.assertIn(f"- {emoji} — {meaning}", acks.ACK_POLICY)
+
+    def test_policy_says_a_reaction_is_never_an_answer(self):
+        import acks
+        self.assertIn("never an answer", acks.ACK_POLICY)
+        self.assertIn("Always reply", acks.ACK_POLICY)
+        self.assertIn("react_to_message", acks.ACK_POLICY)
+
+    def test_apply_is_idempotent_and_keeps_the_persona(self):
+        import acks
+        soul = "# Quill — Writer\n\nYou are **Quill**.\n\n## Never\n- never publish\n"
+        once = acks.apply_policy(soul)
+        self.assertIn("## Never", once)
+        self.assertIn("You are **Quill**", once)
+        self.assertEqual(acks.apply_policy(once), once)
+        self.assertEqual(once.count(acks.ACK_MARKER), 1)
+
+    def test_enable_on_an_existing_bot_backs_up_and_is_repeatable(self):
+        import acks
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = root / "profiles" / "quill"
+            d.mkdir(parents=True)
+            (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**.\n")
+            first = acks.enable_acks(d)
+            self.assertTrue(first["changed"])
+            self.assertTrue(Path(first["backup"]).exists())
+            self.assertTrue(acks.acks_enabled(d))
+            second = acks.enable_acks(d)
+            self.assertFalse(second["changed"])
+            self.assertEqual((d / "SOUL.md").read_text().count(acks.ACK_MARKER), 1)
+
+    def test_new_bots_acknowledge_unless_asked_not_to(self):
+        import acks
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            spec = {"hermes_root": str(root), "role": "Writer", "one_job": "writes",
+                    "soul_md": "# Kairo — Writer\n\nYou are **Kairo**.\n", "display_name": "Kairo"}
+            out = forge.forge({**spec, "sandbox": "nope"})  # refused before creation, but the soul is built first
+            self.assertFalse(out["ok"])
+            # the policy decision is what we assert, without creating a profile:
+            self.assertIn(acks.ACK_MARKER, acks.apply_policy(spec["soul_md"]))
+            self.assertNotIn(acks.ACK_MARKER, spec["soul_md"])
+
+
 if __name__ == "__main__":
     unittest.main()

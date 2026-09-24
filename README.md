@@ -199,7 +199,7 @@ builds a lead plus its specialists, each with one job, each reporting to the lea
 
 ### A Bot that tells you where your request stands
 
-Every new Bot reacts to the message it just picked up, the way a person taps back in a chat:
+Every new Bot starts its reply with one emoji for the state of your request:
 
 | | |
 |---|---|
@@ -210,7 +210,9 @@ Every new Bot reacts to the message it just picked up, the way a person taps bac
 | ⚠️ | blocked, or something failed |
 | ⏳ | scheduled for later |
 
-Once when it starts, once when it ends — and never *instead* of a reply. In Hermes Desktop this uses the built-in `react_to_message`; on messaging platforms, the adapter's own reactions. Where reactions don't exist (CLI, cron), the Bot simply replies.
+One emoji, at the very start, then the answer as normal — it is never the whole reply. Because it rides on the reply itself, it works the same in Hermes Desktop, an editor client, the CLI, a cron run or a messaging platform.
+
+> This deliberately does **not** use Hermes' emoji tapbacks: `react_to_message` is documented as a human touch, "never as a status signal", and a Bot told to do both follows neither.
 
 Turn it off for a Bot with `create_agent(ack_reactions=false)`, or on for an older Bot:
 
@@ -293,7 +295,7 @@ Any failure after step 2 deletes the profile.
 | Chat history excluded from shares | ✅ | — | — | ✅ |
 | Runs entirely on your machine | — | ✅ | ✅ | ✅ |
 | Per-Bot sandbox chosen at creation | — (one shared computer) | — | — | ✅ `sandbox` |
-| Tapback acknowledgements on your message | — | — | — | ✅ built into every Bot |
+| Every reply says where the request stands | — | — | — | ✅ built into every Bot |
 | Install doctor | — | — | — | ✅ `hermes bot-forge-doctor` |
 
 ## Troubleshooting

@@ -1,5 +1,5 @@
 name: bot-forge
-version: 0.7.2
+version: 0.8.0
 description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
 author: Bikash Joshi
 license: MIT
@@ -62,8 +62,8 @@ config_schema:
     type: bool
     default: true
     description: >-
-      New Bots acknowledge a request by reacting to the user's message — 👀 picked up, 💬 answering, ✅ done,
-      ✋ needs approval, ⚠️ blocked, ⏳ scheduled. Once on pickup and once on the outcome, never instead of a reply.
+      New Bots begin each reply with one emoji for the state of the request — 👀 started, 💬 answering, ✅ done,
+      ✋ needs approval, ⚠️ blocked, ⏳ scheduled — then answer as normal. Works on every surface.
   journal_enabled:
     type: bool
     default: true

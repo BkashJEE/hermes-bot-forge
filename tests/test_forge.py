@@ -805,11 +805,36 @@ class Acknowledgements(unittest.TestCase):
         for emoji, meaning in acks.ACKS:
             self.assertIn(f"- {emoji} — {meaning}", acks.ACK_POLICY)
 
-    def test_policy_says_a_reaction_is_never_an_answer(self):
+    def test_policy_asks_for_a_prefix_not_a_reaction(self):
         import acks
-        self.assertIn("never an answer", acks.ACK_POLICY)
-        self.assertIn("Always reply", acks.ACK_POLICY)
-        self.assertIn("react_to_message", acks.ACK_POLICY)
+        self.assertIn("Begin every reply with one emoji", acks.ACK_POLICY)
+        self.assertIn("never the whole reply", acks.ACK_POLICY)
+        # Hermes' own react_to_message says "never as a status signal" — don't fight it
+        self.assertIn("never as a status signal", acks.ACK_POLICY)
+
+    def test_an_older_convention_block_is_replaced_not_stacked(self):
+        import acks
+        legacy = acks.LEGACY_MARKERS[0]
+        soul = (f"# Quill — Writer\n\nYou are **Quill**.\n\n{legacy}\n## Acknowledge with a reaction\n"
+                "React to the message.\n\n- 👀 — picked up\n\n## Never\n- never publish\n")
+        out = acks.apply_policy(soul)
+        self.assertNotIn(legacy, out)
+        self.assertEqual(out.count(acks.ACK_MARKER), 1)
+        self.assertIn("You are **Quill**", out)
+        self.assertIn("never publish", out)
+        self.assertNotIn("## Acknowledge with a reaction", out)
+
+    def test_enable_reports_an_upgrade_from_the_old_convention(self):
+        import acks
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = root / "profiles" / "quill"
+            d.mkdir(parents=True)
+            (d / "SOUL.md").write_text(f"# Quill\n\nYou are **Quill**.\n\n{acks.LEGACY_MARKERS[0]}\n## Acknowledge\n- x\n")
+            out = acks.enable_acks(d)
+            self.assertTrue(out["changed"])
+            self.assertTrue(out["upgraded"])
+            self.assertTrue(acks.acks_enabled(d))
 
     def test_apply_is_idempotent_and_keeps_the_persona(self):
         import acks

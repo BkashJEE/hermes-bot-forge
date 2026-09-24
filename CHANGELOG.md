@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-09-24
+
+### Changed
+- **Acknowledgements now ride on the reply**, not on an emoji tapback: a Bot begins its answer with 👀 / 💬 / ✅ / ✋ / ⚠️ / ⏳ and then answers as normal. Reactions could not do this job — Hermes' own `react_to_message` is documented as a human touch and "never as a status signal", so a Bot told to use it for status followed neither instruction, and it existed only in Desktop sessions with an opt-in setting enabled. The reply prefix works in Desktop, editor clients, the CLI, cron and messaging alike, with no setting.
+- Enabling acknowledgements on a Bot that carries the old convention replaces that block instead of stacking a second one, and reports `upgraded`.
+
 ## [0.7.2] - 2026-09-24
 
 ### Fixed

@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.7.0
+version: 0.7.1
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -82,6 +82,8 @@ intro: <first line of intro>
 If the ask matches a starter, pass `template` and override only what differs: chief of staff → `chief-of-staff`, morning/daily brief → `morning-brief`, "keep me updated on <topic>" → `research-digest`, competitor tracking → `competitor-watcher`, repo/CI triage → `engineering-outer-loop`.
 
 ## Acknowledgements
+Reactions come from the Bot the user is *talking to*, so a Bot created before this feature stays silent until it is switched on — `check_agents` lists those under `not_acknowledging`. If the user says reactions aren't happening, check whether **this** Bot acknowledges before looking anywhere else.
+
 New Bots acknowledge with a reaction by default — leave `ack_reactions` alone unless the user asks for a silent Bot. "make X acknowledge / react" on an existing Bot → `update_agent(name, ack_reactions: true)`.
 
 ## Sandboxes

@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.1] - 2026-09-24
+
+### Fixed
+- Acknowledgements only reached newly created Bots, so the Bot a user actually talks to stayed silent and the feature looked broken. `check_agents` now reports `acknowledges` per Bot and lists `not_acknowledging`, the doctor counts how many Bots acknowledge and names the ones that don't, and the skill tells an agent to check the current Bot first when reactions aren't happening. Switch one on with `update_agent(ack_reactions: true)`.
+
 ## [0.7.0] - 2026-09-24
 
 ### Added

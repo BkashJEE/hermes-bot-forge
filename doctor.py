@@ -164,6 +164,16 @@ def check(root: Path | None = None) -> dict:
                  "none installed — Bots share this machine's shell (install Docker for per-Bot isolation)"
         checks.append({"check": "sandboxes", "status": WARN, "detail": detail})
 
+    import acks
+    bots = [p for _n, p in _profiles(root)[1:]]
+    acking = [p.name for p in bots if acks.acks_enabled(p)]
+    if bots:
+        silent = [p.name for p in bots if p.name not in acking]
+        checks.append({"check": "acknowledgements", "status": OK if not silent else WARN,
+                       "detail": f"{len(acking)}/{len(bots)} Bots acknowledge with a reaction"
+                                 + (f" — {', '.join(silent)} predate the feature: ask an agent to "
+                                    f"\"turn on acknowledgements for <name>\"" if silent else "")})
+
     import portable
     checks.append({"check": "templates", "status": OK,
                    "detail": ", ".join(sorted(portable.bundled_templates()))})

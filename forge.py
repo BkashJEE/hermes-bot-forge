@@ -65,7 +65,7 @@ def default_root() -> Path:
 
 DEFAULT_SETTINGS = {"inherit_model": True, "fallback_model": {},
                     "probe_local_models": False, "install_gateway": True, "suggest_connectors": True,
-                    "journal_enabled": True}
+                    "journal_enabled": True, "ack_reactions": True}
 
 
 # ── hermes cli ───────────────────────────────────────────────────────────────
@@ -431,6 +431,9 @@ def forge(s: dict) -> dict:
     reports_to = (s.get("reports_to") or "").strip().lstrip("@")
     soul = soul.rstrip() + "\n" + guardrails_block(approvals if "## Ask first" not in soul else [],
                                                    reports_to if "## Escalate to" not in soul else "")
+    if settings.get("ack_reactions", True) and s.get("ack_reactions", True):
+        import acks
+        soul = acks.apply_policy(soul)
     if settings.get("journal_enabled", True):
         import journal
 

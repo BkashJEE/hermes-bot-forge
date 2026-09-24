@@ -116,6 +116,14 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
             soul_path.write_text(forge.ensure_identity(soul_path.read_text(), meta_changes["title"],
                                                        s.get("role") or "Bot", name))
 
+    # acknowledgements
+    if s.get("ack_reactions"):
+        import acks
+        result = acks.enable_acks(pdir)
+        if result["changed"]:
+            backups.setdefault("SOUL.md", result["backup"] or "")
+            changed.append("acknowledgements")
+
     # memory
     if s.get("memory"):
         mem = pdir / "memories" / "MEMORY.md"
@@ -170,7 +178,7 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
     if not changed:
         return {"ok": False, "name": name, "error": "nothing to update — pass soul_md/soul_append, display_name, "
                                                     "description, memory, add_toolsets, skill_categories, model, "
-                                                    "avatar_kind or routines"}
+                                                    "avatar_kind, ack_reactions or routines"}
     return {"ok": True, "name": name, "display_name": _bot_meta(pdir).get("title") or name, "changed": changed,
             "routines_added": routines_added, "routines_removed": routines_removed,
             "backups": {k: v for k, v in backups.items() if v},

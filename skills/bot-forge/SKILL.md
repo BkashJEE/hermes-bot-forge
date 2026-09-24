@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.8.0
+version: 0.9.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]

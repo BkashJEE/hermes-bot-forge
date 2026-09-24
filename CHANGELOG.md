@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-09-24
+
+### Added
+- **The acknowledgement now lands on your own message in Hermes Desktop**, the moment you send it: 👀 while the Bot works, then ✅ / ✋ / ⚠️ for how the turn ended. The plugin places it through `react_to_message` itself rather than leaving it to the model — that tool tells the model it is a human touch, "never as a status signal", so a Bot asked to signal status with it did nothing. Desktop sessions only, needs Settings → Appearance → Message Reactions, off with `ack_tapback: false`, and a failed reaction can never break a turn. The reply prefix still covers every other surface.
+
 ## [0.8.0] - 2026-09-24
 
 ### Changed

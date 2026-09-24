@@ -978,5 +978,57 @@ class BotChatSource(unittest.TestCase):
         self.assertNotIn("--source", calls[0])
 
 
+
+class TapbackHooks(unittest.TestCase):
+    """The plugin places the reaction itself — the model is told not to use reactions for status."""
+
+    class FakeCtx:
+        def __init__(self, fail=False):
+            self.calls, self.fail = [], fail
+
+        def dispatch_tool(self, name, args, **kw):
+            self.calls.append((name, args))
+            if self.fail:
+                raise RuntimeError("reactions are off")
+            return "{}"
+
+    def test_reacts_only_on_desktop_and_only_when_enabled(self):
+        import tapback
+        self.assertTrue(tapback.should_react("desktop", True))
+        for platform in ("cli", "acp", "tui", "api_server", "", None):
+            self.assertFalse(tapback.should_react(platform, True), platform)
+        self.assertFalse(tapback.should_react("desktop", False))
+
+    def test_turn_start_marks_working_and_end_marks_the_outcome(self):
+        import tapback
+        ctx = self.FakeCtx()
+        marks = tapback.Tapback(ctx, lambda: True)
+        marks.on_turn_start(platform="desktop")
+        marks.on_turn_end(platform="desktop", assistant_response="Here is the draft.")
+        self.assertEqual([a["emoji"] for _n, a in ctx.calls], [tapback.WORKING, tapback.DONE])
+        self.assertEqual({n for n, _a in ctx.calls}, {"react_to_message"})
+
+    def test_outcome_reads_the_reply(self):
+        import tapback
+        self.assertEqual(tapback.outcome_emoji("Done — draft saved."), tapback.DONE)
+        self.assertEqual(tapback.outcome_emoji("I can't publish for you."), tapback.BLOCKED)
+        self.assertEqual(tapback.outcome_emoji("Ready. Shall I post it?"), tapback.NEEDS_YOU)
+
+    def test_a_failing_reaction_never_breaks_the_turn(self):
+        import tapback
+        ctx = self.FakeCtx(fail=True)
+        marks = tapback.Tapback(ctx, lambda: True)
+        self.assertIsNone(marks.on_turn_start(platform="desktop"))
+        self.assertIsNone(marks.on_turn_end(platform="desktop", assistant_response="x"))
+
+    def test_nothing_is_dispatched_off_desktop(self):
+        import tapback
+        ctx = self.FakeCtx()
+        marks = tapback.Tapback(ctx, lambda: True)
+        marks.on_turn_start(platform="cli")
+        marks.on_turn_end(platform="acp", assistant_response="x")
+        self.assertEqual(ctx.calls, [])
+
+
 if __name__ == "__main__":
     unittest.main()

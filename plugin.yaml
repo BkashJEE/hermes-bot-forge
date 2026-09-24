@@ -1,5 +1,5 @@
 name: bot-forge
-version: 0.8.0
+version: 0.9.0
 description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
 author: Bikash Joshi
 license: MIT
@@ -22,7 +22,9 @@ provides_tools:
   - import_agent
   - hide_agent
   - delete_agent
-provides_hooks: []
+provides_hooks:
+  - pre_llm_call
+  - post_llm_call
 config_schema:
   inherit_model:
     type: bool
@@ -58,6 +60,13 @@ config_schema:
     type: bool
     default: true
     description: Install and start a background gateway service for each new Bot (systemd/launchd; skipped on Windows).
+  ack_tapback:
+    type: bool
+    default: true
+    description: >-
+      In the Hermes desktop app, react to the user's own message as the turn runs — 👀 while working, then
+      ✅ / ✋ / ⚠️ for how it ended. Placed by the plugin, not left to the model. Desktop sessions only, and it
+      needs Settings → Appearance → Message Reactions on.
   ack_reactions:
     type: bool
     default: true

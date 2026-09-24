@@ -5,7 +5,7 @@ from pathlib import Path
 from . import schemas, tools
 
 _SETTINGS = ("inherit_model", "fallback_model", "probe_local_models", "install_gateway",
-             "allow_delete", "backup_before_delete", "suggest_connectors", "allow_secrets", "journal_enabled", "ack_reactions")
+             "allow_delete", "backup_before_delete", "suggest_connectors", "allow_secrets", "journal_enabled", "ack_reactions", "ack_tapback")
 
 
 def register(ctx):
@@ -57,6 +57,12 @@ def register(ctx):
                                              "run the current code, model sign-in, sandbox backends and templates.")
     except Exception:  # older Hermes without plugin CLI commands: the tool and `python doctor.py` still work
         pass
+
+    # Put the acknowledgement on the user's own message in Desktop, without relying on the model.
+    from . import tapback
+    marks = tapback.Tapback(ctx, lambda: ctx.get_config("ack_tapback", default=True) is not False)
+    ctx.register_hook("pre_llm_call", marks.on_turn_start)
+    ctx.register_hook("post_llm_call", marks.on_turn_end)
 
     skills_dir = Path(__file__).parent / "skills"
     for child in sorted(skills_dir.iterdir()):

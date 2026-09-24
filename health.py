@@ -95,6 +95,11 @@ def _journal_status(pdir: Path) -> dict:
             "latest": files[-1].stem if files else None}
 
 
+def _acks_enabled(pdir: Path) -> bool:
+    import acks
+    return acks.acks_enabled(pdir)
+
+
 def check_bot(pdir: Path, gateways: dict, now: float) -> dict:
     name = pdir.name
     meta = forge.load_yaml(pdir / "profile.yaml")
@@ -142,7 +147,7 @@ def check_bot(pdir: Path, gateways: dict, now: float) -> dict:
     return {"name": name, "display_name": title, "model": (cfg.get("model") or {}).get("default", ""),
             "gateway": {True: "running", False: "stopped"}.get(gateways.get(name), "unknown"),
             "routines": routines, "runs_per_day": round(total_runs, 1),
-            "sandbox": backend,
+            "sandbox": backend, "acknowledges": _acks_enabled(pdir),
             "journal": _journal_status(pdir),
             "idle_days": idle_days, "hidden": bool(isinstance(bots, dict) and bots.get("hidden")),
             "flags": flags, "status": "attention" if flags else "ok"}
@@ -167,7 +172,9 @@ def check(s: dict) -> dict:
     gateways = _gateways(root)
     report = [check_bot(d, gateways, now) for d in bots]
     attention = [b for b in report if b["flags"]]
+    silent = [b["display_name"] for b in report if not b.get("acknowledges")]
     return {"ok": True, "bots": len(report), "needing_attention": len(attention),
+            "not_acknowledging": silent,
             "total_routine_runs_per_day": round(sum(b["runs_per_day"] for b in report), 1),
             "report": report,
             "summary": ("all Bots look healthy" if not attention else

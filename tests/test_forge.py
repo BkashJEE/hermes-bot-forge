@@ -848,5 +848,51 @@ class Acknowledgements(unittest.TestCase):
             self.assertNotIn(acks.ACK_MARKER, spec["soul_md"])
 
 
+
+class AckVisibility(unittest.TestCase):
+    """A Bot created before acknowledgements stays silent — that must be visible, not a mystery."""
+
+    def _bot(self, root, name, acking):
+        import acks
+        d = root / "profiles" / name
+        (d / "cron").mkdir(parents=True)
+        (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web"]}}))
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": name.title()}}}))
+        soul = f"# {name.title()}\n\nYou are **{name.title()}**.\n\n## Ask first\n- x"
+        (d / "SOUL.md").write_text(acks.apply_policy(soul) if acking else soul)
+        return d
+
+    def test_health_lists_bots_that_do_not_acknowledge(self):
+        import health
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root, "newbie", acking=True)
+            self._bot(root, "oldtimer", acking=False)
+            with mock.patch.object(health, "_gateways", return_value={}):
+                out = health.check({"hermes_root": str(root)})
+            self.assertEqual(out["not_acknowledging"], ["Oldtimer"])
+            by_name = {b["name"]: b for b in out["report"]}
+            self.assertTrue(by_name["newbie"]["acknowledges"])
+            self.assertFalse(by_name["oldtimer"]["acknowledges"])
+
+    def test_doctor_counts_acknowledging_bots(self):
+        import doctor
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            (root / "config.yaml").write_text(yaml.safe_dump(
+                {"model": {"default": "m", "provider": "custom"}, "plugins": {"enabled": ["bot-forge"]}}))
+            self._bot(root, "newbie", acking=True)
+            self._bot(root, "oldtimer", acking=False)
+            with mock.patch.object(doctor, "_gateway_pids", return_value={}), \
+                    mock.patch.object(doctor, "sandbox_backends", return_value={}):
+                out = doctor.check(root)
+            line = next(c for c in out["checks"] if c["check"] == "acknowledgements")
+            self.assertEqual(line["status"], "warn")
+            self.assertIn("1/2", line["detail"])
+            self.assertIn("oldtimer", line["detail"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.2] - 2026-09-24
+
+### Fixed
+- A Bot created by Bot Forge could never react in Hermes Desktop. Its canonical Bot Chat was created through `chat -c "Bot Chat" --create-if-missing`, which hardcodes `source="cli"` upstream, and a session's stored source is what decides its client surface — so the Desktop toolset holding `react_to_message` was never offered. On a Bot Mode install the chat is now started with `--source desktop` and then given the canonical title, matching what Desktop itself creates.
+
 ## [0.7.1] - 2026-09-24
 
 ### Fixed

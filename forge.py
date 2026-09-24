@@ -330,10 +330,61 @@ def write_bot_meta(pdir: Path, display, description, kind):
     dump_yaml(path, data)
 
 
-def bot_chat(root, profile_id, message):
-    """Send a message in the Bot's canonical Bot Chat (created on first use)."""
-    p = run(root, "-p", profile_id, "chat", "-c", BOT_CHAT_TITLE, "--create-if-missing", "-Q", "--max-turns", "3",
-            "-q", message, timeout=CHAT_TIMEOUT, check=False)
+def bot_mode_install(root: Path) -> bool:
+    """Is this install managed by Desktop Bot Mode? (any profile carrying the hermes-bots marker)"""
+    homes = [root] + ([d for d in (root / "profiles").iterdir() if is_live_profile(d)]
+                      if (root / "profiles").is_dir() else [])
+    return any((load_yaml(h / "profile.yaml").get("ui_meta") or {}).get("hermes-bots") for h in homes)
+
+
+def has_bot_chat(root, profile_id: str) -> bool:
+    """Does this Bot already own its canonical chat? (then just continue it)"""
+    import contextlib
+    import sqlite3
+    db = Path(root) / "profiles" / profile_id / "state.db"
+    if not db.exists():
+        return False
+    try:
+        with contextlib.closing(sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=2)) as c:
+            return bool(c.execute("select 1 from sessions where title=? limit 1", (BOT_CHAT_TITLE,)).fetchone())
+    except sqlite3.Error:
+        return False
+
+
+def newest_session(root, profile_id: str) -> str:
+    import contextlib
+    import sqlite3
+    db = Path(root) / "profiles" / profile_id / "state.db"
+    try:
+        with contextlib.closing(sqlite3.connect(f"file:{db}?mode=ro", uri=True, timeout=2)) as c:
+            row = c.execute("select id from sessions order by started_at desc limit 1").fetchone()
+            return row[0] if row else ""
+    except sqlite3.Error:
+        return ""
+
+
+def bot_chat(root, profile_id, message, source: str = ""):
+    """Send a message in the Bot's canonical Bot Chat (created on first use).
+
+    The source stamped here is permanent, and Hermes decides a session's client surface from it
+    (`tui_gateway/server.py::_gui_surface_toolsets`): a chat stamped `cli` never gets the desktop
+    toolset, so a Bot whose canonical chat we created could not react to a message in Desktop. On a
+    Bot-Mode install this chat belongs to the Desktop roster, so stamp it the way Desktop would."""
+    source = source or ("desktop" if bot_mode_install(Path(root)) else "cli")
+    existing = has_bot_chat(root, profile_id)
+    if existing or source == "cli":
+        p = run(root, "-p", profile_id, "chat", "-c", BOT_CHAT_TITLE, "--create-if-missing", "-Q",
+                "--max-turns", "3", "-q", message, timeout=CHAT_TIMEOUT, check=False)
+    else:
+        # `chat -c <title> --create-if-missing` hardcodes source="cli" (hermes_cli/main.py), and a session's
+        # stored source is what decides its client surface — a cli-stamped chat never gets the desktop
+        # toolset, so the Bot cannot react to a message in Desktop. Start it with the right source, then
+        # give it the canonical title.
+        p = run(root, "-p", profile_id, "chat", "--source", source, "-Q", "--max-turns", "3", "-q", message,
+                timeout=CHAT_TIMEOUT, check=False)
+        session_id = newest_session(root, profile_id)  # -Q hides the session_id line, so read it back
+        if session_id:
+            run(root, "-p", profile_id, "sessions", "rename", session_id, BOT_CHAT_TITLE, check=False, timeout=60)
     out = clean(p.stdout)
     return p.returncode == 0 and bool(out), out or clean(p.stderr)[-800:]
 

@@ -894,5 +894,64 @@ class AckVisibility(unittest.TestCase):
             self.assertIn("oldtimer", line["detail"])
 
 
+
+class BotChatSource(unittest.TestCase):
+    """A Bot Chat's stored source decides its client surface — stamped `cli`, the Bot can never react."""
+
+    def _root(self, bot_mode: bool):
+        t = tempfile.mkdtemp()
+        root = make_root(Path(t), profiles=["quill"])
+        if bot_mode:
+            (root / "profiles" / "quill" / "profile.yaml").write_text(
+                yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}))
+        return root
+
+    def test_bot_mode_install_is_detected_from_the_marker(self):
+        self.assertTrue(forge.bot_mode_install(self._root(bot_mode=True)))
+        self.assertFalse(forge.bot_mode_install(self._root(bot_mode=False)))
+
+    def test_new_chat_on_a_bot_mode_install_is_stamped_desktop_then_titled(self):
+        from unittest import mock
+        root = self._root(bot_mode=True)
+        calls = []
+
+        def fake_run(r, *args, **kw):
+            calls.append(args)
+            return type("P", (), {"returncode": 0, "stdout": "hello", "stderr": ""})()
+
+        with mock.patch.object(forge, "run", side_effect=fake_run), \
+                mock.patch.object(forge, "has_bot_chat", return_value=False), \
+                mock.patch.object(forge, "newest_session", return_value="s1"):
+            ok, _ = forge.bot_chat(root, "quill", "hi")
+        self.assertTrue(ok)
+        self.assertIn("--source", calls[0])
+        self.assertEqual(calls[0][calls[0].index("--source") + 1], "desktop")
+        self.assertNotIn("--create-if-missing", calls[0])  # that path hardcodes source="cli" upstream
+        self.assertEqual(calls[1][:3], ("-p", "quill", "sessions"))
+        self.assertEqual(calls[1][3:], ("rename", "s1", "Bot Chat"))
+
+    def test_existing_chat_is_continued_not_recreated(self):
+        from unittest import mock
+        root = self._root(bot_mode=True)
+        calls = []
+        with mock.patch.object(forge, "run", side_effect=lambda r, *a, **k: calls.append(a) or
+                               type("P", (), {"returncode": 0, "stdout": "hi", "stderr": ""})()), \
+                mock.patch.object(forge, "has_bot_chat", return_value=True):
+            forge.bot_chat(root, "quill", "hi")
+        self.assertEqual(len(calls), 1)
+        self.assertIn("--create-if-missing", calls[0])
+
+    def test_without_bot_mode_the_chat_stays_a_cli_session(self):
+        from unittest import mock
+        root = self._root(bot_mode=False)
+        calls = []
+        with mock.patch.object(forge, "run", side_effect=lambda r, *a, **k: calls.append(a) or
+                               type("P", (), {"returncode": 0, "stdout": "hi", "stderr": ""})()), \
+                mock.patch.object(forge, "has_bot_chat", return_value=False):
+            forge.bot_chat(root, "quill", "hi")
+        self.assertIn("--create-if-missing", calls[0])
+        self.assertNotIn("--source", calls[0])
+
+
 if __name__ == "__main__":
     unittest.main()

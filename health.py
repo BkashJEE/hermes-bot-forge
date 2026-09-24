@@ -79,6 +79,22 @@ def _gateways(root: Path) -> dict:
     return states
 
 
+def _journal_status(pdir: Path) -> dict:
+    """Small, read-only journal summary; entry bodies stay out of health reports."""
+    import journal
+
+    folder = pdir / "journal"
+    files = sorted(folder.glob("????-??-??.md")) if folder.is_dir() and not folder.is_symlink() else []
+    entries = 0
+    for path in files:
+        try:
+            entries += path.read_text(errors="ignore").count("\n## ")
+        except OSError:
+            continue
+    return {"enabled": journal.journaling_enabled(pdir), "entries": entries,
+            "latest": files[-1].stem if files else None}
+
+
 def check_bot(pdir: Path, gateways: dict, now: float) -> dict:
     name = pdir.name
     meta = forge.load_yaml(pdir / "profile.yaml")
@@ -127,6 +143,7 @@ def check_bot(pdir: Path, gateways: dict, now: float) -> dict:
             "gateway": {True: "running", False: "stopped"}.get(gateways.get(name), "unknown"),
             "routines": routines, "runs_per_day": round(total_runs, 1),
             "sandbox": backend,
+            "journal": _journal_status(pdir),
             "idle_days": idle_days, "hidden": bool(isinstance(bots, dict) and bots.get("hidden")),
             "flags": flags, "status": "attention" if flags else "ok"}
 

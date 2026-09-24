@@ -107,8 +107,9 @@ def check(root: Path | None = None) -> dict:
                        "detail": "not enabled on any profile — an agent cannot see the tools"})
         steps.append("hermes plugins enable bot-forge   # and `hermes -p <bot> plugins enable bot-forge` per Bot")
     if missing and enabled:
-        checks.append({"check": "not enabled elsewhere", "status": WARN,
-                       "detail": "no Bot Forge on: " + ", ".join(n for n, _ in missing)})
+        checks.append({"check": "other profiles", "status": OK,
+                       "detail": "no Bot Forge on " + ", ".join(n for n, _ in missing)
+                                 + " (fine — enable it only where you chat)"})
 
     # a gateway started before the plugin files changed is still serving the old code
     pids = _gateway_pids(root)
@@ -148,6 +149,11 @@ def check(root: Path | None = None) -> dict:
             checks.append({"check": f"model ({name})", "status": OK,
                            "detail": f"{model_id or 'unset'} ({provider or 'unset'})"
                                      + (" with a fallback" if has_fallback else "")})
+
+    if os.name == "nt":
+        checks.append({"check": "platform", "status": WARN,
+                       "detail": "Windows is untested: gateway install, sandboxes and login sharing are skipped; "
+                                 "Bots are still created and usable from the CLI"})
 
     boxes = sandbox_backends()
     usable = [n for n, b in boxes.items() if b["usable"]]

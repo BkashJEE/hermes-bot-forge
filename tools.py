@@ -132,6 +132,23 @@ def check_agents(args: dict, **kwargs) -> str:
         return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
 
 
+def agent_journal(args: dict, **kwargs) -> str:
+    """Enable, append to, or read a Bot's work journal."""
+    root = hermes_root()
+    spec = {**args, "launch_profile": launch_profile(kwargs.get("session_id"), root),
+            "hermes_root": str(root)}
+    try:
+        p = subprocess.run([sys.executable, str(PLUGIN_DIR / "journal.py"), "-"], input=json.dumps(spec),
+                           capture_output=True, text=True, timeout=60)
+    except subprocess.TimeoutExpired:
+        return json.dumps({"ok": False, "error": "agent_journal timed out"})
+    out = p.stdout.strip()
+    try:
+        return json.dumps(json.loads(out[out.index("{"):]))
+    except ValueError:
+        return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
+
+
 def teach_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
     return _manage("teach", args, settings)
 

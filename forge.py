@@ -64,7 +64,8 @@ def default_root() -> Path:
 
 
 DEFAULT_SETTINGS = {"inherit_model": True, "fallback_model": {},
-                    "probe_local_models": False, "install_gateway": True, "suggest_connectors": True}
+                    "probe_local_models": False, "install_gateway": True, "suggest_connectors": True,
+                    "journal_enabled": True}
 
 
 # ── hermes cli ───────────────────────────────────────────────────────────────
@@ -430,6 +431,11 @@ def forge(s: dict) -> dict:
     reports_to = (s.get("reports_to") or "").strip().lstrip("@")
     soul = soul.rstrip() + "\n" + guardrails_block(approvals if "## Ask first" not in soul else [],
                                                    reports_to if "## Escalate to" not in soul else "")
+    if settings.get("journal_enabled", True):
+        import journal
+
+        if journal.JOURNAL_MARKER not in soul:
+            soul = soul.rstrip() + "\n\n" + journal.JOURNAL_POLICY.rstrip() + "\n"
     for r in s.get("routines") or []:
         problem = check_routine(r)
         if problem:
@@ -447,6 +453,11 @@ def forge(s: dict) -> dict:
         # 2. Bot Mode identity + SOUL.md
         write_bot_meta(pdir, display, description, s.get("avatar_kind"))
         (pdir / "SOUL.md").write_text(soul)
+        journal_path = None
+        if settings.get("journal_enabled", True):
+            import journal
+
+            journal_path = str(journal.ensure_journal(pdir))
 
         # 3. memories
         mem = pdir / "memories"
@@ -537,6 +548,7 @@ def forge(s: dict) -> dict:
                 "approvals": approvals, "reports_to": reports_to or None,
                 "warning": warning, "toolsets": sorted(tools),
                 "skills_disabled": len(disabled), "routines": routines, "gateway": gateway, "intro": reply[-600:],
+                "journal": journal_path,
                 "note": "done — it already introduced itself. Do not message, test or change this Bot; just report."}
     except Exception as e:
         rolled_back = False

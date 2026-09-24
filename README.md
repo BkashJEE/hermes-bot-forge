@@ -210,7 +210,9 @@ Every new Bot starts its reply with one emoji for the state of your request:
 | ⚠️ | blocked, or something failed |
 | ⏳ | scheduled for later |
 
-One emoji, at the very start, then the answer as normal — it is never the whole reply. Because it rides on the reply itself, it works the same in Hermes Desktop, an editor client, the CLI, a cron run or a messaging platform.
+**In Hermes Desktop the same status lands on your own message as a tapback**, the moment you send it: 👀 while the Bot works, then ✅ / ✋ / ⚠️ for how it ended. The plugin places that reaction itself — it needs *Settings → Appearance → Message Reactions* on, and switches off with `ack_tapback: false`.
+
+Everywhere else, the state rides on the reply: one emoji, at the very start, then the answer as normal — it is never the whole reply. Because it rides on the reply itself, it works the same in Hermes Desktop, an editor client, the CLI, a cron run or a messaging platform.
 
 > This deliberately does **not** use Hermes' emoji tapbacks: `react_to_message` is documented as a human touch, "never as a status signal", and a Bot told to do both follows neither.
 

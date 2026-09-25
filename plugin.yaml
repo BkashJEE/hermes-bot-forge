@@ -1,5 +1,5 @@
 name: bot-forge
-version: 0.11.0
+version: 0.12.0
 description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
 author: Bikash Joshi
 license: MIT
@@ -73,6 +73,21 @@ config_schema:
     description: >-
       New Bots begin each reply with one emoji for the state of the request — 👀 started, 💬 answering, ✅ done,
       ✋ needs approval, ⚠️ blocked, ⏳ scheduled — then answer as normal. Works on every surface.
+  workspace_survey:
+    type: bool
+    default: true
+    description: >-
+      When a Bot is created, read the workspace it was born into — the directory Hermes is running
+      in and the repos under it, plus this install's own Bots, skills and plugins — and write where
+      it fits into the Bot's memory, so it knows on its first turn instead of asking. Also powers the
+      guard that refuses a Bot whose job an existing Bot already does. Read-only and shallow: names,
+      git remotes, and the head of a README / AGENTS.md / CLAUDE.md. Never source files.
+  workspace_roots:
+    type: list
+    default: []
+    description: >-
+      Extra directories the survey may read, replacing the default (the working directory Hermes was
+      launched in). Point it at the projects your Bots should know about.
   journal_enabled:
     type: bool
     default: true

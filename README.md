@@ -264,6 +264,25 @@ A blocked Bot writes the blocker in its journal and then goes quiet — so block
 
 The item closes itself when the Bot records the same piece of work as completed — nothing to tick off by hand.
 
+### It knows where it landed
+
+A new Bot normally arrives knowing its job and nothing about your machine, so the first thing you do is explain your own workspace to it. Bot Forge reads that once, at birth:
+
+> make me a social media manager
+
+```
+🧪 Quill is alive — find it in Bot Mode.
+fits: x-content — X Content Studio (~/work/x-content)
+already here: social-media, media-use
+heads up: Nova already works in this territory
+```
+
+It scores the Bot's own SOUL.md and one-job against the directory Hermes is running in, the repos under it, and this install's Bots, skills and plugins — then writes the answer into the Bot's memory, so it knows on turn one and never researches your machine again. Deterministic word matching, not a model call: no tokens, no waiting, no questions.
+
+**It also refuses to build a Bot you already have.** If an existing Bot's job covers the new one, `create_agent` stops and names it, so a roster of twenty Bots doesn't quietly become a roster of twenty overlapping ones.
+
+Read-only and shallow — directory names, git remotes, and the head of a README / AGENTS.md / CLAUDE.md. Never your source files, never your home directory unless you point `workspace_roots` at it, and anything that looks like a credential never reaches a Bot's memory. Off with `workspace_survey: false`.
+
 ### Cost and safety built in
 
 - **Draft-first by default.** Every Bot is born with approval checkpoints — sending/publishing, spending money, deleting data — unless you explicitly ask for none.

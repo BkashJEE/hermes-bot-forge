@@ -65,7 +65,8 @@ def default_root() -> Path:
 
 DEFAULT_SETTINGS = {"inherit_model": True, "fallback_model": {},
                     "probe_local_models": False, "install_gateway": True, "suggest_connectors": True,
-                    "journal_enabled": True, "ack_reactions": True, "ack_tapback": True}
+                    "journal_enabled": True, "ack_reactions": True, "ack_tapback": True,
+                    "workspace_survey": True, "workspace_roots": []}
 
 
 # ── hermes cli ───────────────────────────────────────────────────────────────
@@ -466,6 +467,21 @@ def forge(s: dict) -> dict:
              **{k: v for k, v in s.items() if v not in (None, "", [])}}
     if not s.get("role"):
         return {"ok": False, "error": "spec needs at least 'role'"}
+    # Two Bots with the same job is what makes a roster useless. Check before building, not after.
+    guard = None
+    if settings.get("workspace_survey", True):
+        try:
+            import survey
+
+            guard = survey.overlap_guard(survey.workspace_index(root, settings), survey.job_terms(s))
+        except Exception:
+            guard = None
+    if guard and guard["verdict"] == "duplicate" and not s.get("allow_overlap"):
+        return {"ok": False, "rolled_back": False, "covered_by": guard,
+                "error": (f"@{guard['bot']} ({guard['display_name']}) already does this job"
+                          + (f": {guard['one_job']}" if guard.get("one_job") else "")
+                          + ". Give this Bot a narrower job, update that one instead, or pass "
+                            "allow_overlap: true if two really are wanted.")}
     display, profile_id, err = pick_name(s.get("display_name") or s.get("name"), existing_bot_names(root))
     if err:
         return {"ok": False, "error": err, "rolled_back": False}
@@ -542,6 +558,18 @@ def forge(s: dict) -> dict:
             facts.append(f"I escalate scope and priority calls to @{reports_to}.")
         (mem / "MEMORY.md").write_text("\n§\n".join(facts) + "\n")
 
+        # Where it landed: read once, written into its memory, so it never researches this again.
+        workspace = None
+        if settings.get("workspace_survey", True):
+            try:
+                import survey
+
+                found = survey.survey(root, {**s, "soul_md": soul}, settings, exclude=profile_id)
+                survey.attach(pdir, found)
+                workspace = {k: found[k] for k in ("roots", "fits", "covered_by", "skills_here", "next_steps")}
+            except Exception as exc:
+                workspace = {"error": f"workspace survey skipped: {exc}"[:200]}
+
         # 4. config: tools, skills, model
         cfg_path = pdir / "config.yaml"
         cfg = load_yaml(cfg_path)
@@ -611,7 +639,7 @@ def forge(s: dict) -> dict:
                 "approvals": approvals, "reports_to": reports_to or None,
                 "warning": warning, "toolsets": sorted(tools),
                 "skills_disabled": len(disabled), "routines": routines, "gateway": gateway, "intro": reply[-600:],
-                "journal": journal_path, "reactions": marks,
+                "journal": journal_path, "reactions": marks, "workspace": workspace,
                 "note": "done — it already introduced itself. Do not message, test or change this Bot; just report."}
     except Exception as e:
         rolled_back = False

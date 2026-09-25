@@ -30,6 +30,9 @@ CREATE_AGENT = {
                 "a cool, unique, Proper Case name for the Bot, e.g. 'Quill', 'Nova', 'Kairo' — never a generic "
                 "role word like 'Writer' or 'Social'. Check list_agents first; if the tool says it's taken, pick another.")},
             "avatar_kind": {"type": "string", "enum": BLOB_KINDS, "description": "blob face silhouette that fits the Bot's vibe"},
+            "allow_overlap": {"type": "boolean", "description": (
+                "only after the tool refused because an existing Bot already does this job, and the user "
+                "confirmed they want a second one anyway. Never pass it on a first attempt.")},
             "sandbox": {"type": "string", "enum": ["local", "docker", "singularity", "apptainer"], "description": (
                 "where this Bot's shell runs. 'local' (default) shares this machine; 'docker' gives the Bot its own "
                 "container, so it cannot touch the user's files and cannot block other Bots. Use a sandbox for any "

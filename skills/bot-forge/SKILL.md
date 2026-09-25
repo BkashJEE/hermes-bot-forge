@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.11.0
+version: 0.12.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -87,6 +87,13 @@ Reactions come from the Bot the user is *talking to*, so a Bot created before th
 The acknowledgement is an emoji at the **start of the reply** — it works on every surface. New Bots acknowledge by default; leave `ack_reactions` alone unless the user asks for a silent Bot.
 
 In the **desktop app** the same status also lands on the user's own message as a tapback. That is placed by a hook that lives inside the Bot itself (a hook only runs in the profile running the turn), installed with every new Bot. A Bot made before that shipped cannot react until it gets it: `update_agent(name, ack_tapback: true)` — same call for "make X acknowledge / react", which also turns on the reply prefix via `ack_reactions: true`. `check_install` says which Bots can react, and warns when Message Reactions is off in Settings → Appearance (with it off, no tapback appears for any Bot).
+
+## Where the new Bot fits
+`create_agent` surveys the workspace it was born into — the directory Hermes runs in and the repos under it, plus this install's own Bots, skills and plugins — and writes the result into the new Bot's memory. **You do not need to research the user's machine, and neither does the new Bot: it already knows on its first turn.** Never run your own directory hunt before calling `create_agent`, and never ask the user where things live.
+
+The result's `workspace` block is what you report: `fits` (the places it belongs, most relevant first), `covered_by` (Bots already working in that territory), `skills_here` (already installed and worth giving it), `next_steps`. Give the user the top fit and at most two next steps — not the whole list.
+
+**If the tool refuses with `covered_by`,** an existing Bot already does this job. Do not retry blindly. Tell the user which Bot holds it and offer the two real choices: a narrower job for the new Bot, or `update_agent` on the existing one. Only pass `allow_overlap: true` after they say they want both.
 
 ## Sandboxes
 Any Bot you give `terminal` or `code_execution` should get `sandbox: "docker"` so its shell runs in a container instead of on the user's machine — say so in your reply. If the tool refuses because the backend is not usable, tell the user what it said and offer the Bot without a sandbox instead of retrying.

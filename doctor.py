@@ -185,7 +185,7 @@ def check(root: Path | None = None) -> dict:
                       "; ask an agent to \"turn on reactions for <name>\""
         try:
             import tapback
-            if not tapback.reactions_allowed():
+            if tapback.reactions_setting() is False:
                 detail += ". Message Reactions is off in Settings → Appearance, so none of them will show"
         except Exception:
             pass

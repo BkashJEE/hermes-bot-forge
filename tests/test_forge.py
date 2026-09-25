@@ -1113,6 +1113,17 @@ class TapbackHooks(unittest.TestCase):
         marks.on_turn_end(platform="desktop", assistant_response="done")
         self.assertEqual(ctx.calls, [])
 
+    def test_an_unreadable_setting_is_not_reported_as_off(self):
+        """"Cannot tell" must not be rendered as "off" — that is the same confident wrong answer."""
+        import tapback
+        self.addCleanup(setattr, tapback, "reactions_setting", tapback.reactions_setting)
+        tapback.reactions_setting = lambda: None
+        self.assertFalse(tapback.reactions_allowed())
+        tapback.reactions_setting = lambda: True
+        self.assertTrue(tapback.reactions_allowed())
+        tapback.reactions_setting = lambda: False
+        self.assertFalse(tapback.reactions_allowed())
+
     def test_a_failing_reaction_never_breaks_the_turn(self):
         ctx = self.FakeCtx(raises=True)
         marks = self._marks(ctx)

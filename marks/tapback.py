@@ -73,13 +73,23 @@ def _succeeded(result) -> bool:
     return bool(result.get("success")) and not result.get("error")
 
 
-def reactions_allowed() -> bool:
-    """Honour Settings → Appearance → Message Reactions, the same switch the tool itself checks."""
+def reactions_setting():
+    """Settings → Appearance → Message Reactions: True, False, or None when it cannot be read.
+
+    None is not False. Reporting "the setting is off" when the answer was really "this process
+    cannot see Hermes' settings" is the same kind of confident wrong answer as a failed reaction
+    reporting success, so the two are kept apart.
+    """
     try:
         from tools import desktop_ui
         return bool(desktop_ui.user_enabled("message_reactions", default=False))
     except Exception:
-        return False
+        return None
+
+
+def reactions_allowed() -> bool:
+    """Honour the user's switch; unreadable means don't place a reaction they may not want."""
+    return reactions_setting() is True
 
 
 class Tapback:

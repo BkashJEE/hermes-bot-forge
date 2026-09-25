@@ -3,6 +3,15 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.1] - 2026-09-25
+
+### Fixed
+- **The survey is useful on a real machine, not just a tidy one.** Three faults, all found by running it against a workspace with ten roots and thirty near-identical checkouts:
+  - One crowded root ate the whole scan budget, so the nine roots after it were never looked at and a Bot was pointed at whatever sorted first. Each root now gets its own share.
+  - A directory with almost no words in it matched anything it shared one word with — a folder named `omarchy` scored a perfect 1.00 against a theming Bot on the strength of its own name. A place now needs real vocabulary and at least two shared terms before it can be recommended.
+  - Nested copies of the same checkout appeared three times; the shallowest path now wins.
+- **A job and a directory rarely use the same word for the same thing.** The job's vocabulary is widened with related terms before places are searched, so a Bot whose job says "x.com posts" finds the repo that holds that work even when it never uses the word "social", and an inbox Bot finds the repo that watches mail. The widening applies only to the job and only when matching places — never to the corpus, and never to the duplicate guard, which still compares what two Bots actually say.
+
 ## [0.12.0] - 2026-09-25
 
 ### Added

@@ -128,6 +128,9 @@ UPDATE_AGENT = {
             "ack_reactions": {"type": "boolean", "description": (
                 "true turns on reaction acknowledgements for a Bot created before this feature; it is added to "
                 "the persona without replacing it")},
+            "ack_tapback": {"type": "boolean", "description": (
+                "true installs the reaction hook inside this Bot so it can tapback the user's own message in the "
+                "desktop app; needed once for a Bot created before that shipped")},
             "model": {"type": "object", "description": "model block {default, provider, base_url} — only when asked"},
             "add_routines": {"type": "array", "items": {
                 "type": "object",

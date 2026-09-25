@@ -1,14 +1,21 @@
 <p align="center">
-  <a href="https://github.com/BkashJEE/hermes-bot-forge/actions/workflows/tests.yml"><img src="https://github.com/BkashJEE/hermes-bot-forge/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
-</p>
-
-<p align="center">
   <img src="docs/banner.png" alt="Bot Forge — one sentence to a complete, working Hermes Bot" width="100%">
 </p>
 
-# 🧪 Hermes Bot Forge
+<p align="center">
+  <a href="https://hermes-agent.nousresearch.com/docs/plugins/"><img src="https://img.shields.io/badge/Hermes%20plugin%20catalog-listed-22D3EE?style=flat-square" alt="in the Hermes plugin catalog"></a>
+  <a href="https://github.com/BkashJEE/hermes-bot-forge/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/BkashJEE/hermes-bot-forge/tests.yml?style=flat-square&label=tests" alt="tests"></a>
+  <a href="https://github.com/BkashJEE/hermes-bot-forge/releases"><img src="https://img.shields.io/github/v/release/BkashJEE/hermes-bot-forge?style=flat-square&color=8B5CF6" alt="release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-64748B?style=flat-square" alt="MIT"></a>
+</p>
+
+# Hermes Bot Forge
 
 **Say "make me a social media manager" — your Hermes agent builds that Bot.**
+
+```bash
+hermes plugins install bot-forge
+```
 
 Bot Forge is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin that lets any agent spawn a complete, working [Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode) Bot from one sentence — no New Agent dialog, no setup:
 
@@ -210,7 +217,7 @@ Every new Bot starts its reply with one emoji for the state of your request:
 | ⚠️ | blocked, or something failed |
 | ⏳ | scheduled for later |
 
-**In Hermes Desktop the same status lands on your own message as a tapback**, the moment you send it: 👀 while the Bot works, then ✅ / ✋ / ⚠️ for how it ended. The plugin places that reaction itself — it needs *Settings → Appearance → Message Reactions* on, and switches off with `ack_tapback: false`.
+**In Hermes Desktop the same status lands on your own message as a tapback**, the moment you send it: 👀 while the Bot works, then ✅ / ✋ / ⚠️ for how it ended. The reaction is placed by a hook, not by the model — and because a Hermes hook only runs in the profile running the turn, that hook ships *inside each Bot* as a tiny companion plugin (`bot-forge-marks`: two hooks, no tools, so a Bot never gains the power to create or delete Bots). New Bots get it automatically; for a Bot made before it, ask an agent to *"turn on reactions for <name>"*. It needs *Settings → Appearance → Message Reactions* on, and switches off with `ack_tapback: false`. `check_install` reports which Bots can react and which cannot.
 
 Everywhere else, the state rides on the reply: one emoji, at the very start, then the answer as normal — it is never the whole reply. Because it rides on the reply itself, it works the same in Hermes Desktop, an editor client, the CLI, a cron run or a messaging platform.
 

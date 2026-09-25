@@ -124,6 +124,13 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
             backups.setdefault("SOUL.md", result["backup"] or "")
             changed.append("acknowledgements")
 
+    # the reaction hook, which has to live inside the Bot to run on the Bot's own turns
+    if s.get("ack_reactions") or s.get("ack_tapback"):
+        import companion
+        marks = companion.install_marks(pdir)
+        if marks.get("ok") and (marks.get("copied") or marks.get("enabled")) and "reactions" not in changed:
+            changed.append("reactions")
+
     # memory
     if s.get("memory"):
         mem = pdir / "memories" / "MEMORY.md"
@@ -178,7 +185,7 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
     if not changed:
         return {"ok": False, "name": name, "error": "nothing to update — pass soul_md/soul_append, display_name, "
                                                     "description, memory, add_toolsets, skill_categories, model, "
-                                                    "avatar_kind, ack_reactions or routines"}
+                                                    "avatar_kind, ack_reactions, ack_tapback or routines"}
     return {"ok": True, "name": name, "display_name": _bot_meta(pdir).get("title") or name, "changed": changed,
             "routines_added": routines_added, "routines_removed": routines_removed,
             "backups": {k: v for k, v in backups.items() if v},

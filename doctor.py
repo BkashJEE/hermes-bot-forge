@@ -174,6 +174,23 @@ def check(root: Path | None = None) -> dict:
                                  + (f" — {', '.join(silent)} predate the feature: ask an agent to "
                                     f"\"turn on acknowledgements for <name>\"" if silent else "")})
 
+    import companion
+    missing = companion.bots_without_marks(root)
+    forged = [p for p in bots if (forge.load_yaml(p / "profile.yaml").get("ui_meta") or {}).get("hermes-bots")]
+    if forged:
+        reacting = len(forged) - len(missing)
+        detail = f"{reacting}/{len(forged)} Bots can react to your message in the desktop app"
+        if missing:
+            detail += " — " + ", ".join(f"{m['display_name']} ({m['reason']})" for m in missing[:4]) + \
+                      "; ask an agent to \"turn on reactions for <name>\""
+        try:
+            import tapback
+            if not tapback.reactions_allowed():
+                detail += ". Message Reactions is off in Settings → Appearance, so none of them will show"
+        except Exception:
+            pass
+        checks.append({"check": "reactions", "status": OK if not missing else WARN, "detail": detail})
+
     import portable
     checks.append({"check": "templates", "status": OK,
                    "detail": ", ".join(sorted(portable.bundled_templates()))})

@@ -8,6 +8,7 @@ convention into the Bot's persona: one reaction on pickup, one on the outcome, a
 instead of an answer.
 """
 
+import re
 from pathlib import Path
 
 ACK_MARKER = "<!-- bot-forge-acks:v2 -->"
@@ -44,18 +45,25 @@ def acks_enabled(pdir: Path) -> bool:
 
 
 def _strip_legacy(soul: str) -> str:
-    """Remove an older convention block so a Bot never carries two contradictory ones."""
+    """Remove an older convention block, and nothing else.
+
+    The block runs from its marker to whatever comes next — the following heading OR another
+    plugin's marker comment. Cutting only at the next heading swallowed the marker line that sits
+    directly above it (that is how an upgrade once disabled a Bot's journal while leaving its text).
+    """
     for marker in LEGACY_MARKERS:
         while marker in soul:
             start = soul.index(marker)
-            nxt = soul.find("\n## ", soul.index("\n", start))
+            after = soul.index("\n", start) + 1
+            stops = []
+            for candidate in re.finditer(r"^(?:##\s|<!--)", soul[after:], re.M):
+                stops.append(after + candidate.start())
             end = len(soul)
-            while nxt != -1:
-                heading = soul[nxt + 1:soul.find("\n", nxt + 1)]
-                if not heading.startswith("## Acknowledge") and not heading.startswith("## Say where"):
-                    end = nxt + 1
+            for stop in stops:
+                line = soul[stop:soul.find("\n", stop) if soul.find("\n", stop) != -1 else len(soul)]
+                if line.startswith("<!--") or not line.startswith(("## Acknowledge", "## Say where")):
+                    end = stop
                     break
-                nxt = soul.find("\n## ", nxt + 1)
             soul = (soul[:start].rstrip() + "\n\n" + soul[end:].lstrip()).strip() + "\n"
     return soul
 

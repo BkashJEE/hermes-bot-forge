@@ -78,6 +78,26 @@ def journaling_enabled(pdir: Path) -> bool:
     return soul.exists() and JOURNAL_MARKER in soul.read_text(errors="ignore")
 
 
+def _drop_orphan_policy(text: str) -> str:
+    """Remove journal guidance whose marker is gone, so re-enabling doesn't duplicate it.
+
+    A Bot can end up with the policy text but no marker (an older Bot Forge stripped the marker
+    line while upgrading a neighbouring block). Without this, enabling again appends a second
+    "## Work journal" section.
+    """
+    heading = "## Work journal"
+    while True:
+        at = text.find("\n" + heading)
+        if at < 0:
+            return text
+        if JOURNAL_MARKER in text[:at + 1].rsplit("\n\n", 1)[-1]:
+            return text  # a marked block — leave it
+        after = at + 1 + len(heading)
+        nxt = re.search(r"^(?:##\s|<!--)", text[after:], re.M)
+        end = after + nxt.start() if nxt else len(text)
+        text = (text[:at].rstrip() + "\n\n" + text[end:].lstrip()).strip() + "\n"
+
+
 def enable_journal(pdir: Path) -> dict:
     """Enable journal guidance without replacing the Bot's existing persona."""
     folder = ensure_journal(pdir)
@@ -89,6 +109,7 @@ def enable_journal(pdir: Path) -> dict:
         import manage
 
         backup = manage._backup(pdir, "SOUL.md")
+        text = _drop_orphan_policy(text)
         soul.write_text((text.rstrip() + "\n\n" if text.strip() else "") + JOURNAL_POLICY.rstrip() + "\n")
     return {"enabled": True, "changed": changed, "path": str(folder), "backup": backup or None}
 

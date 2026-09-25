@@ -169,15 +169,19 @@ def check(s: dict) -> dict:
         bots = [d for d in bots if matches(d)]
         if not bots:
             return {"ok": False, "error": f"no Bot named '{s['name']}'"}
+    import waiting
     gateways = _gateways(root)
     report = [check_bot(d, gateways, now) for d in bots]
+    pending = waiting.waiting_on_user(root)
     attention = [b for b in report if b["flags"]]
     silent = [b["display_name"] for b in report if not b.get("acknowledges")]
     return {"ok": True, "bots": len(report), "needing_attention": len(attention),
             "not_acknowledging": silent,
+            "waiting_on_you": pending["items"], "waiting_count": pending["count"],
             "total_routine_runs_per_day": round(sum(b["runs_per_day"] for b in report), 1),
             "report": report,
-            "summary": ("all Bots look healthy" if not attention else
+            "summary": (f"{pending['count']} waiting on you — {pending['summary']}" if pending["count"] else
+                        "all Bots look healthy" if not attention else
                         "; ".join(f"{b['display_name']}: {b['flags'][0]}" for b in attention[:5]))}
 
 

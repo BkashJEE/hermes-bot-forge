@@ -314,8 +314,10 @@ CHECK_AGENTS = {
         "Health check for the user's Bots — read-only. Reports each Bot's model, gateway, routines with estimated "
         "runs per day, days since last used, and flags: routines that run too often (every run costs a model "
         "call), paused or never-run routines, unused Bots, a SOUL.md missing the Bot's own name or approval "
-        "checkpoints. Use when the user asks 'how are my bots doing', during a weekly review, or before adding "
-        "more routines. Suggest fixes; don't apply them without asking."
+        "checkpoints. It also returns `waiting_on_you`: everything a Bot got blocked on and wrote in its "
+        "journal that nobody has answered yet — report those FIRST, oldest ones by name, because the user "
+        "cannot see them without asking. Use when the user asks 'how are my bots doing' or 'what needs me', "
+        "during a weekly review, or before adding more routines. Suggest fixes; don't apply them without asking."
     ),
     "parameters": {
         "type": "object",

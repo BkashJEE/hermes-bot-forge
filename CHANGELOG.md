@@ -3,6 +3,14 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-09-24
+
+### Added
+- **`check_agents` now leads with what is waiting on you.** A Bot that gets blocked writes it in its journal and goes quiet, so the user had to open each Bot to find out. The new `waiting_on_you` list gathers every unresolved blocked or failed entry across every Bot — which Bot, what it needs, and how many days it has sat there — and the summary reads "2 waiting on you — Marlow: Need the Stripe key…". An item closes itself when the Bot later records the same title as completed.
+
+### Fixed
+- **Upgrading acknowledgements could silently switch a Bot's journal off.** Replacing the old acknowledgement block cut everything up to the next heading, which swallowed the `<!-- bot-forge-journal:v1 -->` marker sitting on the line above it: the guidance text stayed, the marker went, and `agent_journal` then answered "journaling is not enabled for this Bot". Stripping now stops at the next heading *or* the next marker comment, and re-enabling a journal clears guidance text left orphaned by the old bug instead of appending a second copy. Affected Bots are repaired by calling `agent_journal` with `action: enable` once.
+
 ## [0.9.0] - 2026-09-24
 
 ### Added

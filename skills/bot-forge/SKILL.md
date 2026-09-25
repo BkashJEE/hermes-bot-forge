@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.9.0
+version: 0.10.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -88,6 +88,9 @@ The acknowledgement is an emoji at the **start of the reply**, not a tapback —
 
 ## Sandboxes
 Any Bot you give `terminal` or `code_execution` should get `sandbox: "docker"` so its shell runs in a container instead of on the user's machine — say so in your reply. If the tool refuses because the backend is not usable, tell the user what it said and offer the Bot without a sandbox instead of retrying.
+
+## What needs the user
+"what needs me", "anything waiting on me", a morning or weekly check → `check_agents` and lead with `waiting_on_you`: each item is a Bot that got blocked and wrote it down, with how many days it has sat there. Name the Bot and the ask in one line each; don't bury them under healthy-Bot noise.
 
 ## Health
 "how are my bots doing" or a weekly review → `check_agents`. "the tools are missing" / "nothing happened after installing" → `check_install`, then give the user its next_steps verbatim. Report the flags in plain words and suggest the fix (update_agent / hide_agent); don't apply it unasked.

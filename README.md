@@ -167,7 +167,7 @@ Thirteen tools, all driven by plain requests in chat:
 | `copy_agent` | *"make another one like Inkwell, for LinkedIn"* | Duplicates a Bot under a new name (no chat history, no routines). |
 | `list_agents` | *"what bots do I have?"* | Roster with description, model, routine count and hidden state. |
 | `check_install` | *"the tools aren't showing up"* | Checks the install itself: enabled profiles, whether each gateway runs the current code, Bot Mode, model sign-in, sandbox backends. |
-| `check_agents` | *"how are my bots doing?"* | Read-only health check: routines that run too often (and their cost in runs/day), paused or never-run routines, unused Bots, stopped gateways, a persona missing its name or approvals. |
+| `check_agents` | *"anything waiting on me?"* | Leads with `waiting_on_you` — every Bot blocked on something only you can do, with its age. Then the read-only health check: routines that run too often (and their cost in runs/day), paused or never-run routines, unused Bots, stopped gateways, a persona missing its name or approvals. |
 | `agent_journal` | *"what did Inkwell work on this week?"* | Enables, appends to, and reads a Bot's dated work journal. Entries capture outcomes and evidence, never credentials or private reasoning. |
 | `ask_agent` | *"ask Inkwell for 3 post ideas"* | Sends a task to another Bot and returns its reply. |
 | `share_agent` | *"share Inkwell with a friend"* | Writes a readable `.botforge.json` template — persona, its own memory, tools, skills, routines. **Never chat history, facts about you, or keys**, and secret-scanned (CLEAN / WARN / BLOCK). `mode: backup` makes a full private backup instead. |
@@ -242,6 +242,20 @@ For a Bot created before this feature:
 > enable journaling for Inkwell
 
 Then ask *"what did Inkwell work on this week?"* to read recent entries.
+
+### What's waiting on you
+
+A blocked Bot writes the blocker in its journal and then goes quiet — so blockers pile up unseen, one Bot at a time. Ask once:
+
+> anything waiting on me?
+
+`check_agents` answers with `waiting_on_you`: every unresolved blocked or failed entry across every Bot, newest first, each with the Bot's name, what it needs and how many days it has sat there.
+
+```
+2 waiting on you — Marlow: Need the Stripe API key to pull invoices; Nova: Weekly post draft could not publish
+```
+
+The item closes itself when the Bot records the same piece of work as completed — nothing to tick off by hand.
 
 ### Cost and safety built in
 

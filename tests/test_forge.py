@@ -824,6 +824,60 @@ class Acknowledgements(unittest.TestCase):
         self.assertIn("never publish", out)
         self.assertNotIn("## Acknowledge with a reaction", out)
 
+    def test_re_enabling_journal_repairs_orphaned_policy_text(self):
+        """A Bot left with the guidance but no marker gets one clean section, not two."""
+        import acks
+        import journal
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = root / "profiles" / "quill"
+            d.mkdir(parents=True)
+            (d / "SOUL.md").write_text("# Quill\n\nYou are **Quill**.\n\n" +
+                                       journal.JOURNAL_POLICY.replace(journal.JOURNAL_MARKER + "\n", "") +
+                                       f"\n{acks.ACK_MARKER}\n## Say where\n- x\n")
+            self.assertFalse(journal.journaling_enabled(d))
+            out = journal.enable_journal(d)
+            self.assertTrue(out["changed"])
+            soul = (d / "SOUL.md").read_text()
+            self.assertEqual(soul.count("## Work journal"), 1)
+            self.assertEqual(soul.count(journal.JOURNAL_MARKER), 1)
+            self.assertIn("You are **Quill**", soul)
+            self.assertIn(acks.ACK_MARKER, soul)
+            self.assertTrue(journal.journaling_enabled(d))
+
+    def test_upgrading_acks_leaves_the_journal_block_alone(self):
+        """Regression: the v1->v2 upgrade used to cut to the next heading, eating the marker
+        comment above it — journal text stayed, the marker vanished, journaling silently died."""
+        import acks
+        import journal
+        soul = (f"# Quill — Writer\n\nYou are **Quill**.\n\n{acks.LEGACY_MARKERS[0]}\n"
+                "## Acknowledge with a reaction\nReact to the message.\n\n- 👀 — picked up\n\n"
+                f"{journal.JOURNAL_MARKER}\n## Work journal\n- record what you did.\n\n"
+                "## Never\n- never publish\n")
+        out = acks.apply_policy(soul)
+        self.assertIn(journal.JOURNAL_MARKER, out)
+        self.assertIn("## Work journal", out)
+        self.assertIn("record what you did", out)
+        self.assertNotIn("## Acknowledge with a reaction", out)
+        self.assertIn("never publish", out)
+
+    def test_enabling_acks_keeps_a_bot_journaling(self):
+        import acks
+        import journal
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = root / "profiles" / "quill"
+            d.mkdir(parents=True)
+            (d / "SOUL.md").write_text("# Quill\n\nYou are **Quill**.\n")
+            journal.enable_journal(d)
+            (d / "SOUL.md").write_text(
+                (d / "SOUL.md").read_text().replace(acks.ACK_MARKER, acks.LEGACY_MARKERS[0])
+                if acks.ACK_MARKER in (d / "SOUL.md").read_text() else
+                (d / "SOUL.md").read_text() + f"\n{acks.LEGACY_MARKERS[0]}\n## Acknowledge\n- x\n")
+            self.assertTrue(journal.journaling_enabled(d))
+            acks.enable_acks(d)
+            self.assertTrue(journal.journaling_enabled(d), "upgrading acks disabled journaling")
+
     def test_enable_reports_an_upgrade_from_the_old_convention(self):
         import acks
         with tempfile.TemporaryDirectory() as t:
@@ -1028,6 +1082,92 @@ class TapbackHooks(unittest.TestCase):
         marks.on_turn_start(platform="cli")
         marks.on_turn_end(platform="acp", assistant_response="x")
         self.assertEqual(ctx.calls, [])
+
+
+class WaitingQueueTests(unittest.TestCase):
+    """What is still waiting on the user, read out of the Bots' own journals."""
+
+    def _bot(self, root, name, title, entries):
+        import journal
+        d = root / "profiles" / name
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m", "provider": "p"}}))
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}))
+        journal.ensure_journal(d)
+        for day, stamp, status, title_, body in entries:
+            f = d / "journal" / f"{day}.md"
+            f.write_text((f.read_text() if f.exists() else "")
+                         + f"\n## {stamp} · {status} · {title_}\n{body}\n")
+        return d
+
+    def test_blocked_bots_surface_with_bot_name_age_and_detail(self):
+        import waiting
+        from datetime import datetime, timezone
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root, "marlow", "Marlow", [
+                ("2026-09-20", "2026-09-20T09:00:00Z", "blocked", "Need the Stripe key",
+                 "Invoice sync cannot run without it.")])
+            now = datetime(2026, 9, 24, 9, 0, tzinfo=timezone.utc)
+            out = waiting.waiting_on_user(root, now)
+            self.assertEqual(out["count"], 1)
+            item = out["items"][0]
+            self.assertEqual(item["display_name"], "Marlow")
+            self.assertEqual(item["bot"], "marlow")
+            self.assertEqual(item["age_days"], 4.0)
+            self.assertEqual(item["icon"], "⚠️")
+            self.assertIn("Invoice sync", item["detail"])
+            self.assertIn("Marlow: Need the Stripe key", out["summary"])
+
+    def test_a_later_completion_closes_the_item(self):
+        import waiting
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root, "marlow", "Marlow", [
+                ("2026-09-20", "2026-09-20T09:00:00Z", "blocked", "Need the Stripe key", "waiting"),
+                ("2026-09-21", "2026-09-21T09:00:00Z", "completed", "Need the Stripe key", "got it")])
+            self.assertEqual(waiting.waiting_on_user(root)["count"], 0)
+
+    def test_finished_and_planned_work_never_counts_as_waiting(self):
+        import waiting
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root, "nova", "Nova", [
+                ("2026-09-20", "2026-09-20T09:00:00Z", "completed", "Wrote the post", "done"),
+                ("2026-09-20", "2026-09-20T10:00:00Z", "planned", "Next week's posts", "later"),
+                ("2026-09-20", "2026-09-20T11:00:00Z", "progress", "Drafting", "ongoing")])
+            out = waiting.waiting_on_user(root)
+            self.assertEqual(out["count"], 0)
+            self.assertEqual(out["summary"], "nothing is waiting on you")
+
+    def test_newest_first_and_capped(self):
+        import waiting
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root, "marlow", "Marlow", [
+                (f"2026-08-{d:02d}", f"2026-08-{d:02d}T09:00:00Z", "failed", f"item {d}", "x")
+                for d in range(1, 29)])
+            out = waiting.waiting_on_user(root)
+            self.assertEqual(out["count"], waiting.MAX_ITEMS)
+            self.assertEqual(out["items"][0]["title"], "item 28")
+            self.assertIn("more)", out["summary"])
+
+    def test_a_bot_without_a_journal_is_simply_quiet(self):
+        import waiting
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t), profiles=("gary",))
+            self.assertEqual(waiting.waiting_on_user(root)["count"], 0)
+
+    def test_health_leads_with_what_is_waiting(self):
+        import health
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root, "nova", "Nova", [
+                ("2026-09-20", "2026-09-20T09:00:00Z", "failed", "Could not publish", "needs approval")])
+            out = health.check({"hermes_root": str(root)})
+            self.assertEqual(out["waiting_count"], 1)
+            self.assertTrue(out["summary"].startswith("1 waiting on you"))
+            self.assertEqual(out["waiting_on_you"][0]["title"], "Could not publish")
 
 
 if __name__ == "__main__":

@@ -1,14 +1,21 @@
 <p align="center">
-  <a href="https://github.com/BkashJEE/hermes-bot-forge/actions/workflows/tests.yml"><img src="https://github.com/BkashJEE/hermes-bot-forge/actions/workflows/tests.yml/badge.svg" alt="tests"></a>
-</p>
-
-<p align="center">
   <img src="docs/banner.png" alt="Bot Forge — one sentence to a complete, working Hermes Bot" width="100%">
 </p>
 
-# 🧪 Hermes Bot Forge
+<p align="center">
+  <a href="https://hermes-agent.nousresearch.com/docs/plugins/"><img src="https://img.shields.io/badge/Hermes%20plugin%20catalog-listed-22D3EE?style=flat-square" alt="in the Hermes plugin catalog"></a>
+  <a href="https://github.com/BkashJEE/hermes-bot-forge/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/BkashJEE/hermes-bot-forge/tests.yml?style=flat-square&label=tests" alt="tests"></a>
+  <a href="https://github.com/BkashJEE/hermes-bot-forge/releases"><img src="https://img.shields.io/github/v/release/BkashJEE/hermes-bot-forge?style=flat-square&color=8B5CF6" alt="release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-64748B?style=flat-square" alt="MIT"></a>
+</p>
+
+# Hermes Bot Forge
 
 **Say "make me a social media manager" — your Hermes agent builds that Bot.**
+
+```bash
+hermes plugins install bot-forge
+```
 
 Bot Forge is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin that lets any agent spawn a complete, working [Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode) Bot from one sentence — no New Agent dialog, no setup:
 

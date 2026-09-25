@@ -3,6 +3,20 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-09-24
+
+### Fixed
+- **The desktop tapback shipped in 0.9.0 never worked, anywhere.** Three faults stacked, and the third hid the other two:
+  - A Hermes hook runs in the profile that runs the turn. Bot Forge lives in the profile that *creates* Bots, so when the user talked to a Bot, none of this plugin's code was loaded — the reaction could not be placed no matter what.
+  - `react_to_message` registers itself when its module is imported, and that import is lazy. In a turn's process the registry had no such entry, so the call returned `Unknown tool: react_to_message`.
+  - `dispatch_tool` returns failures as a **value**, never as an exception. The hook caught only exceptions, so every failed reaction was recorded as a success — a feature that had never once worked reported as working, in the tests too, because the test double could not fail either.
+
+  The reaction now ships *inside* each Bot as `bot-forge-marks`: two hooks and no tools, so a Bot gains the acknowledgement and not the ability to create or delete Bots. It is installed with every new Bot, imports the tool before dispatching, reads the dispatch result and honours Settings → Appearance → Message Reactions.
+
+### Added
+- `update_agent(name, ack_tapback: true)` installs the reaction hook into a Bot made before this release.
+- `check_install` reports how many Bots can react, names those that cannot and why, and says when Message Reactions is off in Settings — so a silent reaction is visible instead of invisible.
+
 ## [0.10.0] - 2026-09-24
 
 ### Added

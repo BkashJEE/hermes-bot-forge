@@ -1037,14 +1037,26 @@ class TapbackHooks(unittest.TestCase):
     """The plugin places the reaction itself — the model is told not to use reactions for status."""
 
     class FakeCtx:
-        def __init__(self, fail=False):
-            self.calls, self.fail = [], fail
+        """dispatch_tool the way the real one behaves: failures come back as a value."""
+
+        def __init__(self, result='{"success": true, "row_id": 31}', raises=False):
+            self.calls, self.result, self.raises = [], result, raises
 
         def dispatch_tool(self, name, args, **kw):
             self.calls.append((name, args))
-            if self.fail:
-                raise RuntimeError("reactions are off")
-            return "{}"
+            if self.raises:
+                raise RuntimeError("no session")
+            return self.result
+
+    def _marks(self, ctx, allowed=True, registered=True):
+        """A Tapback with the environment stubbed: reactions allowed, tool registered."""
+        import tapback
+        marks = tapback.Tapback(ctx, lambda: True)
+        self.addCleanup(setattr, tapback, "reactions_allowed", tapback.reactions_allowed)
+        self.addCleanup(setattr, tapback, "_ensure_tool", tapback._ensure_tool)
+        tapback.reactions_allowed = lambda: allowed
+        tapback._ensure_tool = lambda: registered
+        return marks
 
     def test_reacts_only_on_desktop_and_only_when_enabled(self):
         import tapback
@@ -1056,7 +1068,7 @@ class TapbackHooks(unittest.TestCase):
     def test_turn_start_marks_working_and_end_marks_the_outcome(self):
         import tapback
         ctx = self.FakeCtx()
-        marks = tapback.Tapback(ctx, lambda: True)
+        marks = self._marks(ctx)
         marks.on_turn_start(platform="desktop")
         marks.on_turn_end(platform="desktop", assistant_response="Here is the draft.")
         self.assertEqual([a["emoji"] for _n, a in ctx.calls], [tapback.WORKING, tapback.DONE])
@@ -1068,20 +1080,167 @@ class TapbackHooks(unittest.TestCase):
         self.assertEqual(tapback.outcome_emoji("I can't publish for you."), tapback.BLOCKED)
         self.assertEqual(tapback.outcome_emoji("Ready. Shall I post it?"), tapback.NEEDS_YOU)
 
-    def test_a_failing_reaction_never_breaks_the_turn(self):
+    def test_an_error_payload_is_a_failure_not_a_success(self):
+        """The bug that hid a reaction that never appeared: dispatch returns errors as a value."""
         import tapback
-        ctx = self.FakeCtx(fail=True)
-        marks = tapback.Tapback(ctx, lambda: True)
+        self.assertFalse(tapback._succeeded('{"error": "Unknown tool: react_to_message"}'))
+        self.assertFalse(tapback._succeeded('{"error": "No active session"}'))
+        self.assertFalse(tapback._succeeded("{}"))
+        self.assertFalse(tapback._succeeded("not json at all"))
+        self.assertFalse(tapback._succeeded(None))
+        self.assertTrue(tapback._succeeded('{"success": true, "row_id": 31}'))
+        self.assertTrue(tapback._succeeded({"success": True}))
+
+    def test_the_hook_reports_whether_the_reaction_landed(self):
+        import tapback
+        ctx = self.FakeCtx(result='{"error": "Unknown tool: react_to_message"}')
+        marks = self._marks(ctx)
+        self.assertFalse(marks._react(tapback.WORKING))
+        ok = self._marks(self.FakeCtx())
+        self.assertTrue(ok._react(tapback.WORKING))
+
+    def test_an_unregistered_tool_is_not_dispatched_at_all(self):
+        import tapback
+        ctx = self.FakeCtx()
+        marks = self._marks(ctx, registered=False)
+        marks.on_turn_start(platform="desktop")
+        self.assertEqual(ctx.calls, [])
+
+    def test_the_users_reaction_setting_is_honoured(self):
+        ctx = self.FakeCtx()
+        marks = self._marks(ctx, allowed=False)
+        marks.on_turn_start(platform="desktop")
+        marks.on_turn_end(platform="desktop", assistant_response="done")
+        self.assertEqual(ctx.calls, [])
+
+    def test_an_unreadable_setting_is_not_reported_as_off(self):
+        """"Cannot tell" must not be rendered as "off" — that is the same confident wrong answer."""
+        import tapback
+        self.addCleanup(setattr, tapback, "reactions_setting", tapback.reactions_setting)
+        tapback.reactions_setting = lambda: None
+        self.assertFalse(tapback.reactions_allowed())
+        tapback.reactions_setting = lambda: True
+        self.assertTrue(tapback.reactions_allowed())
+        tapback.reactions_setting = lambda: False
+        self.assertFalse(tapback.reactions_allowed())
+
+    def test_a_failing_reaction_never_breaks_the_turn(self):
+        ctx = self.FakeCtx(raises=True)
+        marks = self._marks(ctx)
         self.assertIsNone(marks.on_turn_start(platform="desktop"))
         self.assertIsNone(marks.on_turn_end(platform="desktop", assistant_response="x"))
 
     def test_nothing_is_dispatched_off_desktop(self):
-        import tapback
         ctx = self.FakeCtx()
-        marks = tapback.Tapback(ctx, lambda: True)
+        marks = self._marks(ctx)
         marks.on_turn_start(platform="cli")
         marks.on_turn_end(platform="acp", assistant_response="x")
         self.assertEqual(ctx.calls, [])
+
+
+class CompanionInstall(unittest.TestCase):
+    """The reaction hook has to live inside the Bot — a hook only runs in the profile running the turn."""
+
+    def _bot(self, root, name="marlow", title="Marlow", meta=True):
+        d = root / "profiles" / name
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m", "provider": "p"}}))
+        if meta:
+            (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}))
+        return d
+
+    def test_it_installs_the_hook_and_switches_it_on(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root)
+            self.assertFalse(companion.marks_ready(d))
+            out = companion.install_marks(d)
+            self.assertTrue(out["ok"], out)
+            self.assertTrue(out["copied"])
+            self.assertTrue((d / "plugins" / companion.MARKS_NAME / "plugin.yaml").exists())
+            self.assertTrue(companion.is_enabled(d))
+            self.assertTrue(companion.marks_ready(d))
+
+    def test_the_companion_grants_no_tools(self):
+        """A Bot must not gain create_agent/delete_agent just to be able to react."""
+        import companion
+        manifest = yaml.safe_load((companion.SOURCE / "plugin.yaml").read_text())
+        self.assertEqual(manifest.get("manifest_version", 1), 1)
+        self.assertFalse(manifest.get("provides_tools"))
+        self.assertEqual(sorted(manifest["provides_hooks"]), ["post_llm_call", "pre_llm_call"])
+
+    def test_installing_twice_changes_nothing(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root)
+            companion.install_marks(d)
+            again = companion.install_marks(d)
+            self.assertTrue(again["ok"])
+            self.assertFalse(again["copied"])
+            enabled = yaml.safe_load((d / "config.yaml").read_text())["plugins"]["enabled"]
+            self.assertEqual(enabled.count(companion.MARKS_NAME), 1)
+
+    def test_an_older_copy_is_replaced(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root)
+            companion.install_marks(d)
+            manifest = companion.installed_dir(d) / "plugin.yaml"
+            manifest.write_text(manifest.read_text().replace(
+                f"version: {companion.marks_version()}", "version: 0.0.1"))
+            self.assertEqual(companion.installed_version(d), "0.0.1")
+            self.assertFalse(companion.marks_ready(d))
+            out = companion.install_marks(d)
+            self.assertTrue(out["copied"])
+            self.assertEqual(out["previous_version"], "0.0.1")
+            self.assertTrue(companion.marks_ready(d))
+
+    def test_it_keeps_the_profiles_other_plugins(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root)
+            (d / "config.yaml").write_text(yaml.safe_dump(
+                {"model": {"default": "m"}, "plugins": {"enabled": ["hermes-rss", "githermes"]}}))
+            companion.install_marks(d)
+            enabled = yaml.safe_load((d / "config.yaml").read_text())["plugins"]["enabled"]
+            self.assertIn("hermes-rss", enabled)
+            self.assertIn("githermes", enabled)
+            self.assertIn(companion.MARKS_NAME, enabled)
+
+    def test_the_shipped_copy_matches_the_module_under_test(self):
+        """marks/tapback.py is what actually runs in a Bot — it must not drift from tapback.py."""
+        import companion
+        root = Path(__file__).resolve().parent.parent
+        self.assertEqual((root / "tapback.py").read_text(),
+                         (companion.SOURCE / "tapback.py").read_text(),
+                         "marks/tapback.py has drifted — copy tapback.py over it")
+
+    def test_bots_without_the_hook_are_listed_with_a_reason(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            ready = self._bot(root, "marlow", "Marlow")
+            companion.install_marks(ready)
+            self._bot(root, "nova", "Nova")
+            self._bot(root, "plain", "Plain", meta=False)  # not a Bot Forge Bot
+            missing = companion.bots_without_marks(root)
+            self.assertEqual([m["bot"] for m in missing], ["nova"])
+            self.assertEqual(missing[0]["reason"], "not installed")
+
+    def test_installed_but_switched_off_is_reported_as_not_enabled(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root, "nova", "Nova")
+            companion.install_marks(d)
+            cfg = yaml.safe_load((d / "config.yaml").read_text())
+            cfg["plugins"]["enabled"] = []
+            (d / "config.yaml").write_text(yaml.safe_dump(cfg))
+            self.assertEqual(companion.bots_without_marks(root)[0]["reason"], "not enabled")
 
 
 class WaitingQueueTests(unittest.TestCase):

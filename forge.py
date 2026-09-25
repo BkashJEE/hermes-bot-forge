@@ -65,7 +65,7 @@ def default_root() -> Path:
 
 DEFAULT_SETTINGS = {"inherit_model": True, "fallback_model": {},
                     "probe_local_models": False, "install_gateway": True, "suggest_connectors": True,
-                    "journal_enabled": True, "ack_reactions": True}
+                    "journal_enabled": True, "ack_reactions": True, "ack_tapback": True}
 
 
 # ── hermes cli ───────────────────────────────────────────────────────────────
@@ -513,6 +513,15 @@ def forge(s: dict) -> dict:
 
             journal_path = str(journal.ensure_journal(pdir))
 
+        # The reaction hook ships inside the Bot: a hook only runs in the profile running the turn,
+        # so one living here would never fire when the user talks to this Bot. Hooks only, no tools.
+        marks = None
+        if settings.get("ack_tapback", True):
+            import companion
+
+            installed = companion.install_marks(pdir)
+            marks = installed.get("version") if installed.get("ok") else f"not installed: {installed.get('error')}"
+
         # 3. memories
         mem = pdir / "memories"
         mem.mkdir(exist_ok=True)
@@ -602,7 +611,7 @@ def forge(s: dict) -> dict:
                 "approvals": approvals, "reports_to": reports_to or None,
                 "warning": warning, "toolsets": sorted(tools),
                 "skills_disabled": len(disabled), "routines": routines, "gateway": gateway, "intro": reply[-600:],
-                "journal": journal_path,
+                "journal": journal_path, "reactions": marks,
                 "note": "done — it already introduced itself. Do not message, test or change this Bot; just report."}
     except Exception as e:
         rolled_back = False

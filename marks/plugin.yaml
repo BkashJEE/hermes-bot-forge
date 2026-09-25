@@ -1,0 +1,20 @@
+manifest_version: 1
+name: bot-forge-marks
+version: 0.11.0
+description: Reacts to your message while a Bot works on it — 👀 on pickup, then ✅ / ✋ / ⚠️ for how the turn ended. Hooks only; grants the Bot no tools.
+author: Bikash Joshi
+license: MIT
+homepage: https://github.com/BkashJEE/hermes-bot-forge
+tags: [bots, reactions, acknowledgements]
+kind: standalone
+requires_hermes: ">=0.21"
+provides_hooks:
+  - pre_llm_call
+  - post_llm_call
+config_schema:
+  ack_tapback:
+    type: bool
+    default: true
+    description: >-
+      React to the user's own message as the turn runs. Hermes desktop sessions only, and it needs
+      Settings → Appearance → Message Reactions on.

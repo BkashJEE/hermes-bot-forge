@@ -3,6 +3,13 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-09-25
+
+### Added
+- **A new Bot knows where it landed.** `create_agent` now surveys the workspace the Bot was born into — the directory Hermes is running in and the repos under it, plus this install's own Bots, skills and plugins — scores it against the Bot's own SOUL.md and one-job, and writes the result into the Bot's memory. The Bot knows which repo holds its work on its first turn, and neither it nor the calling agent has to research the user's machine. Deterministic word matching, no model call. The result's `workspace` block carries `fits`, `covered_by`, `skills_here` and `next_steps` for the reply.
+- **A Bot that already exists is not built twice.** When an existing Bot's job covers the new one, `create_agent` refuses and names it, rather than letting the roster fill with overlapping Bots. `allow_overlap: true` is the way past it, once the user has said they want both.
+- `workspace_survey` (default on) and `workspace_roots` configure the scan. It is read-only and shallow: directory names, git remotes, and the head of a README / AGENTS.md / CLAUDE.md — never source files, never the home directory unless it is named in `workspace_roots`, never inside dependency trees, capped at 3s and cached so the tenth Bot costs nothing. Anything the secret scanner flags never reaches a Bot's memory.
+
 ## [0.11.0] - 2026-09-24
 
 ### Fixed

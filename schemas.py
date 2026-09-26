@@ -4,20 +4,39 @@ TOOLSETS = ["browser", "code_execution", "computer_use", "connections", "cronjob
             "image_gen", "terminal", "tts", "vision", "web"]
 BLOB_KINDS = ["round", "organic", "boxy", "capsule", "nub", "cloud", "droplet", "hexagon", "sun", "triangle"]
 
+# Creation replaces the model block; name and provider must travel together.
+MODEL = {
+    "type": "object",
+    "description": (
+        "Optional explicit model route, applied before the Bot's first model call. "
+        "Use only an authorized model/provider; omit to retain existing inheritance. "
+        "Credentials belong in Hermes provider configuration, never here."
+    ),
+    "properties": {
+        "default": {"type": "string", "minLength": 1},
+        "provider": {"type": "string", "minLength": 1},
+        "base_url": {"type": "string"},
+        "api_mode": {"type": "string"},
+    },
+    "required": ["default", "provider"],
+    "additionalProperties": False,
+}
+
+
 CREATE_AGENT = {
     "name": "create_agent",
     "description": (
-        "Spawn a brand-new, fully working Hermes Bot (its own profile) right now. Use whenever the user asks to "
-        "make/create/spawn/build/hire a bot, agent, assistant or 'someone to handle' a job (e.g. 'make me a "
-        "social media manager'). Do NOT ask the user questions first: design the Bot yourself and call this. "
-        "Write the full SOUL.md in `soul_md` (sections: '# <Name> — <Role>', 'You are **<Name>**…', "
-        "'## Your one job', '## How you work', '## Voice', '## Never', '## Escalate to'), specific to the job. "
-        "One job per Bot; for two unrelated jobs call this twice. The tool creates the profile, writes SOUL.md "
-        "and memories, sets tools and skills, adds routines, opens its Bot Chat with a self-introduction, starts "
-        "its gateway, and rolls everything back on failure. The Bot appears in Desktop Bot Mode with its name "
-        "and face. Takes 1-3 minutes. After it succeeds, do not message, test or change the new Bot — just "
-        "report. Pass `template` to start from a proven design. Load skill 'bot-forge:bot-forge' for role "
-        "defaults if unsure."
+        "Create a persistent Hermes Bot after that provisioning choice is authorized. "
+        "For a generic job request, first use list_agents and inspect relevant skills/routines: "
+        "prefer reuse, a skill, temporary delegation, or a routine on an existing owner when sufficient. "
+        "A new profile is for a justified persistent responsibility, state or configuration difference, "
+        "not every specialty. Explicit authorized Bot/profile creation stays direct; ask only about "
+        "material ambiguity or missing authority. Apply the bundled skill 'bot-forge:bot-forge'. "
+        "Write a job-specific SOUL.md in soul_md and use template when helpful. The tool provisions "
+        "identity, memory, tools, skills and optional routines, tries a Bot Chat introduction, and "
+        "handles the existing gateway topology without forcing a separate service. Creation failures "
+        "attempt cleanup; authentication and gateway readiness can remain pending. Takes 1-3 minutes. "
+        "Report the actual intro, warning and gateway result instead of assuming the Bot is live."
     ),
     "parameters": {
         "type": "object",
@@ -38,6 +57,7 @@ CREATE_AGENT = {
                 "container, so it cannot touch the user's files and cannot block other Bots. Use a sandbox for any "
                 "Bot you give terminal or code_execution, and say so when you report back. The call is refused if "
                 "the backend is not usable on this machine.")},
+            "model": MODEL,
             "role": {"type": "string", "description": "role title, e.g. 'Social Media Manager'"},
             "description": {"type": "string", "description": "1-2 sentences on what it is good at (used for routing)"},
             "one_job": {"type": "string", "description": "the Bot's single job in one sentence"},
@@ -238,12 +258,15 @@ DELETE_AGENT = {
 CREATE_TEAM = {
     "name": "create_team",
     "description": (
-        "Build a whole team of Bots in one go — use when the user asks for a team, a crew, a department or "
-        "several Bots at once ('set me up a content team', 'hire me a marketing team'). Design every member "
-        "yourself, one job each, no questions. Give `lead` to build a chief of staff that the others report to, "
-        "or `lead_name` to put an existing Bot in charge; the lead learns the roster so it can delegate "
-        "immediately. Up to 6 members, built one at a time — a member that fails is rolled back alone and the "
-        "rest of the team stands. Takes several minutes; say so before calling."
+        "Provision the authorized new persistent members of a team. Before building, inspect "
+        "list_agents and relevant skills/routines and apply the same persistence test to each member: "
+        "reuse an existing Bot, a skill, temporary delegation or a routine when sufficient. "
+        "A request for a team does not imply a new profile for every specialty or a fixed team size. "
+        "Use lead_name for an existing lead; put only justified NEW profiles in members. "
+        "Explicit authorized profile creation stays direct. Apply skill 'bot-forge:bot-forge'. "
+        "Each new lead/member may have an explicit model route; omission preserves inheritance. "
+        "Up to 6 members are built one at a time; failure cleanup is per Bot, not a team transaction. "
+        "Report each member's warning and gateway status. Takes several minutes; say so before calling."
     ),
     "parameters": {
         "type": "object",
@@ -254,6 +277,7 @@ CREATE_TEAM = {
     "properties": {
         "display_name": {"type": "string"}, "role": {"type": "string"}, "one_job": {"type": "string"},
         "description": {"type": "string"}, "soul_md": {"type": "string"},
+        "model": MODEL,
         "avatar_kind": {"type": "string", "enum": BLOB_KINDS},
         "sandbox": {"type": "string", "enum": ["local", "docker", "singularity", "apptainer"]},
         "toolsets": {"type": "array", "items": {"type": "string", "enum": TOOLSETS}},
@@ -273,6 +297,7 @@ CREATE_TEAM = {
     "properties": {
         "display_name": {"type": "string"}, "role": {"type": "string"}, "one_job": {"type": "string"},
         "description": {"type": "string"}, "soul_md": {"type": "string"},
+        "model": MODEL,
         "avatar_kind": {"type": "string", "enum": BLOB_KINDS},
         "sandbox": {"type": "string", "enum": ["local", "docker", "singularity", "apptainer"]},
         "toolsets": {"type": "array", "items": {"type": "string", "enum": TOOLSETS}},

@@ -83,12 +83,12 @@ def build_team(s: dict) -> dict:
         except OSError:
             pass
 
-    made = [{k: m.get(k) for k in ("name", "display_name", "model", "routines", "warning", "connect_next")
+    made = [{k: m.get(k) for k in ("name", "display_name", "model", "routines", "warning", "gateway", "connect_next")
              if m.get(k)} for m in built if m.get("ok")]
     out = {"ok": bool(made), "team": s.get("team") or None,
            "lead": (lead or {}).get("name"), "members": made,
            "failed": [{"name": f.get("name"), "error": f.get("error")} for f in failed],
-           "note": "each Bot is alive, introduced itself in its own Bot Chat, and knows who it reports to"}
+           "note": "report created members, failures, and each member's warning and gateway readiness"}
     if not made:
         out["error"] = "no Bot in the team could be built"
     return out

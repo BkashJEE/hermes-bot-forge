@@ -17,9 +17,9 @@ import sys
 import time
 from pathlib import Path
 
-try:
+if __package__:
     from . import forge
-except ImportError:  # standalone CLI/repository import
+else:
     import forge
 
 STALE_DAYS = 7
@@ -84,9 +84,9 @@ def _gateways(root: Path) -> dict:
 
 def _journal_status(pdir: Path) -> dict:
     """Small, read-only journal summary; entry bodies stay out of health reports."""
-    try:
+    if __package__:
         from . import journal
-    except ImportError:  # standalone CLI/repository import
+    else:
         import journal
 
     folder = pdir / "journal"
@@ -102,9 +102,9 @@ def _journal_status(pdir: Path) -> dict:
 
 
 def _acks_enabled(pdir: Path) -> bool:
-    try:
+    if __package__:
         from . import acks
-    except ImportError:  # standalone CLI/repository import
+    else:
         import acks
     return acks.acks_enabled(pdir)
 
@@ -178,9 +178,9 @@ def check(s: dict) -> dict:
         bots = [d for d in bots if matches(d)]
         if not bots:
             return {"ok": False, "error": f"no Bot named '{s['name']}'"}
-    try:
+    if __package__:
         from . import waiting
-    except ImportError:  # standalone CLI/repository import
+    else:
         import waiting
     gateways = _gateways(root)
     report = [check_bot(d, gateways, now) for d in bots]

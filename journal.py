@@ -15,13 +15,13 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-try:
+if __package__:
     from . import forge
-except ImportError:  # standalone CLI/repository import
+else:
     import forge
-try:
+if __package__:
     from . import portable
-except ImportError:  # standalone CLI/repository import
+else:
     import portable
 
 JOURNAL_MARKER = "<!-- bot-forge-journal:v1 -->"
@@ -112,9 +112,9 @@ def enable_journal(pdir: Path) -> dict:
     changed = JOURNAL_MARKER not in text
     backup = ""
     if changed:
-        try:
+        if __package__:
             from . import manage
-        except ImportError:  # standalone CLI/repository import
+        else:
             import manage
 
         backup = manage._backup(pdir, "SOUL.md")
@@ -227,9 +227,9 @@ def read_entries(pdir: Path, spec: dict) -> dict:
 
 
 def _target(root: Path, spec: dict) -> Path:
-    try:
+    if __package__:
         from . import manage
-    except ImportError:  # standalone CLI/repository import
+    else:
         import manage
 
     name = str(spec.get("name") or spec.get("launch_profile") or "").strip()

@@ -28,9 +28,9 @@ import subprocess
 import time
 from pathlib import Path
 
-try:
+if __package__:
     from . import forge
-except ImportError:  # standalone CLI/repository import
+else:
     import forge
 
 WORKSPACE_MARKER = "<!-- bot-forge-workspace:v1 -->"
@@ -496,9 +496,9 @@ def attach(pdir: Path, result: dict) -> bool:
     block = memory_block(result)
     if not block:
         return False
-    try:
+    if __package__:
         from . import portable
-    except ImportError:  # standalone CLI/repository import
+    else:
         import portable
 
     if portable.scan_text(block)["verdict"] == "BLOCK":

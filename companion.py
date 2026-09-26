@@ -9,9 +9,9 @@ that ships with the Bot: two hooks, no tools, so a Bot gains the reaction and no
 import shutil
 from pathlib import Path
 
-try:
+if __package__:
     from . import forge
-except ImportError:  # standalone CLI/repository import
+else:
     import forge
 
 MARKS_NAME = "bot-forge-marks"

@@ -170,10 +170,7 @@ def check(root: Path | None = None) -> dict:
     if __package__:
         from . import acks
     else:
-        try:
-            from . import acks
-        except ImportError:  # standalone CLI/repository import
-            import acks
+        import acks
     bots = [p for _n, p in _profiles(root)[1:]]
     acking = [p.name for p in bots if acks.acks_enabled(p)]
     if bots:
@@ -186,10 +183,7 @@ def check(root: Path | None = None) -> dict:
     if __package__:
         from . import companion
     else:
-        try:
-            from . import companion
-        except ImportError:  # standalone CLI/repository import
-            import companion
+        import companion
     missing = companion.bots_without_marks(root)
     forged = [p for p in bots if (forge.load_yaml(p / "profile.yaml").get("ui_meta") or {}).get("hermes-bots")]
     if forged:
@@ -202,10 +196,7 @@ def check(root: Path | None = None) -> dict:
             if __package__:
                 from . import tapback
             else:
-                try:
-                    from . import tapback
-                except ImportError:  # standalone CLI/repository import
-                    import tapback
+                import tapback
             if tapback.reactions_setting() is False:
                 detail += ". Message Reactions is off in Settings → Appearance, so none of them will show"
         except Exception:
@@ -215,10 +206,7 @@ def check(root: Path | None = None) -> dict:
     if __package__:
         from . import portable
     else:
-        try:
-            from . import portable
-        except ImportError:  # standalone CLI/repository import
-            import portable
+        import portable
     checks.append({"check": "templates", "status": OK,
                    "detail": ", ".join(sorted(portable.bundled_templates()))})
 

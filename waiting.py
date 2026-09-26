@@ -10,9 +10,9 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-try:
+if __package__:
     from . import forge
-except ImportError:  # standalone CLI/repository import
+else:
     import forge
 
 # `## <timestamp> · <status> · <title>` — written by journal.py

@@ -1,7 +1,9 @@
 """Unit tests for the pure parts of bot-forge. Run: python -m unittest discover -s tests"""
 
 import json
+import os
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import time
@@ -14,6 +16,26 @@ sys.path.insert(0, str(ROOT))
 
 import forge  # noqa: E402
 import yaml  # noqa: E402
+
+
+class PackageImports(unittest.TestCase):
+    def test_internal_imports_outside_repository(self):
+        """Package imports must not rely on the repository being on sys.path."""
+        code = (
+            "import importlib; "
+            f"f = importlib.import_module({ROOT.name!r} + '.forge'); "
+            f"d = importlib.import_module({ROOT.name!r} + '.doctor'); "
+            "d.sandbox_backends = lambda: {'docker': {'usable': True}}; "
+            "assert f.sandbox_error('docker') == ''; "
+            "r = f.forge({'template': 'missing-template-for-import-test'}); "
+            "assert r['ok'] is False and 'template' in r['error']"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            env = {"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(ROOT.parent),
+                   "HOME": os.environ.get("HOME", ""), "SYSTEMROOT": os.environ.get("SYSTEMROOT", "")}
+            proc = subprocess.run([sys.executable, "-B", "-c", code], cwd=tmp, env=env,
+                                  capture_output=True, text=True, timeout=30)
+        self.assertEqual(proc.returncode, 0, proc.stderr)
 
 try:  # the plugin package (tools.py uses relative-free imports, so plain import works too)
     import tools  # noqa: E402

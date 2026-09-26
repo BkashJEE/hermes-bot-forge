@@ -8,7 +8,10 @@ import json
 import re
 from pathlib import Path
 
-import forge
+if __package__:
+    from . import forge  # loaded as a Hermes plugin package
+else:
+    import forge  # standalone scripts and repository tests
 
 FORMAT = "bot-forge/template"
 VERSION = 1

@@ -250,7 +250,10 @@ def sandbox_error(sandbox: str) -> str:
         return ""
     if sandbox not in SANDBOXES:
         return f"unknown sandbox '{sandbox}' — use one of: {', '.join(SANDBOXES)}"
-    import doctor
+    if __package__:
+        from . import doctor
+    else:
+        import doctor
     found = doctor.sandbox_backends().get(sandbox)
     if not found:
         return (f"{sandbox} is not installed on this machine, so the Bot would have no computer of its own. "
@@ -451,7 +454,10 @@ def forge(s: dict) -> dict:
     root = Path(s.get("hermes_root") or default_root())
     settings = {**DEFAULT_SETTINGS, **{k: v for k, v in (s.get("settings") or {}).items() if v is not None}}
     if s.get("template"):
-        import portable
+        if __package__:
+            from . import portable
+        else:
+            import portable
         ref = str(s["template"]).strip()
         path = portable.bundled_templates().get(ref.lower()) or Path(ref).expanduser()
         try:

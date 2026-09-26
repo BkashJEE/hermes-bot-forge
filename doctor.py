@@ -14,7 +14,10 @@ import sys
 import time
 from pathlib import Path
 
-import forge
+if __package__:
+    from . import forge  # loaded as a Hermes plugin package
+else:
+    import forge  # direct `python doctor.py` and repository tests
 
 PLUGIN_DIR = Path(__file__).resolve().parent
 OAUTH_PROVIDERS = {"openai-codex", "anthropic", "anthropic-oauth", "xai", "nous"}
@@ -164,7 +167,10 @@ def check(root: Path | None = None) -> dict:
                  "none installed — Bots share this machine's shell (install Docker for per-Bot isolation)"
         checks.append({"check": "sandboxes", "status": WARN, "detail": detail})
 
-    import acks
+    if __package__:
+        from . import acks
+    else:
+        import acks
     bots = [p for _n, p in _profiles(root)[1:]]
     acking = [p.name for p in bots if acks.acks_enabled(p)]
     if bots:
@@ -174,7 +180,10 @@ def check(root: Path | None = None) -> dict:
                                  + (f" — {', '.join(silent)} predate the feature: ask an agent to "
                                     f"\"turn on acknowledgements for <name>\"" if silent else "")})
 
-    import companion
+    if __package__:
+        from . import companion
+    else:
+        import companion
     missing = companion.bots_without_marks(root)
     forged = [p for p in bots if (forge.load_yaml(p / "profile.yaml").get("ui_meta") or {}).get("hermes-bots")]
     if forged:
@@ -184,14 +193,20 @@ def check(root: Path | None = None) -> dict:
             detail += " — " + ", ".join(f"{m['display_name']} ({m['reason']})" for m in missing[:4]) + \
                       "; ask an agent to \"turn on reactions for <name>\""
         try:
-            import tapback
+            if __package__:
+                from . import tapback
+            else:
+                import tapback
             if tapback.reactions_setting() is False:
                 detail += ". Message Reactions is off in Settings → Appearance, so none of them will show"
         except Exception:
             pass
         checks.append({"check": "reactions", "status": OK if not missing else WARN, "detail": detail})
 
-    import portable
+    if __package__:
+        from . import portable
+    else:
+        import portable
     checks.append({"check": "templates", "status": OK,
                    "detail": ", ".join(sorted(portable.bundled_templates()))})
 

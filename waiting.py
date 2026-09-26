@@ -10,7 +10,10 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-import forge
+try:
+    from . import forge
+except ImportError:  # standalone CLI/repository import
+    import forge
 
 # `## <timestamp> · <status> · <title>` — written by journal.py
 ENTRY = re.compile(r"^##\s+(?P<stamp>\S+)\s+·\s+(?P<status>\w+)\s+·\s+(?P<title>.+)$", re.M)

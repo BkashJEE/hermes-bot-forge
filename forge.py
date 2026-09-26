@@ -457,7 +457,10 @@ def forge(s: dict) -> dict:
         if __package__:
             from . import portable
         else:
-            import portable
+            try:
+                from . import portable
+            except ImportError:  # standalone CLI/repository import
+                import portable
         ref = str(s["template"]).strip()
         path = portable.bundled_templates().get(ref.lower()) or Path(ref).expanduser()
         try:
@@ -477,7 +480,10 @@ def forge(s: dict) -> dict:
     guard = None
     if settings.get("workspace_survey", True):
         try:
-            import survey
+            try:
+                from . import survey
+            except ImportError:  # standalone CLI/repository import
+                import survey
 
             guard = survey.overlap_guard(survey.workspace_index(root, settings), survey.job_terms(s))
         except Exception:
@@ -505,10 +511,16 @@ def forge(s: dict) -> dict:
     soul = soul.rstrip() + "\n" + guardrails_block(approvals if "## Ask first" not in soul else [],
                                                    reports_to if "## Escalate to" not in soul else "")
     if settings.get("ack_reactions", True) and s.get("ack_reactions", True):
-        import acks
+        try:
+            from . import acks
+        except ImportError:  # standalone CLI/repository import
+            import acks
         soul = acks.apply_policy(soul)
     if settings.get("journal_enabled", True):
-        import journal
+        try:
+            from . import journal
+        except ImportError:  # standalone CLI/repository import
+            import journal
 
         if journal.JOURNAL_MARKER not in soul:
             soul = soul.rstrip() + "\n\n" + journal.JOURNAL_POLICY.rstrip() + "\n"
@@ -531,7 +543,10 @@ def forge(s: dict) -> dict:
         (pdir / "SOUL.md").write_text(soul)
         journal_path = None
         if settings.get("journal_enabled", True):
-            import journal
+            try:
+                from . import journal
+            except ImportError:  # standalone CLI/repository import
+                import journal
 
             journal_path = str(journal.ensure_journal(pdir))
 
@@ -539,7 +554,10 @@ def forge(s: dict) -> dict:
         # so one living here would never fire when the user talks to this Bot. Hooks only, no tools.
         marks = None
         if settings.get("ack_tapback", True):
-            import companion
+            try:
+                from . import companion
+            except ImportError:  # standalone CLI/repository import
+                import companion
 
             installed = companion.install_marks(pdir)
             marks = installed.get("version") if installed.get("ok") else f"not installed: {installed.get('error')}"
@@ -568,7 +586,10 @@ def forge(s: dict) -> dict:
         workspace = None
         if settings.get("workspace_survey", True):
             try:
-                import survey
+                try:
+                    from . import survey
+                except ImportError:  # standalone CLI/repository import
+                    import survey
 
                 found = survey.survey(root, {**s, "soul_md": soul}, settings, exclude=profile_id)
                 survey.attach(pdir, found)

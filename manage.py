@@ -18,7 +18,10 @@ from pathlib import Path
 
 import yaml
 
-import forge
+try:
+    from . import forge
+except ImportError:  # standalone CLI/repository import
+    import forge
 
 MAX_SOUL_BYTES = 64_000
 
@@ -118,7 +121,10 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
 
     # acknowledgements
     if s.get("ack_reactions"):
-        import acks
+        try:
+            from . import acks
+        except ImportError:  # standalone CLI/repository import
+            import acks
         result = acks.enable_acks(pdir)
         if result["changed"]:
             backups.setdefault("SOUL.md", result["backup"] or "")
@@ -126,7 +132,10 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
 
     # the reaction hook, which has to live inside the Bot to run on the Bot's own turns
     if s.get("ack_reactions") or s.get("ack_tapback"):
-        import companion
+        try:
+            from . import companion
+        except ImportError:  # standalone CLI/repository import
+            import companion
         marks = companion.install_marks(pdir)
         if marks.get("ok") and (marks.get("copied") or marks.get("enabled")) and "reactions" not in changed:
             changed.append("reactions")
@@ -210,7 +219,10 @@ def op_copy(s: dict, root: Path, settings: dict) -> dict:
         soul = (pdir / "SOUL.md").read_text() if (pdir / "SOUL.md").exists() else ""
         (pdir / "SOUL.md").write_text(forge.ensure_identity(soul, display, s.get("role") or "Bot", new_id))
         if settings.get("journal_enabled", True):
-            import journal
+            try:
+                from . import journal
+            except ImportError:  # standalone CLI/repository import
+                import journal
 
             journal.enable_journal(pdir)
         if settings.get("install_gateway", True) and os.name != "nt":
@@ -248,7 +260,10 @@ def _export_target(root: Path, requested, default_name: str):
 def op_export(s: dict, root: Path, settings: dict) -> dict:
     """Share a Bot. Default: a portable .botforge.json template (design only, secret-scanned).
     mode=backup: a full `hermes profile export` for the user's own safekeeping — includes chat history."""
-    import portable
+    try:
+        from . import portable
+    except ImportError:  # standalone CLI/repository import
+        import portable
     pdir = _require_bot(root, s.get("name"))
     stamp = time.strftime("%Y%m%d-%H%M%S")
     if (s.get("mode") or "template") == "backup":

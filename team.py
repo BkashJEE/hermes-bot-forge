@@ -19,7 +19,10 @@ import json
 import sys
 from pathlib import Path
 
-import forge
+try:
+    from . import forge
+except ImportError:  # standalone CLI/repository import
+    import forge
 
 MAX_MEMBERS = 6
 

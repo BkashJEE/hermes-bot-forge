@@ -28,7 +28,10 @@ import subprocess
 import time
 from pathlib import Path
 
-import forge
+try:
+    from . import forge
+except ImportError:  # standalone CLI/repository import
+    import forge
 
 WORKSPACE_MARKER = "<!-- bot-forge-workspace:v1 -->"
 INDEX_REL = Path(".bot-forge") / "workspace.json"
@@ -493,7 +496,10 @@ def attach(pdir: Path, result: dict) -> bool:
     block = memory_block(result)
     if not block:
         return False
-    import portable
+    try:
+        from . import portable
+    except ImportError:  # standalone CLI/repository import
+        import portable
 
     if portable.scan_text(block)["verdict"] == "BLOCK":
         return False  # a path that looks like a credential never reaches memory

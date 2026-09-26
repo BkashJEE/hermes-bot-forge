@@ -20,8 +20,8 @@ Spec ("role" required; everything else gets a sane default):
   "settings": {...}                      # plugin settings (see plugin.yaml config_schema)
 }
 
-Prints one JSON result. Name problems are reported before anything is created; any later failure
-deletes the half-built profile.
+Prints one JSON result. Name problems are reported before anything is created; creation failures
+attempt cleanup. Sign-in and gateway readiness can remain pending on a created profile.
 """
 import json
 import os
@@ -109,6 +109,90 @@ def dump_yaml(path: Path, data: dict):
         os.fsync(fh.fileno())
     os.chmod(tmp, mode)
     tmp.replace(path)
+
+
+def provision_gateway(root: Path, profile_id: str, settings: dict) -> str:
+    """Best-effort gateway readiness; never infer a live multiplexer from a config or PID file.
+
+    Use Hermes' local control client (including its long-path handling), not a second
+    socket implementation. Missing/older control support means unverified, not permission to
+    install a second inbound process. No host restart, migration, --force or automatic unpark.
+    """
+    if not settings["install_gateway"] or os.name == "nt":
+        return "skipped"
+    pdir = root / "profiles" / profile_id
+    cfg = load_yaml(pdir / "config.yaml")
+    standalone = (cfg.get("gateway") or {}).get("standalone") is True
+    if not standalone and (pdir / "gateway.parked").exists():
+        return "parked: marker present; no unpark requested"
+
+    host = None
+    identify = rescan = None
+    try:
+        from gateway import control_socket
+        identify = getattr(control_socket, "identify_gateway", None)
+        rescan = getattr(control_socket, "rescan_gateway_profiles", None)
+    except ImportError:
+        pass
+
+    def live_identity(home):
+        if not callable(identify):
+            return None
+        try:
+            record = identify(home)
+            if (not isinstance(record, dict) or type(record.get("protocol")) is not int
+                    or record["protocol"] != 1
+                    or record.get("kind") != "hermes-gateway"
+                    or type(record.get("pid")) is not int or record["pid"] <= 0
+                    or not isinstance(record.get("hermes_home"), str)
+                    or Path(record["hermes_home"]).resolve() != home.resolve()):
+                return None
+            served = record.get("served_profiles")
+            if not isinstance(served, list) or not all(isinstance(n, str) for n in served):
+                return None
+            return record
+        except Exception:
+            # A broken diagnostic is not evidence that the host is down or that legacy mode is safe.
+            return None
+
+    profiles = root / "profiles"
+    homes = [root] + ([d for d in sorted(profiles.iterdir()) if is_live_profile(d)
+                      and d.resolve().parent == profiles.resolve()] if profiles.is_dir() else [])
+    for home in homes:
+        record = live_identity(home)
+        if record is None:
+            continue
+        if profile_id in record["served_profiles"]:
+            if standalone:
+                if home == pdir:
+                    return "started"
+                return "pending: host still serves this standalone profile; wait for its rescan"
+            return "served by host gateway"
+        home_cfg = load_yaml(home / "config.yaml")
+        if home != root and (home_cfg.get("gateway") or {}).get("standalone") is True:
+            continue
+        if record["served_profiles"] and host is None:
+            host = home
+
+    if standalone:
+        # This is an existing explicit configuration, not a topology chosen by Bot Forge.
+        # The native CLI still owns all refusal/attach rules; never add --force.
+        gw = run(root, "-p", profile_id, "gateway", "install", "--start-now", "--start-on-login",
+                 check=False, timeout=120)
+        return "started" if gw.returncode == 0 else f"not started: {clean(gw.stderr or gw.stdout)[-200:]}"
+    if host is not None:
+        # One native hot-rescan, then a fresh identify. An ACK alone is not proof of serving.
+        try:
+            if callable(rescan):
+                rescan(host)
+        except Exception:
+            pass
+        record = live_identity(host)
+        if record is not None and profile_id in record["served_profiles"]:
+            return "served by host gateway"
+        return "pending: host has not confirmed serving this profile; check hermes gateway status"
+    return ("pending: no live host gateway could be verified; check hermes gateway status. "
+            "No per-profile service was installed")
 
 
 # ── names ────────────────────────────────────────────────────────────────────
@@ -624,10 +708,11 @@ def forge(s: dict) -> dict:
             raise RuntimeError(f"Bot did not answer: {reply}")
 
         # 7. gateway (best effort)
-        gateway = "skipped"
-        if settings["install_gateway"] and os.name != "nt":
-            gw = run(root, "-p", profile_id, "gateway", "install", "--start-now", "--start-on-login", check=False, timeout=120)
-            gateway = "started" if gw.returncode == 0 else f"not started: {clean(gw.stderr or gw.stdout)[-200:]}"
+        try:
+            gateway = provision_gateway(root, profile_id, settings)
+        except Exception:
+            # A gateway diagnostic/setup failure must not delete an otherwise created profile.
+            gateway = "pending: gateway setup could not be verified; check hermes gateway status"
 
         connect_next = []
         if settings.get("suggest_connectors", True):
@@ -640,7 +725,7 @@ def forge(s: dict) -> dict:
                 "warning": warning, "toolsets": sorted(tools),
                 "skills_disabled": len(disabled), "routines": routines, "gateway": gateway, "intro": reply[-600:],
                 "journal": journal_path, "reactions": marks, "workspace": workspace,
-                "note": "done — it already introduced itself. Do not message, test or change this Bot; just report."}
+                "note": "profile created; report the actual intro, warning and gateway readiness"}
     except Exception as e:
         rolled_back = False
         if created:

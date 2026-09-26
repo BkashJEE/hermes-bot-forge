@@ -11,13 +11,13 @@
 
 # Hermes Bot Forge
 
-**Say "make me a social media manager" — your Hermes agent builds that Bot.**
+**Describe the job. Reuse what fits; provision a new Bot when it needs its own persistent role.**
 
 ```bash
 hermes plugins install bot-forge
 ```
 
-Bot Forge is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin that lets any agent spawn a complete, working [Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode) Bot from one sentence — no New Agent dialog, no setup:
+Bot Forge is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin that lets any agent spawn a complete, working [Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode) Bot from an authorized design, without the New Agent dialog:
 
 | The new Bot gets | |
 |---|---|
@@ -26,10 +26,22 @@ Bot Forge is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) plug
 | 🧠 **Memory** | starter facts, plus what Hermes already knows about you |
 | 🛠️ **Tools & skills** | file, web and browser, plus what the role needs |
 | ⏰ **Routines** | optional cron jobs that post into its Bot Chat |
-| 💬 **Bot Chat** | opened with the Bot introducing itself |
-| 🔌 **Gateway** | a background service, started and enabled on login |
+| 💬 **Bot Chat** | introduction attempted; sign-in may still be needed |
+| 🔌 **Gateway** | live host serving checked; a hot-rescan is requested when needed |
 
-Every step is checked, and the whole Bot is rolled back if one fails.
+Creation failures attempt cleanup of that Bot. Sign-in and gateway readiness may remain
+pending; the result says which. A team is not an all-or-nothing transaction.
+
+### Does this job need a new Bot?
+
+For a generic job or team request, the existing bundled skill asks the caller to inspect the
+roster and relevant skills/routines first. Reuse an existing owner, a skill, temporary delegation
+or a routine when sufficient. Create a new profile for a justified persistent responsibility,
+state or configuration difference, not just a new specialty. Profiles are not security sandboxes.
+
+This is advisory guidance, not a deterministic classifier or a new planning service. Explicit
+authorized profile creation remains direct, with the existing duplicate and safety checks.
+The same decision applies to each proposed team member.
 
 ## Demo
 
@@ -72,7 +84,7 @@ If `enable` asks to grant tool overrides, answer **no** — Bot Forge doesn't ov
 
 ```bash
 hermes gateway restart
-hermes -p ceo gateway restart   # for each profile you enabled
+# With independent legacy services, restart their owners instead; do not create new services here.
 ```
 
 Then quit and reopen **Hermes Desktop**.
@@ -109,7 +121,21 @@ Click the new Bot — its Bot Chat already has its introduction.
 
 ### 7. Choose how new Bots sign in
 
-New Bots inherit the model of the Bot that created them. Whether they can use it right away depends on the provider:
+Unless given an explicit route, new Bots retain the existing model inheritance behavior.
+`create_agent.model`, `create_team.lead.model` and `create_team.members[].model` accept:
+
+```json
+{"default": "<model-id>", "provider": "<provider-id>"}
+```
+
+Optional `base_url` and `api_mode` travel with that route. The complete block is applied
+before the first inference, without carrying over the creator's provider transport settings.
+Creation-tool calls reject missing/empty names or providers and unsupported fields before
+spawning; credentials must never be supplied here. Omit `model` to inherit, rather than `{}`.
+This does not select tiers automatically or authorize changing providers/budgets. An omitted
+team-member route inherits the calling profile as before, not the newly configured team lead.
+
+Whether the selected model can be used right away depends on the provider:
 
 | Your model's provider | What happens | What to do |
 |---|---|---|
@@ -139,10 +165,10 @@ plugins:
 
 | Key | Default | Meaning |
 |---|---|---|
-| `inherit_model` | `true` | New Bots use the model of the profile that asked for them, like Bot Mode's New Agent. |
+| `inherit_model` | `true` | Inherit the calling profile's model unless an explicit creation route is supplied. |
 | `fallback_model` | `{}` | Model to switch a Bot to when its inherited model can't sign in, e.g. `{default: qwen3, provider: custom, base_url: http://127.0.0.1:8080/v1}`. |
 | `probe_local_models` | `false` | With no `fallback_model`, look for a local llama.cpp / Ollama / LM Studio server to fall back to. |
-| `install_gateway` | `true` | Install and start a gateway service per Bot (skipped on Windows). |
+| `install_gateway` | `true` | Verify live host serving and request a hot-rescan if needed. Install a dedicated service only for an explicitly standalone profile. Skipped on Windows. |
 | `journal_enabled` | `true` | Give new Bots a private, append-only work journal for outcomes, evidence and next steps. |
 | `allow_delete` | `false` | Let `delete_agent` work at all. Off by default — an agent should not be able to destroy a Bot on its own. |
 | `backup_before_delete` | `true` | Export the Bot to a `.tar.gz` before deleting it, so it can be restored. If the backup fails, the delete is refused. |
@@ -163,7 +189,7 @@ It points that Bot's `auth.json`/`auth.lock` at the root profile's. Hermes delib
 
 ## Tools
 
-Thirteen tools, all driven by plain requests in chat:
+Fourteen tools, all driven by plain requests in chat:
 
 | Tool | Say this | What it does |
 |---|---|---|
@@ -202,7 +228,12 @@ Any field you give overrides the template's, so *"a morning brief bot called Sol
 
 > set me up a content team
 
-builds a lead plus its specialists, each with one job, each reporting to the lead, each introduced in its own Bot Chat. A member that fails is rolled back on its own — the rest of the team stands.
+first considers what already exists. Only justified, authorized new profiles go into
+`members`; use `lead_name` to reuse an existing lead. The tool does not enroll arbitrary
+existing members. If no new profiles are needed, no team creation call is needed.
+For a multi-Bot creation, each new member gets its own role and optional model route.
+Failed members are cleaned up individually; successful members remain. Inspect each
+member's `warning` and `gateway`, rather than assuming the whole team is online.
 
 ### A Bot that tells you where your request stands
 
@@ -310,12 +341,22 @@ Bundled skill: `bot-forge:bot-forge` — role defaults, naming rules and a SOUL.
 3. **Bot Mode metadata** in `profile.yaml` (`ui_meta.hermes-bots`: title, description, blob face) — the same shape Desktop's New Agent dialog saves
 4. **SOUL.md** (guaranteed to state the Bot's own name), `memories/MEMORY.md`, and `memories/USER.md` minus entries that name the assistant — otherwise the new Bot adopts another Bot's name
 5. **Journal** — private, dated Markdown entries plus a concise factual journaling policy
-6. **Config** — `platform_toolsets.cli`, unrelated skill categories disabled (not deleted), inherited model
+6. **Config**: `platform_toolsets.cli`, unrelated skill categories disabled (not deleted), explicit or inherited model before the first inference
 7. **Routines** — `hermes cron create … --deliver bot-chat:<id>`
 8. **Smoke test** — the kickoff message in its `Bot Chat`
-9. **Gateway** — `hermes -p <id> gateway install --start-now --start-on-login`
+9. **Gateway**: query the live host, request one native hot-rescan if needed, and verify the fresh served roster; no automatic per-profile service in multiplex mode
 
-Any failure after step 2 deletes the profile.
+Failures during creation attempt to delete that profile. An authentication failure can instead
+leave it waiting for sign-in. Gateway setup is best-effort and does not delete a created Bot.
+
+The gateway check uses the installed `gateway.control_socket` client with an explicit home,
+including named-profile host owners. It does not treat a config flag, stale PID file or rescan
+ACK as proof of serving, and never restarts/migrates the host or uses `--force`. An explicitly
+standalone profile keeps the native installation path and its refusal rules; parked profiles
+are not unparked. `install_gateway: false` skips this setup, not the host's own discovery.
+Older Hermes versions or unavailable control clients return `pending`, not an automatic
+legacy-service fallback. Consult the installed Hermes documentation for operator setup.
+The existing general `check_agents`/`check_install` diagnostics are outside this change.
 
 > **Note:** step 3 writes Desktop's Bot Mode metadata directly. It isn't a public API and may change between Hermes releases.
 
@@ -324,7 +365,7 @@ Any failure after step 2 deletes the profile.
 | | Grok Bots | OpenMausBot | OpenClaw | **Bot Forge** |
 |---|---|---|---|---|
 | Build a Bot from one sentence, no dialog | partial | roster UI | config/CLI | ✅ |
-| Tested before you get it, rolled back on failure | — | — | — | ✅ |
+| Creation checks and failure cleanup | — | — | — | ✅; pending sign-in/gateway reported separately |
 | Persona file you can read and edit | instructions | `SOUL.md` | `SOUL.md` | ✅ `SOUL.md` |
 | Edit by chatting | UI | UI | delegation tool | ✅ `update_agent` |
 | Share / import a Bot | templates | markdown teams | ClawHub | ✅ `share_agent` |
@@ -344,12 +385,12 @@ Any failure after step 2 deletes the profile.
 
 | Symptom | Fix |
 |---|---|
-| Agent asks questions instead of building | Say "bot" or "agent" in the request, e.g. *"make me a bot that…"* |
+| Agent suggests reuse or asks a relevant question | Expected for a generic/ambiguous job; explicitly request a new persistent profile when that is the intended design. |
 | Agent doesn't know `create_agent` | Run `hermes bot-forge-doctor` — usually the profile isn't enabled or the gateway still runs the old code |
 | "name … is taken" | Expected — your agent picks another name automatically |
 | New Bot says it needs a sign-in | See step 7 |
 | New Bot doesn't appear in the roster | Click another Bot and back, or reopen Hermes Desktop |
-| Gateway "not started" | Run `hermes -p <bot> gateway install --start-now` and read its output |
+| Gateway pending/not started | Read the reason and `hermes gateway status`; do not force a per-profile service or unpark a Bot to hide a warning. |
 | An edit didn't take | Changes apply on the Bot's next turn; send it a message. Previous files are in `<profile>/backups/bot-forge/` |
 | `delete_agent` refuses | By design: set `allow_delete: true`, or run `hermes profile delete <name>` yourself |
 

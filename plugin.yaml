@@ -1,6 +1,6 @@
 name: bot-forge
 version: 0.12.0
-description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
+description: Choose the smallest sufficient setup, then provision authorized Hermes Bots with explicit model routing and topology-aware gateway readiness.
 author: Bikash Joshi
 license: MIT
 homepage: https://github.com/BkashJEE/hermes-bot-forge
@@ -29,7 +29,7 @@ config_schema:
   inherit_model:
     type: bool
     default: true
-    description: New Bots use the model of the profile that asked for them (like Bot Mode's New Agent).
+    description: Unless an explicit model is supplied, new Bots use the creator's model (like Bot Mode's New Agent).
   fallback_model:
     type: dict
     default: {}
@@ -59,7 +59,10 @@ config_schema:
   install_gateway:
     type: bool
     default: true
-    description: Install and start a background gateway service for each new Bot (systemd/launchd; skipped on Windows).
+    description: >-
+      Verify serving by the live host gateway and request a hot-rescan if needed. Install a dedicated
+      service only for an already explicitly standalone profile. Unverified topology remains pending;
+      never force a second gateway. False skips setup, not host discovery. Skipped on Windows.
   ack_tapback:
     type: bool
     default: true

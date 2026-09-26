@@ -57,7 +57,26 @@ def launch_profile(session_id=None, root=None) -> str:
     return "default"
 
 
+def _creation_model_error(spec: dict) -> str:
+    """Validate only an explicitly supplied creation-tool route, without echoing values."""
+    if "model" not in spec:
+        return ""
+    model = spec["model"]
+    if not isinstance(model, dict) or any(
+        not isinstance(model.get(k), str) or not model[k].strip() for k in ("default", "provider")
+    ):
+        return "model must be an object with non-empty default and provider strings"
+    if set(model) - {"default", "provider", "base_url", "api_mode"}:
+        return "model accepts only default, provider, base_url and api_mode; never supply credentials"
+    if any(not isinstance(v, str) for v in model.values()):
+        return "model route fields must be strings"
+    return ""
+
+
 def create_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
+    problem = _creation_model_error(args)
+    if problem:
+        return json.dumps({"ok": False, "error": problem})
     root = hermes_root()
     spec = {**args, "launch_profile": launch_profile(kwargs.get("session_id"), root),
             "hermes_root": str(root), "settings": settings or {}}
@@ -89,6 +108,13 @@ def _manage(op: str, args: dict, settings: dict | None = None) -> str:
 
 
 def create_team(args: dict, settings: dict | None = None, **kwargs) -> str:
+    # Check every explicit route before building the lead or any member.
+    specs = [args.get("lead")] + list(args.get("members") or [])
+    for spec in specs:
+        if isinstance(spec, dict):
+            problem = _creation_model_error(spec)
+            if problem:
+                return json.dumps({"ok": False, "error": problem})
     root = hermes_root()
     spec = {**args, "launch_profile": launch_profile(kwargs.get("session_id"), root),
             "hermes_root": str(root), "settings": settings or {}}

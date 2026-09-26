@@ -15,8 +15,14 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-import forge
-import portable
+if __package__:
+    from . import forge
+else:
+    import forge
+if __package__:
+    from . import portable
+else:
+    import portable
 
 JOURNAL_MARKER = "<!-- bot-forge-journal:v1 -->"
 JOURNAL_POLICY = f"""{JOURNAL_MARKER}
@@ -106,7 +112,10 @@ def enable_journal(pdir: Path) -> dict:
     changed = JOURNAL_MARKER not in text
     backup = ""
     if changed:
-        import manage
+        if __package__:
+            from . import manage
+        else:
+            import manage
 
         backup = manage._backup(pdir, "SOUL.md")
         text = _drop_orphan_policy(text)
@@ -218,7 +227,10 @@ def read_entries(pdir: Path, spec: dict) -> dict:
 
 
 def _target(root: Path, spec: dict) -> Path:
-    import manage
+    if __package__:
+        from . import manage
+    else:
+        import manage
 
     name = str(spec.get("name") or spec.get("launch_profile") or "").strip()
     if not name or name == "default":

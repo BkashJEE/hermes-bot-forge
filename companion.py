@@ -9,7 +9,10 @@ that ships with the Bot: two hooks, no tools, so a Bot gains the reaction and no
 import shutil
 from pathlib import Path
 
-import forge
+if __package__:
+    from . import forge
+else:
+    import forge
 
 MARKS_NAME = "bot-forge-marks"
 SOURCE = Path(__file__).resolve().parent / "marks"

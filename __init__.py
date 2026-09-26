@@ -47,7 +47,7 @@ def register(ctx):
         parser.add_argument("--json", action="store_true", help="machine-readable output")
 
     def _doctor_handler(args):
-        import doctor
+        from . import doctor
         return doctor.cli(args)
 
     try:

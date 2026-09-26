@@ -83,7 +83,10 @@ def enable_acks(pdir: Path) -> dict:
     if ACK_MARKER in text:
         return {"enabled": True, "changed": False, "backup": None}
     upgraded = any(m in text for m in LEGACY_MARKERS)
-    import manage
+    if __package__:
+        from . import manage
+    else:
+        import manage
 
     backup = manage._backup(pdir, "SOUL.md")
     soul.write_text(apply_policy(text))

@@ -250,7 +250,10 @@ def sandbox_error(sandbox: str) -> str:
         return ""
     if sandbox not in SANDBOXES:
         return f"unknown sandbox '{sandbox}' — use one of: {', '.join(SANDBOXES)}"
-    import doctor
+    if __package__:
+        from . import doctor
+    else:
+        import doctor
     found = doctor.sandbox_backends().get(sandbox)
     if not found:
         return (f"{sandbox} is not installed on this machine, so the Bot would have no computer of its own. "
@@ -451,7 +454,10 @@ def forge(s: dict) -> dict:
     root = Path(s.get("hermes_root") or default_root())
     settings = {**DEFAULT_SETTINGS, **{k: v for k, v in (s.get("settings") or {}).items() if v is not None}}
     if s.get("template"):
-        import portable
+        if __package__:
+            from . import portable
+        else:
+            import portable
         ref = str(s["template"]).strip()
         path = portable.bundled_templates().get(ref.lower()) or Path(ref).expanduser()
         try:
@@ -471,7 +477,10 @@ def forge(s: dict) -> dict:
     guard = None
     if settings.get("workspace_survey", True):
         try:
-            import survey
+            if __package__:
+                from . import survey
+            else:
+                import survey
 
             guard = survey.overlap_guard(survey.workspace_index(root, settings), survey.job_terms(s))
         except Exception:
@@ -499,10 +508,16 @@ def forge(s: dict) -> dict:
     soul = soul.rstrip() + "\n" + guardrails_block(approvals if "## Ask first" not in soul else [],
                                                    reports_to if "## Escalate to" not in soul else "")
     if settings.get("ack_reactions", True) and s.get("ack_reactions", True):
-        import acks
+        if __package__:
+            from . import acks
+        else:
+            import acks
         soul = acks.apply_policy(soul)
     if settings.get("journal_enabled", True):
-        import journal
+        if __package__:
+            from . import journal
+        else:
+            import journal
 
         if journal.JOURNAL_MARKER not in soul:
             soul = soul.rstrip() + "\n\n" + journal.JOURNAL_POLICY.rstrip() + "\n"
@@ -525,7 +540,10 @@ def forge(s: dict) -> dict:
         (pdir / "SOUL.md").write_text(soul)
         journal_path = None
         if settings.get("journal_enabled", True):
-            import journal
+            if __package__:
+                from . import journal
+            else:
+                import journal
 
             journal_path = str(journal.ensure_journal(pdir))
 
@@ -533,7 +551,10 @@ def forge(s: dict) -> dict:
         # so one living here would never fire when the user talks to this Bot. Hooks only, no tools.
         marks = None
         if settings.get("ack_tapback", True):
-            import companion
+            if __package__:
+                from . import companion
+            else:
+                import companion
 
             installed = companion.install_marks(pdir)
             marks = installed.get("version") if installed.get("ok") else f"not installed: {installed.get('error')}"
@@ -562,7 +583,10 @@ def forge(s: dict) -> dict:
         workspace = None
         if settings.get("workspace_survey", True):
             try:
-                import survey
+                if __package__:
+                    from . import survey
+                else:
+                    import survey
 
                 found = survey.survey(root, {**s, "soul_md": soul}, settings, exclude=profile_id)
                 survey.attach(pdir, found)

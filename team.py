@@ -19,7 +19,10 @@ import json
 import sys
 from pathlib import Path
 
-import forge
+if __package__:
+    from . import forge
+else:
+    import forge
 
 MAX_MEMBERS = 6
 

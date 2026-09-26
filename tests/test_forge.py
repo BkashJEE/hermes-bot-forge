@@ -1,7 +1,9 @@
 """Unit tests for the pure parts of bot-forge. Run: python -m unittest discover -s tests"""
 
 import json
+import os
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import time

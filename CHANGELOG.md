@@ -3,6 +3,15 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] - 2026-09-28
+
+### Added
+- **A blocked Bot emails you instead of waiting to be asked.** `check_agents` gathers what needs you when you think to ask; this is the push half. When a Bot journals a `blocked` or `failed` entry it sends one plain-text message, and `notify.py --action digest` sends the whole queue on a schedule. It reuses the email Hermes already has (`EMAIL_SMTP_HOST` / `EMAIL_ADDRESS` / `EMAIL_PASSWORD`) — no new credential, no new service, nothing to sign up for. `notify_email` redirects it or switches it off; `notify_blocked` controls the per-blocker message.
+- `check_install` now reports whether a blocked Bot can reach you, or is waiting silently.
+
+### Security
+- **Outbound only, and the recipient is resolved from config alone** — never from a tool argument, a persona, or any text a model produced. A Bot can write to the user's own address and no other, so it cannot be talked into mailing a third party, and two Bots cannot start a reply loop. Nothing in the plugin reads a mailbox. Messages are rate limited per Bot, secret-scanned before sending, and skipped silently when mail is unconfigured or the server is unreachable — a failed send can never break a turn, a journal write, or a routine.
+
 ## [0.12.1] - 2026-09-25
 
 ### Fixed

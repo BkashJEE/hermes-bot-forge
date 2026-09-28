@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.12.1
+version: 0.13.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -100,6 +100,9 @@ Any Bot you give `terminal` or `code_execution` should get `sandbox: "docker"` s
 
 ## What needs the user
 "what needs me", "anything waiting on me", a morning or weekly check → `check_agents` and lead with `waiting_on_you`: each item is a Bot that got blocked and wrote it down, with how many days it has sat there. Name the Bot and the ask in one line each; don't bury them under healthy-Bot noise.
+
+## Mail
+When a Bot journals a `blocked` or `failed` entry, the plugin emails the user by itself — you do not call anything, and `agent_journal`'s result carries `notified` so you can say "and I've emailed you" when it sent. It only ever writes to the user's own address, so never offer to email anyone else; there is no tool for that, by design. If the user asks why no mail arrived, the reason is in `notified.reason` — usually that email isn't configured in Hermes (`EMAIL_SMTP_HOST` / `EMAIL_ADDRESS` / `EMAIL_PASSWORD`).
 
 ## Health
 "how are my bots doing" or a weekly review → `check_agents`. "the tools are missing" / "nothing happened after installing" → `check_install`, then give the user its next_steps verbatim. Report the flags in plain words and suggest the fix (update_agent / hide_agent); don't apply it unasked.

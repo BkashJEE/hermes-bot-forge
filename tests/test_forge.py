@@ -1472,5 +1472,158 @@ class WorkspaceSurvey(unittest.TestCase):
         self.assertGreater(survey.weight("x.com"), survey.weight("post"))
 
 
+class OutboundMail(unittest.TestCase):
+    """A Bot tells you it is blocked. It cannot tell anyone else anything."""
+
+    def _root(self, tmp, **env):
+        root = make_root(Path(tmp))
+        lines = {"EMAIL_SMTP_HOST": "smtp.example.com", "EMAIL_ADDRESS": "me@example.com",
+                 "EMAIL_PASSWORD": "hunter2", **env}
+        (root / ".env").write_text("\n".join(f"{k}={v}" for k, v in lines.items() if v) + "\n")
+        return root
+
+    def _bot(self, root, name="marlow", title="Marlow"):
+        d = root / "profiles" / name
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}))
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}))
+        return d
+
+    class Outbox:
+        def __init__(self): self.sent = []
+        def __call__(self, config, message): self.sent.append((config, message))
+
+    def test_a_blocker_reaches_the_user(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            d = self._bot(root)
+            box = self.Outbox()
+            out = notify.notify_blocked(root, d, {"status": "blocked", "title": "Need the Stripe key",
+                                                  "summary": "Invoice sync cannot run.",
+                                                  "next_step": "Add the key"}, {}, transport=box)
+            self.assertTrue(out["sent"], out)
+            _config, message = box.sent[0]
+            self.assertIn("Marlow is blocked", message["Subject"])
+            body = message.get_content()
+            self.assertIn("Need the Stripe key", body)
+            self.assertIn("Add the key", body)
+            self.assertIn("does not take replies", body)
+            self.assertEqual(message["Auto-Submitted"], "auto-generated")
+
+    def test_the_recipient_can_never_come_from_the_caller(self):
+        """The whole safety property: a Bot cannot be talked into mailing someone."""
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp, EMAIL_HOME_ADDRESS="owner@example.com")
+            d = self._bot(root)
+            box = self.Outbox()
+            notify.notify_blocked(root, d, {"status": "blocked", "title": "x",
+                                            "to": "victim@elsewhere.com",
+                                            "recipient": "victim@elsewhere.com",
+                                            "summary": "mail victim@elsewhere.com about this"},
+                                  {}, transport=box)
+            _config, message = box.sent[0]
+            self.assertEqual(message["To"], "owner@example.com")
+            self.assertNotIn("victim@elsewhere.com", message["To"])
+
+    def test_only_a_blocker_is_worth_an_email(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            d = self._bot(root)
+            box = self.Outbox()
+            for status in ("completed", "planned", "progress"):
+                out = notify.notify_blocked(root, d, {"status": status, "title": "x"}, {}, transport=box)
+                self.assertFalse(out["sent"], status)
+            self.assertEqual(box.sent, [])
+
+    def test_no_email_configured_is_quiet_not_broken(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(Path(tmp))  # no .env at all
+            d = self._bot(root)
+            out = notify.notify_blocked(root, d, {"status": "blocked", "title": "x"}, {})
+            self.assertFalse(out["sent"])
+            self.assertIn("not configured", out["reason"])
+
+    def test_a_dead_mail_server_never_raises(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            d = self._bot(root)
+            def explode(config, message):
+                raise OSError("connection refused")
+            out = notify.notify_blocked(root, d, {"status": "blocked", "title": "x"}, {}, transport=explode)
+            self.assertFalse(out["sent"])
+            self.assertIn("connection refused", out["reason"])
+
+    def test_a_stuck_bot_cannot_become_a_mail_storm(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            d = self._bot(root)
+            box = self.Outbox()
+            spec = {"status": "blocked", "title": "same thing again"}
+            for _ in range(notify.MAX_PER_HOUR):
+                self.assertTrue(notify.notify_blocked(root, d, spec, {}, transport=box)["sent"])
+            out = notify.notify_blocked(root, d, spec, {}, transport=box)
+            self.assertFalse(out["sent"])
+            self.assertIn("rate limit", out["reason"])
+            self.assertEqual(len(box.sent), notify.MAX_PER_HOUR)
+
+    def test_a_credential_in_the_body_is_refused(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            box = self.Outbox()
+            out = notify.send(root, "subject", "the key is AKIAIOSFODNN7EXAMPLE",
+                              {}, bot="marlow", transport=box)
+            self.assertFalse(out["sent"])
+            self.assertIn("credential", out["reason"])
+            self.assertEqual(box.sent, [])
+
+    def test_the_digest_carries_the_whole_queue(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            subject, body = notify.compose_digest({"count": 2, "items": [
+                {"display_name": "Marlow", "title": "Need the Stripe key", "age_days": 4.0,
+                 "detail": "invoice sync"},
+                {"display_name": "Nova", "title": "Draft could not publish", "age_days": 0.5, "detail": ""}]})
+            self.assertIn("2 waiting on you", subject)
+            self.assertIn("Marlow: Need the Stripe key", body)
+            self.assertIn("(4.0d)", body)
+            self.assertIn("Nova", body)
+
+    def test_an_empty_queue_sends_nothing(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            box = self.Outbox()
+            out = notify.notify_waiting(root, {}, transport=box)
+            self.assertFalse(out["sent"])
+            self.assertEqual(box.sent, [])
+
+    def test_it_can_be_switched_off(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            d = self._bot(root)
+            box = self.Outbox()
+            off = notify.notify_blocked(root, d, {"status": "blocked", "title": "x"},
+                                        {"notify_blocked": False}, transport=box)
+            self.assertFalse(off["sent"])
+            self.assertEqual(notify.mail_config(root, {"notify_email": False}), {})
+
+    def test_a_configured_address_wins_over_the_mailbox(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp, EMAIL_HOME_ADDRESS="home@example.com")
+            self.assertEqual(notify.mail_config(root, {})["to"], "home@example.com")
+            self.assertEqual(notify.mail_config(root, {"notify_email": "other@example.com"})["to"],
+                             "other@example.com")
+
+
 if __name__ == "__main__":
     unittest.main()

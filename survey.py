@@ -34,7 +34,11 @@ WORKSPACE_MARKER = "<!-- bot-forge-workspace:v1 -->"
 INDEX_REL = Path(".bot-forge") / "workspace.json"
 
 MAX_DEPTH = 3
-MAX_PLACES = 120
+MAX_PLACES = 240
+MIN_PER_ROOT = 18
+# A place with almost no words in it can match anything; it has not earned a recommendation.
+MIN_PLACE_TERMS = 5
+MIN_SHARED_TERMS = 2
 BUDGET_SECONDS = 3.0
 HEAD_LINES = 40
 HEAD_BYTES = 4000
@@ -112,6 +116,43 @@ def weight(term: str) -> float:
 
 def mass(words) -> float:
     return sum(weight(w) for w in words)
+
+
+# A job and a directory rarely use the same word for the same thing: a Bot says "social", the repo
+# that holds the work says "content"; a Bot says "x.com", the directory says "posts" or nothing at all.
+# These are the bridges, applied to the JOB only — never to the corpus, so a directory still has to
+# say something real to match, and never to the duplicate guard, which compares two Bots' own words.
+_RELATED = {
+    "social": ["content", "posts", "threads", "audience", "editorial", "x.com", "twitter", "linkedin"],
+    "x.com": ["social", "posts", "threads", "content", "twitter"],
+    "twitter": ["x.com", "social", "posts", "threads"],
+    "posts": ["content", "threads", "social", "editorial", "writing"],
+    "threads": ["posts", "social", "content"],
+    "content": ["editorial", "posts", "writing", "blog", "copy"],
+    "writing": ["content", "editorial", "copy", "draft"],
+    "newsletter": ["content", "editorial", "subscribers"],
+    "email": ["inbox", "mail", "gmail", "messages"],
+    "inbox": ["email", "mail", "messages", "triage"],
+    "devops": ["deploy", "pipeline", "build", "workflow", "actions", "release"],
+    "deploy": ["pipeline", "build", "release", "actions", "workflow"],
+    "release": ["changelog", "version", "tag", "notes"],
+    "theme": ["css", "styles", "colors", "wallpaper", "hyprland", "waybar", "desktop"],
+    "desktop": ["hyprland", "waybar", "omarchy", "wallpaper", "theme"],
+    "research": ["digest", "brief", "report", "summary", "notes"],
+    "video": ["render", "clip", "footage", "editing", "screen"],
+    "design": ["figma", "css", "layout", "brand", "visual"],
+    "docs": ["documentation", "readme", "guide", "reference"],
+    "support": ["tickets", "issues", "triage", "customers"],
+}
+RELATED = {stem(k): {stem(v) for v in vals} for k, vals in _RELATED.items()}
+
+
+def expand(words: set) -> set:
+    """The job's own words plus the words a workspace is likely to use for the same thing."""
+    out = set(words)
+    for w in words:
+        out |= RELATED.get(w, set())
+    return out
 
 
 def job_terms(spec: dict) -> set:
@@ -253,13 +294,19 @@ def _describe(d: Path) -> dict:
 
 
 def scan_places(roots: list, now: float | None = None) -> list:
-    """Every plausible place in the workspace, with the cheap signals that describe it."""
+    """Every plausible place in the workspace, with the cheap signals that describe it.
+
+    Each root gets its own share of the cap. Draining roots in order let a single crowded one —
+    a Projects folder with thirty variants of the same repo — use the whole budget, so the nine
+    roots after it were never looked at and a Bot was pointed at whatever happened to sort first.
+    """
     now = now or time.time()
     deadline = now + BUDGET_SECONDS
     places = []
+    share = max(MAX_PLACES // max(1, len(roots)), MIN_PER_ROOT)
     for root in roots:
-        stack = [(root, 0)]
-        while stack and len(places) < MAX_PLACES and time.time() < deadline:
+        taken, stack = 0, [(root, 0)]
+        while stack and taken < share and len(places) < MAX_PLACES and time.time() < deadline:
             d, depth = stack.pop()
             try:
                 children = sorted(d.iterdir())
@@ -272,6 +319,7 @@ def scan_places(roots: list, now: float | None = None) -> list:
                     mtime = d.stat().st_mtime
                 except OSError:
                     mtime = 0
+                taken += 1
                 places.append({
                     "path": str(d), "name": d.name, "repo": is_repo,
                     "remote": _git_remote(d) if is_repo else "",
@@ -380,9 +428,19 @@ def workspace_index(root: Path, settings: dict | None = None, now: float | None 
 # ── what it means for this Bot ───────────────────────────────────────────────
 def where_it_fits(index: dict, wanted: set, limit: int = 4) -> list:
     """Places in the workspace whose own words match this Bot's job."""
-    scored = []
-    for place in index.get("places") or []:
-        share = overlap(wanted, set(place.get("terms") or []))
+    scored, seen = [], set()
+    for place in sorted(index.get("places") or [], key=lambda p: p["path"].count("/")):
+        own = set(place.get("terms") or [])
+        shared = wanted & own
+        # A directory with three words in it will match anything it happens to share one with —
+        # `omarchy` scored a perfect 1.00 against a theming Bot on the strength of its own name.
+        if len(own) < MIN_PLACE_TERMS or len(shared) < MIN_SHARED_TERMS:
+            continue
+        key = (place["name"], place.get("headline", ""))
+        if key in seen:  # nested copies of the same checkout, shallowest wins
+            continue
+        seen.add(key)
+        share = overlap(wanted, own)
         if share <= 0:
             continue
         # a repo is a stronger home than a loose folder, and recent work beats a dormant tree
@@ -460,7 +518,9 @@ def survey(root: Path, spec: dict, settings: dict | None = None, now: float | No
     """Everything the new Bot should already know about where it landed."""
     index = workspace_index(root, settings, now)
     wanted = job_terms(spec)
-    fits = where_it_fits(index, wanted)
+    # Places are searched with the widened vocabulary; the guard keeps the Bot's own words, so a
+    # duplicate is judged on what the two Bots actually say, not on what they might have meant.
+    fits = where_it_fits(index, expand(wanted))
     covered = existing_coverage(index, wanted, exclude)
     skills = matching_skills(index, wanted)
     return {"roots": [r[0] for r in index.get("roots") or []],

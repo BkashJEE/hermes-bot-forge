@@ -132,11 +132,11 @@ def check_agents(args: dict, **kwargs) -> str:
         return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
 
 
-def agent_journal(args: dict, **kwargs) -> str:
+def agent_journal(args: dict, settings: dict | None = None, **kwargs) -> str:
     """Enable, append to, or read a Bot's work journal."""
     root = hermes_root()
     spec = {**args, "launch_profile": launch_profile(kwargs.get("session_id"), root),
-            "hermes_root": str(root)}
+            "hermes_root": str(root), "settings": settings or {}}
     try:
         p = subprocess.run([sys.executable, str(PLUGIN_DIR / "journal.py"), "-"], input=json.dumps(spec),
                            capture_output=True, text=True, timeout=60)

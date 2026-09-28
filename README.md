@@ -283,6 +283,34 @@ It scores the Bot's own SOUL.md and one-job against the directory Hermes is runn
 
 Read-only and shallow — directory names, git remotes, and the head of a README / AGENTS.md / CLAUDE.md. Never your source files, never your home directory unless you point `workspace_roots` at it, and anything that looks like a credential never reaches a Bot's memory. Off with `workspace_survey: false`.
 
+### A blocked Bot tells you
+
+The waiting queue answers *when you ask*. This is the other half: when a Bot records a blocker, it emails you.
+
+```
+[Bot Forge] Marlow is blocked — Need the Stripe API key
+
+Marlow stopped and needs you.
+
+  Need the Stripe API key
+
+Invoice sync cannot run without a read-only key.
+
+Next step: add the key, then rerun
+
+Reply to Marlow in Hermes — this address does not take replies.
+```
+
+It uses the email Hermes already has (`EMAIL_SMTP_HOST` / `EMAIL_ADDRESS` / `EMAIL_PASSWORD`), so there is nothing new to configure and no new credential anywhere. Set `notify_email` to send somewhere other than your own mailbox, or `false` to switch it off.
+
+**Outbound only, on purpose.** The recipient is resolved from your config and nothing else — never from a tool call, a persona, or anything a model wrote. A Bot can write to your address and no other, so it cannot be talked into mailing a stranger and two Bots cannot reply to each other forever. Nothing here reads a mailbox. Messages are rate limited per Bot so a stuck routine can't become a mail storm, secret-scanned before they leave, and skipped in silence when mail isn't set up — a mail server being down never breaks a turn.
+
+For the whole queue on a schedule rather than one blocker at a time:
+
+```bash
+echo '{"action":"digest"}' | python3 ~/.hermes/plugins/bot-forge/notify.py
+```
+
 ### Cost and safety built in
 
 - **Draft-first by default.** Every Bot is born with approval checkpoints — sending/publishing, spending money, deleting data — unless you explicitly ask for none.

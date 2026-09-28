@@ -235,6 +235,14 @@ def operate(spec: dict) -> dict:
             result = enable_journal(pdir)
         elif action == "add":
             result = add_entry(pdir, spec)
+            # The queue is a pull; this is the push. A mail failure must never affect the entry
+            # that was already written, so it is reported alongside, never raised.
+            try:
+                import notify
+
+                result["notified"] = notify.notify_blocked(root, pdir, spec, spec.get("settings") or {})
+            except Exception as exc:
+                result["notified"] = {"sent": False, "reason": f"{type(exc).__name__}: {exc}"[:120]}
         elif action == "read":
             result = read_entries(pdir, spec)
         else:

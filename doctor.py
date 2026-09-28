@@ -191,6 +191,14 @@ def check(root: Path | None = None) -> dict:
             pass
         checks.append({"check": "reactions", "status": OK if not missing else WARN, "detail": detail})
 
+    import notify
+    mail = notify.mail_config(root, {})
+    checks.append({"check": "mail", "status": OK if mail else WARN,
+                   "detail": (f"a blocked Bot will email {mail['to']} via {mail['host']}" if mail else
+                              "no email configured — a blocked Bot waits silently until you ask. "
+                              "Set EMAIL_SMTP_HOST, EMAIL_ADDRESS and EMAIL_PASSWORD in Hermes to "
+                              "have Bots tell you")})
+
     import portable
     checks.append({"check": "templates", "status": OK,
                    "detail": ", ".join(sorted(portable.bundled_templates()))})

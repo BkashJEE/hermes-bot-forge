@@ -5,7 +5,8 @@ from pathlib import Path
 from . import schemas, tools
 
 _SETTINGS = ("inherit_model", "fallback_model", "probe_local_models", "install_gateway",
-             "allow_delete", "backup_before_delete", "suggest_connectors", "allow_secrets", "journal_enabled", "ack_reactions", "ack_tapback")
+             "allow_delete", "backup_before_delete", "suggest_connectors", "allow_secrets", "journal_enabled", "ack_reactions", "ack_tapback",
+             "workspace_survey", "workspace_roots", "notify_email", "notify_blocked")
 
 
 def register(ctx):

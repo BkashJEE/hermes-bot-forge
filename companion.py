@@ -93,3 +93,23 @@ def bots_without_marks(root: Path) -> list:
                                "not enabled" if not is_enabled(pdir) else
                                f"version {have}, expected {marks_version()}")})
     return out
+
+
+def companion_running(plugin_dir: Path) -> bool:
+    """True when `bot-forge-marks` is installed and enabled beside this plugin.
+
+    Both register the same pair of turn hooks, and Hermes treats setting the same emoji twice on a
+    message as a tapback toggle — so with both loaded every reaction is placed and immediately
+    cleared, and the user sees nothing at all. The companion wins that tie: it ships inside every
+    Bot, including the profile that creates them, so it is the copy that is always present.
+    """
+    sibling = Path(plugin_dir).parent / MARKS_NAME
+    if not (sibling / "plugin.yaml").exists():
+        return False
+    try:
+        import yaml
+
+        data = yaml.safe_load((Path(plugin_dir).parent.parent / "config.yaml").read_text()) or {}
+    except Exception:
+        return True  # installed but the config cannot be read: never risk double-placing
+    return MARKS_NAME in ((data.get("plugins") or {}).get("enabled") or [])

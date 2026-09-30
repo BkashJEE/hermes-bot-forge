@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.1] - 2026-09-30
+
+### Fixed
+- **A Bot in the profile that also runs Bot Forge itself never appeared to react at all.** Both the plugin and its `bot-forge-marks` companion register the same pair of turn hooks, so in a profile holding both, the reaction was placed twice — and Hermes reads a second identical emoji as a tapback toggle, clearing it. The reaction was being placed and instantly removed on every turn. The plugin now stands down when the companion is installed and enabled beside it, since the companion is the copy that ships inside every Bot.
+
 ## [0.14.0] - 2026-09-29
 
 ### Changed

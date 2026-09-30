@@ -1126,6 +1126,27 @@ class TapbackHooks(unittest.TestCase):
         marks.on_turn_end(platform="desktop", assistant_response="Done — the build is green.")
         self.assertEqual([a["emoji"] for _n, a in ctx.calls], ["🔧", tapback.DONE])
 
+    def test_the_plugin_stands_down_when_the_companion_is_here(self):
+        """Two placements of the same emoji cancel — Hermes reads that as a tapback toggle."""
+        import companion as plugin
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = Path(tmp) / "profiles" / "ceo"
+            forge_dir = profile / "plugins" / "bot-forge"
+            marks_dir = profile / "plugins" / "bot-forge-marks"
+            forge_dir.mkdir(parents=True)
+            self.assertFalse(plugin.companion_running(forge_dir), "no companion installed")
+
+            marks_dir.mkdir(parents=True)
+            (marks_dir / "plugin.yaml").write_text("name: bot-forge-marks\n")
+            (profile / "config.yaml").write_text(yaml.safe_dump(
+                {"plugins": {"enabled": ["bot-forge", "bot-forge-marks"]}}))
+            self.assertTrue(plugin.companion_running(forge_dir), "installed and enabled")
+
+            (profile / "config.yaml").write_text(yaml.safe_dump(
+                {"plugins": {"enabled": ["bot-forge"]}}))
+            self.assertFalse(plugin.companion_running(forge_dir),
+                             "installed but switched off — this plugin must cover the reaction")
+
     def test_outcome_reads_the_reply(self):
         import tapback
         self.assertEqual(tapback.outcome_emoji("Done — draft saved."), tapback.DONE)

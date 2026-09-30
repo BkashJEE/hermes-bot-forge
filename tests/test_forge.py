@@ -1074,6 +1074,58 @@ class TapbackHooks(unittest.TestCase):
         self.assertEqual([a["emoji"] for _n, a in ctx.calls], [tapback.WORKING, tapback.DONE])
         self.assertEqual({n for n, _a in ctx.calls}, {"react_to_message"})
 
+    def test_the_pickup_reaction_fits_what_was_asked(self):
+        """One 👀 for everything says "I am alive"; this says "I understood what you asked"."""
+        import tapback
+        cases = {
+            "fix the failing build": "🔧",
+            "the deploy is broken": "🔧",
+            "research what our competitor shipped": "🔎",
+            "dig into the churn numbers": "🔎",
+            "draft the launch thread": "✍️",
+            "write me a newsletter": "✍️",
+            "how many followers did we gain?": "📊",
+            "compare last month's revenue": "📊",
+            "schedule a daily 8am digest": "⏳",
+            "remind me tomorrow at 9": "⏳",
+            "review this diff": "📋",
+            "build me a competitor watcher": "🛠️",
+            "set up a sandbox": "🛠️",
+            "thanks!": "👋",
+            "hey": "👋",
+            "why did it fail?": "💬",
+            "what is bot forge?": "💬",
+        }
+        for message, expected in cases.items():
+            self.assertEqual(tapback.pickup_emoji(message), expected, message)
+
+    def test_an_unreadable_ask_still_gets_picked_up(self):
+        import tapback
+        for message in ("ok go", "", None, "   ", 42):
+            self.assertEqual(tapback.pickup_emoji(message), tapback.WORKING, repr(message))
+
+    def test_the_message_is_read_whatever_shape_it_arrives_in(self):
+        import tapback
+        self.assertEqual(tapback.pickup_emoji({"content": "fix the build"}), "🔧")
+        self.assertEqual(tapback.pickup_emoji({"text": "draft a post"}), "✍️")
+        self.assertEqual(tapback.pickup_emoji(
+            {"content": [{"type": "text", "text": "review this diff"}]}), "📋")
+
+    def test_a_pickup_never_collides_with_an_outcome(self):
+        """Hermes clears a reaction when the same emoji is set twice, so the two sets must not meet."""
+        import tapback
+        pickups = {emoji for emoji, _pattern in tapback.PICKUP} | {tapback.WORKING}
+        outcomes = {tapback.DONE, tapback.BLOCKED, tapback.NEEDS_YOU}
+        self.assertEqual(pickups & outcomes, set())
+
+    def test_the_turn_start_reaction_comes_from_the_message(self):
+        import tapback
+        ctx = self.FakeCtx()
+        marks = self._marks(ctx)
+        marks.on_turn_start(platform="desktop", user_message="fix the failing build")
+        marks.on_turn_end(platform="desktop", assistant_response="Done — the build is green.")
+        self.assertEqual([a["emoji"] for _n, a in ctx.calls], ["🔧", tapback.DONE])
+
     def test_outcome_reads_the_reply(self):
         import tapback
         self.assertEqual(tapback.outcome_emoji("Done — draft saved."), tapback.DONE)

@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-09-29
+
+### Changed
+- **The pickup reaction now fits what was asked.** Every turn used to open with the same 👀, which only told the user the Bot was alive. The reaction is now chosen from the message itself — 🔧 a fix, 🔎 research, ✍️ writing, 📊 numbers, ⏳ something scheduled, 📋 a review, 🛠️ something to build, 👋 a greeting, 💬 a question — and falls back to 👀 when the ask is not recognisable rather than guessing. The end of the turn still replaces it with ✅ / ✋ / ⚠️, so the two sets are kept disjoint: Hermes clears a reaction when the same emoji is set twice.
+
 ## [0.13.0] - 2026-09-28
 
 ### Added

@@ -7,7 +7,8 @@ Spec: {"hermes_root": "...", "name": "optional single Bot"}
 
 Read-only. Reports per Bot: model, gateway, routines with estimated runs/day, last activity, and flags —
 too-frequent routines, paused or never-run routines, unused Bots, a SOUL.md that doesn't state the Bot's
-name or approval checkpoints. Suggestions only; it never changes anything.
+name or approval checkpoints, plugins enabled in config but not installed in the profile (enabled but inert).
+Suggestions only; it never changes anything.
 """
 import contextlib
 import json
@@ -100,7 +101,7 @@ def _acks_enabled(pdir: Path) -> bool:
     return acks.acks_enabled(pdir)
 
 
-def check_bot(pdir: Path, gateways: dict, now: float) -> dict:
+def check_bot(pdir: Path, gateways: dict, now: float, bundled: set | None = None) -> dict:
     name = pdir.name
     meta = forge.load_yaml(pdir / "profile.yaml")
     bots = (meta.get("ui_meta") or {}).get("hermes-bots") or {}
@@ -143,11 +144,17 @@ def check_bot(pdir: Path, gateways: dict, now: float) -> dict:
         flags.append("no approval checkpoints in SOUL.md — add them with update_agent")
     if name in gateways and not gateways[name]:
         flags.append("gateway is not running — `hermes -p %s gateway start`" % name)
+    import companion
+    inert = companion.inert_plugins(pdir, pdir.parent.parent, bundled)
+    if inert:
+        flags.append(f"plugins enabled but not installed in this Bot: {', '.join(inert)} — its config names them "
+                     f"(cloned from the root profile) but they never load; update_agent with inherit_plugins "
+                     f"copies them in, or remove them from plugins.enabled in its config.yaml")
 
     return {"name": name, "display_name": title, "model": (cfg.get("model") or {}).get("default", ""),
             "gateway": {True: "running", False: "stopped"}.get(gateways.get(name), "unknown"),
             "routines": routines, "runs_per_day": round(total_runs, 1),
-            "sandbox": backend, "acknowledges": _acks_enabled(pdir),
+            "sandbox": backend, "acknowledges": _acks_enabled(pdir), "inert_plugins": inert,
             "journal": _journal_status(pdir),
             "idle_days": idle_days, "hidden": bool(isinstance(bots, dict) and bots.get("hidden")),
             "flags": flags, "status": "attention" if flags else "ok"}
@@ -170,8 +177,10 @@ def check(s: dict) -> dict:
         if not bots:
             return {"ok": False, "error": f"no Bot named '{s['name']}'"}
     import waiting
+    import companion
     gateways = _gateways(root)
-    report = [check_bot(d, gateways, now) for d in bots]
+    bundled = companion.bundled_plugin_names()
+    report = [check_bot(d, gateways, now, bundled) for d in bots]
     pending = waiting.waiting_on_user(root)
     attention = [b for b in report if b["flags"]]
     silent = [b["display_name"] for b in report if not b.get("acknowledges")]

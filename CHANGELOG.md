@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] - 2026-09-29
+
+### Added
+- **A Bot can inherit your plugins — when you say so.** `hermes profile create --clone-from` copies the root profile's `config.yaml`, with its `plugins.enabled` list, but not the plugin directories, so a plugin you run on your main profile was silently *enabled but inert* in every Bot. `inherit_plugins` (the plugin setting for every new Bot, or the `create_agent` / `update_agent` argument for one) copies the named plugins — or `["all"]` of the enabled ones — into the Bot on the same path the reaction companion already uses, and enables them. Default off: a Bot gets only what it was asked for. Bot Forge itself is never copied into a Bot, the companion is never copied twice, and no `.env`, key or credential file travels with a plugin. Rollback still removes the whole profile. (#25, reported by @thealps01-netizen)
+- `check_agents` flags a Bot whose config enables a plugin that has no directory in that profile — enabled but inert — and says how to fix it. Hermes' own bundled plugins are never flagged.
+
 ## [0.13.0] - 2026-09-28
 
 ### Added

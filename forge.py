@@ -17,6 +17,7 @@ Spec ("role" required; everything else gets a sane default):
   "model": {...},                        # optional explicit model block
   "launch_profile": "ceo",               # set by the plugin: whose model to inherit
   "hermes_root": "/home/me/.hermes",     # set by the plugin
+  "inherit_plugins": true,               # or ["name", ...]: copy root-profile plugins into the Bot (default off)
   "settings": {...}                      # plugin settings (see plugin.yaml config_schema)
 }
 
@@ -66,7 +67,7 @@ def default_root() -> Path:
 DEFAULT_SETTINGS = {"inherit_model": True, "fallback_model": {},
                     "probe_local_models": False, "install_gateway": True, "suggest_connectors": True,
                     "journal_enabled": True, "ack_reactions": True, "ack_tapback": True,
-                    "workspace_survey": True, "workspace_roots": []}
+                    "workspace_survey": True, "workspace_roots": [], "inherit_plugins": []}
 
 
 # ── hermes cli ───────────────────────────────────────────────────────────────
@@ -538,6 +539,20 @@ def forge(s: dict) -> dict:
             installed = companion.install_marks(pdir)
             marks = installed.get("version") if installed.get("ok") else f"not installed: {installed.get('error')}"
 
+        # `profile create --clone-from` copies config.yaml — with the root's plugins.enabled list — but not
+        # the plugin directories, so a user plugin on the root profile is enabled-but-inert in the Bot. Opt in
+        # (the setting, or the call) to carry them across; Bot Forge itself and credentials never travel.
+        plugins = None
+        wanted = s["inherit_plugins"] if s.get("inherit_plugins") is not None else settings.get("inherit_plugins")
+        if wanted not in (None, False, [], ""):
+            import companion
+
+            carried = companion.inherit_plugins(root, pdir, wanted)
+            if carried["failed"]:
+                raise RuntimeError("could not inherit plugins: "
+                                   + "; ".join(f["error"] for f in carried["failed"]))
+            plugins = {"inherited": [i["name"] for i in carried["installed"]], "skipped": carried["skipped"]}
+
         # 3. memories
         mem = pdir / "memories"
         mem.mkdir(exist_ok=True)
@@ -639,7 +654,7 @@ def forge(s: dict) -> dict:
                 "approvals": approvals, "reports_to": reports_to or None,
                 "warning": warning, "toolsets": sorted(tools),
                 "skills_disabled": len(disabled), "routines": routines, "gateway": gateway, "intro": reply[-600:],
-                "journal": journal_path, "reactions": marks, "workspace": workspace,
+                "journal": journal_path, "reactions": marks, "plugins": plugins, "workspace": workspace,
                 "note": "done — it already introduced itself. Do not message, test or change this Bot; just report."}
     except Exception as e:
         rolled_back = False

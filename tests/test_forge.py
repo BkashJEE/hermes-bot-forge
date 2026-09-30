@@ -1243,6 +1243,245 @@ class CompanionInstall(unittest.TestCase):
             self.assertEqual(companion.bots_without_marks(root)[0]["reason"], "not enabled")
 
 
+class InheritedPlugins(unittest.TestCase):
+    """Issue #25: a clone carries the root's plugins.enabled list but not the plugin directories, so a root
+    plugin is enabled-but-inert in every Bot. Inheriting is opt-in and never carries Bot Forge or a secret."""
+
+    def _root(self, tmp):
+        root = make_root(Path(tmp))
+        (root / "config.yaml").write_text(yaml.safe_dump({
+            "model": {"default": "root-model", "provider": "p"},
+            "plugins": {"enabled": ["style", "bot-forge", "bot-forge-marks", "bundled-thing"],
+                        "disabled": ["orchestrator"]}}))
+        for name, manifest in (("style", "style"), ("orchestrator", "orchestrator"),
+                               ("forge-checkout", "bot-forge"), ("bot-forge-marks", "bot-forge-marks")):
+            d = root / "plugins" / name
+            d.mkdir(parents=True)
+            (d / "plugin.yaml").write_text(f"name: {manifest}\nversion: 1.2.3\n")
+            (d / "__init__.py").write_text("# code\n")
+        style = root / "plugins" / "style"
+        (style / ".env").write_text("STYLE_API_KEY=sk-live-do-not-copy\n")
+        (style / "service.pem").write_text("-----BEGIN PRIVATE KEY-----\n")
+        (style / "credentials.json").write_text("{}")
+        (style / ".git").mkdir()
+        (style / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+        (style / "__pycache__").mkdir()
+        (style / "__pycache__" / "x.pyc").write_bytes(b"\x00")
+        (style / "skills" / "tone").mkdir(parents=True)
+        (style / "skills" / "tone" / "SKILL.md").write_text("# tone\n")
+        return root
+
+    def _bot(self, root, name="marlow", enabled=None):
+        d = root / "profiles" / name
+        d.mkdir(parents=True, exist_ok=True)
+        cfg = {"model": {"default": "m", "provider": "p"}}
+        if enabled is not None:
+            cfg["plugins"] = {"enabled": enabled, "disabled": ["style"]}
+        (d / "config.yaml").write_text(yaml.safe_dump(cfg))
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": name.title()}}}))
+        return d
+
+    def test_true_means_every_enabled_root_plugin_but_never_bot_forge(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            chosen, skipped = companion.select_inherited(root, True)
+            self.assertEqual(list(chosen), ["style"])  # not orchestrator (disabled), not bot-forge, not marks
+            self.assertEqual({s["name"] for s in skipped}, {"bot-forge", "bot-forge-marks"})
+            for spelling in (["all"], ["*"], "all"):
+                self.assertEqual(list(companion.select_inherited(root, spelling)[0]), ["style"], spelling)
+
+    def test_a_named_list_reports_what_it_cannot_carry(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            chosen, skipped = companion.select_inherited(root, ["style", "orchestrator", "nope", "bot-forge", "style"])
+            self.assertEqual(list(chosen), ["style", "orchestrator"])  # a disabled root plugin can still be named
+            reasons = {s["name"]: s["reason"] for s in skipped}
+            self.assertIn("not installed", reasons["nope"])
+            self.assertIn("never copied", reasons["bot-forge"])
+            self.assertEqual(companion.select_inherited(root, None), ({}, []))
+            self.assertEqual(companion.select_inherited(root, []), ({}, []))
+            self.assertEqual(companion.select_inherited(root, False), ({}, []))
+
+    def test_forge_is_recognised_by_manifest_and_by_path(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            self.assertTrue(companion.is_forge_itself(root / "plugins" / "forge-checkout"))
+            self.assertTrue(companion.is_forge_itself(ROOT))  # this very checkout
+            self.assertFalse(companion.is_forge_itself(root / "plugins" / "style"))
+
+    def test_copy_enables_the_plugin_and_leaves_secrets_and_litter_behind(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            d = self._bot(root, enabled=["bot-forge"])
+            out = companion.inherit_plugins(root, d, ["style"])
+            self.assertTrue(out["ok"], out)
+            self.assertEqual([i["name"] for i in out["installed"]], ["style"])
+            self.assertEqual(out["installed"][0]["version"], "1.2.3")
+            target = d / "plugins" / "style"
+            self.assertTrue((target / "plugin.yaml").exists())
+            self.assertTrue((target / "__init__.py").exists())
+            self.assertTrue((target / "skills" / "tone" / "SKILL.md").exists())
+            for gone in (".env", "service.pem", "credentials.json", ".git", "__pycache__"):
+                self.assertFalse((target / gone).exists(), gone)
+            plugins = yaml.safe_load((d / "config.yaml").read_text())["plugins"]
+            self.assertEqual(plugins["enabled"], ["bot-forge", "style"])
+            self.assertNotIn("style", plugins["disabled"])  # a cloned disabled entry would keep it off
+
+    def test_inheriting_twice_replaces_the_copy_and_enables_once(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            d = self._bot(root)
+            companion.inherit_plugins(root, d, ["style"])
+            (d / "plugins" / "style" / "stale.py").write_text("old\n")
+            companion.inherit_plugins(root, d, ["style"])
+            self.assertFalse((d / "plugins" / "style" / "stale.py").exists())
+            self.assertEqual(yaml.safe_load((d / "config.yaml").read_text())["plugins"]["enabled"].count("style"), 1)
+
+    def test_the_companion_is_installed_once_at_its_own_version(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            d = self._bot(root)
+            companion.install_marks(d)
+            out = companion.inherit_plugins(root, d, True)
+            self.assertTrue(out["ok"])
+            self.assertEqual(companion.installed_version(d), companion.marks_version())  # not the root's 1.2.3
+            self.assertTrue(companion.marks_ready(d))
+            self.assertEqual(yaml.safe_load((d / "config.yaml").read_text())["plugins"]["enabled"].count(
+                companion.MARKS_NAME), 1)
+
+    def test_inert_plugins_never_name_a_bundled_or_unknown_one(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            d = self._bot(root, enabled=["style", "bot-forge", "bundled-thing", "mystery"])
+            companion.install_marks(d)
+            # bundled set known: everything without a directory that is not bundled
+            self.assertEqual(sorted(companion.inert_plugins(d, root, {"bundled-thing"})), ["bot-forge", "mystery", "style"])
+            # bundled set unknown: only names that exist as a directory under the root are certain
+            self.assertEqual(sorted(companion.inert_plugins(d, root, None)), ["bot-forge", "style"])
+            companion.inherit_plugins(root, d, ["style"])
+            self.assertEqual(companion.inert_plugins(d, root, None), ["bot-forge"])
+
+    def test_check_agents_flags_enabled_but_inert(self):
+        import health
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            d = self._bot(root, enabled=["style"])
+            (d / "SOUL.md").write_text("# Marlow\n\nYou are **Marlow**.\n\n## Ask first\n- x\n")
+            with mock.patch.object(health, "_gateways", return_value={}):
+                out = health.check({"hermes_root": str(root)})
+            bot = out["report"][0]
+            self.assertEqual(bot["inert_plugins"], ["style"])
+            self.assertTrue(any("enabled but not installed" in f and "style" in f for f in bot["flags"]), bot["flags"])
+            import companion
+            companion.inherit_plugins(root, d, ["style"])
+            with mock.patch.object(health, "_gateways", return_value={}):
+                bot = health.check({"hermes_root": str(root)})["report"][0]
+            self.assertEqual(bot["inert_plugins"], [])
+            self.assertFalse(any("enabled but not installed" in f for f in bot["flags"]))
+
+    @unittest.skipIf(manage is None, "manage module not importable")
+    def test_update_agent_carries_plugins_into_an_existing_bot(self):
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            d = self._bot(root)
+            (d / "SOUL.md").write_text("# Marlow\n\nYou are **Marlow**.\n")
+            out = manage.manage({"op": "update", "hermes_root": str(root), "name": "marlow",
+                                 "inherit_plugins": ["style", "nope"]})
+            self.assertTrue(out["ok"], out)
+            self.assertIn("plugins", out["changed"])
+            self.assertEqual(out["plugins"]["inherited"], ["style"])
+            self.assertEqual(out["plugins"]["skipped"][0]["name"], "nope")
+            self.assertTrue((d / "plugins" / "style" / "plugin.yaml").exists())
+
+    # ── create_agent end to end, with the hermes CLI faked ───────────────────
+    def _fake_run(self, root, calls):
+        def fake(r, *args, **kw):
+            calls.append(args)
+            if args[:2] == ("profile", "create"):
+                d = root / "profiles" / args[2]
+                d.mkdir(parents=True)
+                (d / "config.yaml").write_text((root / "config.yaml").read_text())  # a clone carries the list
+            if args[:2] == ("profile", "delete"):
+                import shutil
+                shutil.rmtree(root / "profiles" / args[3], ignore_errors=True)
+            return type("P", (), {"returncode": 0, "stdout": "Hi, I am Marlow.", "stderr": ""})()
+        return fake
+
+    def _spec(self, root, **extra):
+        return {"hermes_root": str(root), "role": "Editor", "display_name": "Marlow", "one_job": "edits",
+                "soul_md": "# Marlow — Editor\n\nYou are **Marlow**.\n",
+                "settings": {"install_gateway": False, "suggest_connectors": False, "workspace_survey": False},
+                **extra}
+
+    def test_create_agent_inherits_nothing_unless_asked(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            calls = []
+            with mock.patch.object(forge, "run", side_effect=self._fake_run(root, calls)), \
+                    mock.patch.object(forge, "has_bot_chat", return_value=True):
+                out = forge.forge(self._spec(root))
+            self.assertTrue(out["ok"], out)
+            self.assertIsNone(out["plugins"])
+            self.assertEqual(sorted(p.name for p in (root / "profiles" / "marlow" / "plugins").iterdir()),
+                             ["bot-forge-marks"])
+
+    def test_create_agent_inherits_by_setting_or_by_argument(self):
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            calls = []
+            spec = self._spec(root)
+            spec["settings"]["inherit_plugins"] = ["all"]
+            with mock.patch.object(forge, "run", side_effect=self._fake_run(root, calls)), \
+                    mock.patch.object(forge, "has_bot_chat", return_value=True):
+                out = forge.forge(spec)
+            self.assertTrue(out["ok"], out)
+            self.assertEqual(out["plugins"]["inherited"], ["style"])
+            pdir = root / "profiles" / "marlow"
+            self.assertTrue((pdir / "plugins" / "style" / "plugin.yaml").exists())
+            self.assertFalse((pdir / "plugins" / "style" / ".env").exists())
+            self.assertFalse((pdir / "plugins" / "forge-checkout").exists())
+            enabled = yaml.safe_load((pdir / "config.yaml").read_text())["plugins"]["enabled"]
+            self.assertEqual(enabled.count("style"), 1)
+            self.assertEqual(enabled.count("bot-forge-marks"), 1)
+        with tempfile.TemporaryDirectory() as t:  # the call's own argument wins over the setting
+            root = self._root(t)
+            spec = self._spec(root, display_name="Vesper", inherit_plugins=["orchestrator"])
+            spec["settings"]["inherit_plugins"] = ["style"]
+            with mock.patch.object(forge, "run", side_effect=self._fake_run(root, [])), \
+                    mock.patch.object(forge, "has_bot_chat", return_value=True):
+                out = forge.forge(spec)
+            self.assertTrue(out["ok"], out)
+            self.assertEqual(out["plugins"]["inherited"], ["orchestrator"])
+            self.assertFalse((root / "profiles" / "vesper" / "plugins" / "style").exists())
+
+    def test_a_failed_inherit_rolls_the_whole_profile_back(self):
+        import companion
+        from unittest import mock
+        with tempfile.TemporaryDirectory() as t:
+            root = self._root(t)
+            calls = []
+            with mock.patch.object(forge, "run", side_effect=self._fake_run(root, calls)), \
+                    mock.patch.object(forge, "has_bot_chat", return_value=True), \
+                    mock.patch.object(companion, "install_plugin",
+                                      return_value={"ok": False, "name": "style", "error": "disk full"}):
+                out = forge.forge(self._spec(root, inherit_plugins=["style"]))
+            self.assertFalse(out["ok"])
+            self.assertIn("disk full", out["error"])
+            self.assertTrue(out["rolled_back"])
+            self.assertIn(("profile", "delete", "-y", "marlow"), calls)
+            self.assertFalse((root / "profiles" / "marlow").exists())
+
+
 class WaitingQueueTests(unittest.TestCase):
     """What is still waiting on the user, read out of the Bots' own journals."""
 

@@ -113,3 +113,65 @@ def companion_running(plugin_dir: Path) -> bool:
     except Exception:
         return True  # installed but the config cannot be read: never risk double-placing
     return MARKS_NAME in ((data.get("plugins") or {}).get("enabled") or [])
+
+
+# ── adoption ─────────────────────────────────────────────────────────────────
+def reactions_setting(pdir: Path) -> bool:
+    """Hermes' own Settings → Appearance → Message Reactions, for this profile."""
+    display = forge.load_yaml(Path(pdir) / "config.yaml").get("display") or {}
+    return display.get("message_reactions") is True
+
+
+def enable_reactions_setting(pdir: Path) -> bool:
+    """Switch the setting on. Unset means off in Hermes, and a Bot born without it is silent.
+
+    This is the half that is easy to miss: the hook can be installed, enabled and running, and the
+    Bot still never reacts, because Hermes reads `message_reactions` as False when it is absent.
+    """
+    path = Path(pdir) / "config.yaml"
+    cfg = forge.load_yaml(path)
+    if not cfg or (cfg.get("display") or {}).get("message_reactions") is True:
+        return False
+    display = dict(cfg.get("display") or {})
+    display["message_reactions"] = True
+    cfg["display"] = display
+    forge.dump_yaml(path, cfg)
+    return True
+
+
+def ensure_reactions(pdir: Path) -> dict:
+    """Everything a profile needs to acknowledge a message, in one idempotent call."""
+    pdir = Path(pdir)
+    installed = install_marks(pdir)
+    if not installed.get("ok"):
+        return {"ok": False, "bot": pdir.name, "error": installed.get("error")}
+    return {"ok": True, "bot": pdir.name,
+            "hook": bool(installed.get("copied")), "switched_on": bool(installed.get("enabled")),
+            "setting": enable_reactions_setting(pdir)}
+
+
+def adopt_all(root: Path, settings: dict | None = None) -> list:
+    """Give every profile the reaction, including ones this plugin did not create.
+
+    A Bot made through Hermes' own New Agent dialog, or a profile created on the command line, has
+    no idea this plugin exists — and the user does not care which door a Bot came through; they
+    expect all of them to behave the same. This runs on plugin load, does nothing when everything
+    is already in place, and reports only what it changed.
+    """
+    if (settings or {}).get("adopt_bots") is False:
+        return []
+    root = Path(root)
+    profiles = root / "profiles"
+    changed = []
+    for pdir in sorted(profiles.iterdir()) if profiles.is_dir() else []:
+        if not forge.is_live_profile(pdir):
+            continue
+        if marks_ready(pdir) and reactions_setting(pdir):
+            continue
+        try:
+            result = ensure_reactions(pdir)
+        except Exception as exc:  # one broken profile must never stop the others
+            result = {"ok": False, "bot": pdir.name, "error": f"{type(exc).__name__}: {exc}"[:120]}
+        if result.get("ok") is False or any(result.get(k) for k in ("hook", "switched_on", "setting")):
+            changed.append(result)
+    return changed

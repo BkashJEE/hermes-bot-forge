@@ -48,6 +48,21 @@ BLOCKED_HINTS = ("i can't", "i cannot", "unable to", "blocked", "failed", "error
 APPROVAL_HINTS = ("your approval", "before i ", "shall i", "do you want me to", "confirm first",
                   "let me know if you want")
 
+# How the turn ended, read from the reply — the answer to "and then what happened?". State comes
+# first (blocked, waiting on you), because that matters more than what kind of work it was. Every
+# emoji here is absent from PICKUP on purpose: Hermes clears a reaction when the same one is set
+# twice, so an outcome that could equal its own pickup would erase itself.
+OUTCOME = (
+    ("🚀", r"\b(shipped|deployed|merged|published|posted|released|live now|went out|sent it)\b"),
+    ("📝", r"\b(draft(ed)?|wrote|written|rewrote|here'?s the (post|thread|copy|draft)|word(ed|ing))\b"),
+    # `\d+%` must sit outside the \b-wrapped group: a trailing \b after "%" can never match,
+    # because "%" is already a non-word character, and it silently killed the whole alternative.
+    ("📈", r"\d+\s?%|\b(report|breakdown|totals?|averag|trend|grew|dropped|compared|up \d|down \d)\b"),
+    ("🗓️", r"\b(scheduled|booked|set (it )?for|every (day|morning|week)|cron|routine added)\b"),
+    ("💡", r"\b(turns out|found (that|it)|the answer|it looks like|the reason|because)\b"),
+    ("🧹", r"\b(cleaned|removed|deleted|tidied|archived|closed (it|them)|nothing left)\b"),
+)
+
 
 def _text(message) -> str:
     """The user's words, whatever shape the host handed them in."""
@@ -73,12 +88,19 @@ def pickup_emoji(user_message) -> str:
 
 
 def outcome_emoji(reply: str) -> str:
-    """The state a finished turn ended in, read from what the Bot actually said."""
+    """What the turn ended in, read from what the Bot actually said.
+
+    State wins over kind: a Bot that wrote a draft but needs approval is ✋, not 📝, because the
+    user has to do something about the first and nothing about the second.
+    """
     text = (reply or "").strip().lower()[:600]
     if any(h in text for h in APPROVAL_HINTS):
         return NEEDS_YOU
     if any(h in text for h in BLOCKED_HINTS):
         return BLOCKED
+    for emoji, pattern in OUTCOME:
+        if re.search(pattern, text):
+            return emoji
     return DONE
 
 

@@ -63,6 +63,16 @@ def register(ctx):
     # unless the companion is here to do it, in which case two placements would cancel each other.
     from . import companion, tapback
 
+    # Any profile, however it was made — Hermes' own New Agent dialog, `hermes profile create`, a
+    # clone — gets the reaction. The user does not care which door a Bot came through; they expect
+    # all of them to behave the same. No-op when everything is already in place.
+    try:
+        import forge as _forge
+
+        companion.adopt_all(_forge.default_root(), settings())
+    except Exception:  # never let adoption stop the plugin loading
+        pass
+
     if not companion.companion_running(Path(__file__).resolve().parent):
 
         marks = tapback.Tapback(ctx, lambda: ctx.get_config("ack_tapback", default=True) is not False)

@@ -3,6 +3,26 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.0] - 2026-09-30
+
+### Added
+- **Every profile gets the reaction, however it was made.** A Bot created through Hermes' own New Agent dialog or `hermes profile create` never heard of this plugin, and stayed silent while Bot Forge's own Bots acknowledged. The plugin now adopts every live profile on load: it installs the hook and switches on Hermes' `message_reactions` setting, does nothing when both are already in place, and never blocks loading if a profile is broken. `adopt_bots: false` switches it off.
+- **The ending reaction says what happened, not just that something did** — 🚀 shipped, 📝 written, 📈 numbers, 🗓️ scheduled, 💡 found out, 🧹 cleaned up, with ✅ as the fallback. State still wins over kind: a draft that needs sign-off is ✋, and a write that ended in a failed deploy is ⚠️.
+
+### Fixed
+- **A new Bot could be created with the hook installed and still never react**, because `create_agent` set up the hook but not Hermes' `message_reactions` setting — and an unset value reads as off. Creation now does both.
+- The numbers rule never matched a percentage: the pattern ended in a word boundary right after `%`, which is already a non-word character, so `up 18%` silently fell through to the generic ✅.
+
+## [0.14.1] - 2026-09-30
+
+### Fixed
+- **A Bot in the profile that also runs Bot Forge itself never appeared to react at all.** Both the plugin and its `bot-forge-marks` companion register the same pair of turn hooks, so in a profile holding both, the reaction was placed twice — and Hermes reads a second identical emoji as a tapback toggle, clearing it. The reaction was being placed and instantly removed on every turn. The plugin now stands down when the companion is installed and enabled beside it, since the companion is the copy that ships inside every Bot.
+
+## [0.14.0] - 2026-09-29
+
+### Changed
+- **The pickup reaction now fits what was asked.** Every turn used to open with the same 👀, which only told the user the Bot was alive. The reaction is now chosen from the message itself — 🔧 a fix, 🔎 research, ✍️ writing, 📊 numbers, ⏳ something scheduled, 📋 a review, 🛠️ something to build, 👋 a greeting, 💬 a question — and falls back to 👀 when the ask is not recognisable rather than guessing. The end of the turn still replaces it with ✅ / ✋ / ⚠️, so the two sets are kept disjoint: Hermes clears a reaction when the same emoji is set twice.
+
 ## [0.13.0] - 2026-09-28
 
 ### Added

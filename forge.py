@@ -535,8 +535,8 @@ def forge(s: dict) -> dict:
         if settings.get("ack_tapback", True):
             import companion
 
-            installed = companion.install_marks(pdir)
-            marks = installed.get("version") if installed.get("ok") else f"not installed: {installed.get('error')}"
+            installed = companion.ensure_reactions(pdir)
+            marks = companion.marks_version() if installed.get("ok") else f"not installed: {installed.get('error')}"
 
         # 3. memories
         mem = pdir / "memories"

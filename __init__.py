@@ -59,11 +59,25 @@ def register(ctx):
     except Exception:  # older Hermes without plugin CLI commands: the tool and `python doctor.py` still work
         pass
 
-    # Put the acknowledgement on the user's own message in Desktop, without relying on the model.
-    from . import tapback
-    marks = tapback.Tapback(ctx, lambda: ctx.get_config("ack_tapback", default=True) is not False)
-    ctx.register_hook("pre_llm_call", marks.on_turn_start)
-    ctx.register_hook("post_llm_call", marks.on_turn_end)
+    # Put the acknowledgement on the user's own message in Desktop, without relying on the model —
+    # unless the companion is here to do it, in which case two placements would cancel each other.
+    from . import companion, tapback
+
+    # Any profile, however it was made — Hermes' own New Agent dialog, `hermes profile create`, a
+    # clone — gets the reaction. The user does not care which door a Bot came through; they expect
+    # all of them to behave the same. No-op when everything is already in place.
+    try:
+        import forge as _forge
+
+        companion.adopt_all(_forge.default_root(), settings())
+    except Exception:  # never let adoption stop the plugin loading
+        pass
+
+    if not companion.companion_running(Path(__file__).resolve().parent):
+
+        marks = tapback.Tapback(ctx, lambda: ctx.get_config("ack_tapback", default=True) is not False)
+        ctx.register_hook("pre_llm_call", marks.on_turn_start)
+        ctx.register_hook("post_llm_call", marks.on_turn_end)
 
     skills_dir = Path(__file__).parent / "skills"
     for child in sorted(skills_dir.iterdir()):

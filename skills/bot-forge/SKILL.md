@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.13.0
+version: 0.15.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -86,7 +86,7 @@ Reactions come from the Bot the user is *talking to*, so a Bot created before th
 
 The acknowledgement is an emoji at the **start of the reply** — it works on every surface. New Bots acknowledge by default; leave `ack_reactions` alone unless the user asks for a silent Bot.
 
-In the **desktop app** the same status also lands on the user's own message as a tapback. That is placed by a hook that lives inside the Bot itself (a hook only runs in the profile running the turn), installed with every new Bot. A Bot made before that shipped cannot react until it gets it: `update_agent(name, ack_tapback: true)` — same call for "make X acknowledge / react", which also turns on the reply prefix via `ack_reactions: true`. `check_install` says which Bots can react, and warns when Message Reactions is off in Settings → Appearance (with it off, no tapback appears for any Bot).
+In the **desktop app** a reaction also lands on the user's own message as a tapback, chosen from what they asked — 🔧 fix, 🔎 research, ✍️ writing, 📊 numbers, ⏳ scheduling, 📋 review, 🛠️ build, 💬 question — then replaced by ✅ / ✋ / ⚠️ when the turn ends. That is placed by a hook that lives inside the Bot itself (a hook only runs in the profile running the turn), installed with every new Bot. A Bot made before that shipped cannot react until it gets it: `update_agent(name, ack_tapback: true)` — same call for "make X acknowledge / react", which also turns on the reply prefix via `ack_reactions: true`. `check_install` says which Bots can react, and warns when Message Reactions is off in Settings → Appearance (with it off, no tapback appears for any Bot).
 
 ## Where the new Bot fits
 `create_agent` surveys the workspace it was born into — the directory Hermes runs in and the repos under it, plus this install's own Bots, skills and plugins — and writes the result into the new Bot's memory. **You do not need to research the user's machine, and neither does the new Bot: it already knows on its first turn.** Never run your own directory hunt before calling `create_agent`, and never ask the user where things live.

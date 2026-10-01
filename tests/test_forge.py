@@ -1070,15 +1070,113 @@ class TapbackHooks(unittest.TestCase):
         ctx = self.FakeCtx()
         marks = self._marks(ctx)
         marks.on_turn_start(platform="desktop")
-        marks.on_turn_end(platform="desktop", assistant_response="Here is the draft.")
+        marks.on_turn_end(platform="desktop", assistant_response="All done.")
         self.assertEqual([a["emoji"] for _n, a in ctx.calls], [tapback.WORKING, tapback.DONE])
         self.assertEqual({n for n, _a in ctx.calls}, {"react_to_message"})
 
+    def test_the_pickup_reaction_fits_what_was_asked(self):
+        """One 👀 for everything says "I am alive"; this says "I understood what you asked"."""
+        import tapback
+        cases = {
+            "fix the failing build": "🔧",
+            "the deploy is broken": "🔧",
+            "research what our competitor shipped": "🔎",
+            "dig into the churn numbers": "🔎",
+            "draft the launch thread": "✍️",
+            "write me a newsletter": "✍️",
+            "how many followers did we gain?": "📊",
+            "compare last month's revenue": "📊",
+            "schedule a daily 8am digest": "⏳",
+            "remind me tomorrow at 9": "⏳",
+            "review this diff": "📋",
+            "build me a competitor watcher": "🛠️",
+            "set up a sandbox": "🛠️",
+            "thanks!": "👋",
+            "hey": "👋",
+            "why did it fail?": "💬",
+            "what is bot forge?": "💬",
+        }
+        for message, expected in cases.items():
+            self.assertEqual(tapback.pickup_emoji(message), expected, message)
+
+    def test_an_unreadable_ask_still_gets_picked_up(self):
+        import tapback
+        for message in ("ok go", "", None, "   ", 42):
+            self.assertEqual(tapback.pickup_emoji(message), tapback.WORKING, repr(message))
+
+    def test_the_message_is_read_whatever_shape_it_arrives_in(self):
+        import tapback
+        self.assertEqual(tapback.pickup_emoji({"content": "fix the build"}), "🔧")
+        self.assertEqual(tapback.pickup_emoji({"text": "draft a post"}), "✍️")
+        self.assertEqual(tapback.pickup_emoji(
+            {"content": [{"type": "text", "text": "review this diff"}]}), "📋")
+
+    def test_a_pickup_never_collides_with_an_outcome(self):
+        """Hermes clears a reaction when the same emoji is set twice, so the two sets must not meet."""
+        import tapback
+        pickups = {emoji for emoji, _pattern in tapback.PICKUP} | {tapback.WORKING}
+        outcomes = ({emoji for emoji, _pattern in tapback.OUTCOME}
+                    | {tapback.DONE, tapback.BLOCKED, tapback.NEEDS_YOU})
+        self.assertEqual(pickups & outcomes, set())
+
+    def test_the_turn_start_reaction_comes_from_the_message(self):
+        import tapback
+        ctx = self.FakeCtx()
+        marks = self._marks(ctx)
+        marks.on_turn_start(platform="desktop", user_message="fix the failing build")
+        marks.on_turn_end(platform="desktop", assistant_response="Done — the build is green.")
+        self.assertEqual([a["emoji"] for _n, a in ctx.calls], ["🔧", tapback.DONE])
+
+    def test_the_plugin_stands_down_when_the_companion_is_here(self):
+        """Two placements of the same emoji cancel — Hermes reads that as a tapback toggle."""
+        import companion as plugin
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = Path(tmp) / "profiles" / "ceo"
+            forge_dir = profile / "plugins" / "bot-forge"
+            marks_dir = profile / "plugins" / "bot-forge-marks"
+            forge_dir.mkdir(parents=True)
+            self.assertFalse(plugin.companion_running(forge_dir), "no companion installed")
+
+            marks_dir.mkdir(parents=True)
+            (marks_dir / "plugin.yaml").write_text("name: bot-forge-marks\n")
+            (profile / "config.yaml").write_text(yaml.safe_dump(
+                {"plugins": {"enabled": ["bot-forge", "bot-forge-marks"]}}))
+            self.assertTrue(plugin.companion_running(forge_dir), "installed and enabled")
+
+            (profile / "config.yaml").write_text(yaml.safe_dump(
+                {"plugins": {"enabled": ["bot-forge"]}}))
+            self.assertFalse(plugin.companion_running(forge_dir),
+                             "installed but switched off — this plugin must cover the reaction")
+
     def test_outcome_reads_the_reply(self):
         import tapback
-        self.assertEqual(tapback.outcome_emoji("Done — draft saved."), tapback.DONE)
+        self.assertEqual(tapback.outcome_emoji("All done."), tapback.DONE)
         self.assertEqual(tapback.outcome_emoji("I can't publish for you."), tapback.BLOCKED)
         self.assertEqual(tapback.outcome_emoji("Ready. Shall I post it?"), tapback.NEEDS_YOU)
+
+    def test_the_ending_reaction_says_what_happened(self):
+        """"Done" is the fallback, not the answer: the reply usually says what kind of done."""
+        import tapback
+        cases = {
+            "Fixed and deployed — the build is green.": "🚀",
+            "Published the thread just now.": "🚀",
+            "Here's the draft, five posts.": "📝",
+            "I rewrote the opening line.": "📝",
+            "You gained 412 followers, up 18% on last week.": "📈",
+            "Here is the breakdown by source.": "📈",
+            "Scheduled for every morning at 8.": "🗓️",
+            "Turns out the token expired overnight.": "💡",
+            "Removed 14 stale sessions.": "🧹",
+            "All done.": "✅",
+        }
+        for reply, expected in cases.items():
+            self.assertEqual(tapback.outcome_emoji(reply), expected, reply)
+
+    def test_state_beats_the_kind_of_work(self):
+        """A draft that needs sign-off is ✋, not 📝 — one needs the user, the other does not."""
+        import tapback
+        self.assertEqual(tapback.outcome_emoji("Here's the draft — shall I post it?"), tapback.NEEDS_YOU)
+        self.assertEqual(tapback.outcome_emoji("I wrote it but the deploy failed."), tapback.BLOCKED)
 
     def test_an_error_payload_is_a_failure_not_a_success(self):
         """The bug that hid a reaction that never appeared: dispatch returns errors as a value."""
@@ -1218,6 +1316,39 @@ class CompanionInstall(unittest.TestCase):
         self.assertEqual((root / "tapback.py").read_text(),
                          (companion.SOURCE / "tapback.py").read_text(),
                          "marks/tapback.py has drifted — copy tapback.py over it")
+
+    def test_a_profile_made_any_other_way_is_adopted(self):
+        """A Bot from Hermes' own New Agent dialog never heard of this plugin — it still reacts."""
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            stranger = self._bot(root, "made-elsewhere", "Elsewhere", meta=False)
+            self.assertFalse(companion.marks_ready(stranger))
+            changed = companion.adopt_all(root)
+            self.assertIn("made-elsewhere", [c["bot"] for c in changed])
+            self.assertTrue(companion.marks_ready(stranger))
+            self.assertTrue(companion.reactions_setting(stranger))
+            self.assertEqual(companion.adopt_all(root), [], "a second pass must change nothing")
+
+    def test_the_setting_is_switched_on_not_just_the_hook(self):
+        """The half that is easy to miss: unset reads as off, and the Bot is silent."""
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root, "quiet", "Quiet")
+            self.assertFalse(companion.reactions_setting(d))
+            out = companion.ensure_reactions(d)
+            self.assertTrue(out["ok"])
+            self.assertTrue(out["setting"])
+            self.assertTrue(companion.reactions_setting(d))
+            self.assertFalse(companion.ensure_reactions(d)["setting"], "idempotent")
+
+    def test_adoption_can_be_switched_off(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            self._bot(root, "left-alone", "Left Alone")
+            self.assertEqual(companion.adopt_all(root, {"adopt_bots": False}), [])
 
     def test_bots_without_the_hook_are_listed_with_a_reason(self):
         import companion

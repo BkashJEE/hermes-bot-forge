@@ -71,6 +71,27 @@ class AskAgentEnvironment(unittest.TestCase):
             self.assertNotIn("PRIVATE_TOKEN", kwargs["env"])
             self.assertEqual(kwargs["env"]["HOME"], "/different-user")
 
+    def test_the_bot_can_still_reach_the_network_and_its_vault(self):
+        """An allowlist that is too narrow fails silently: the Bot simply cannot reach the model
+        behind a proxy, or cannot find keys kept in 1Password or Bitwarden."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(Path(tmp), profiles=("kairo",))
+            carried = {"HTTPS_PROXY": "http://proxy.corp:3128", "NO_PROXY": "localhost",
+                       "NODE_EXTRA_CA_CERTS": "/etc/ssl/corp.pem",
+                       "XDG_CONFIG_HOME": "/home/u/.config"}
+            with mock.patch.object(tools, "hermes_root", return_value=root), \
+                 mock.patch.dict(os.environ, {**carried, "SSH_AUTH_SOCK": "/run/agent.sock",
+                                              "OPENAI_API_KEY": "sk-do-not-inherit"}), \
+                 mock.patch.object(tools.subprocess, "run",
+                                   return_value=subprocess.CompletedProcess([], 0, "done", "")) as run:
+                tools.ask_agent({"name": "kairo", "message": "Review only"})
+            env = run.call_args.kwargs["env"]
+            for key, value in carried.items():
+                self.assertEqual(env.get(key), value, key)
+            # reaching the network is not the same as carrying authority
+            self.assertNotIn("SSH_AUTH_SOCK", env)
+            self.assertNotIn("OPENAI_API_KEY", env)
+
 
 class Names(unittest.TestCase):
     def test_proper_case_and_slug(self):

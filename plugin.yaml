@@ -90,12 +90,13 @@ config_schema:
       launched in). Point it at the projects your Bots should know about.
   adopt_bots:
     type: bool
-    default: true
+    default: false
     description: >-
-      Give every profile on this machine the acknowledgement reaction, not only Bots this plugin
-      created — one made through Hermes' New Agent dialog or `hermes profile create` behaves the
-      same. Runs on plugin load, installs the hook and switches Hermes' own Message Reactions
-      setting on, and does nothing when everything is already in place.
+      Opt in to give every profile on this machine the acknowledgement reaction, not only Bots this
+      plugin created — one made through Hermes' New Agent dialog or `hermes profile create` behaves
+      the same. When true, runs on plugin load, installs the hook into each profile and switches
+      Hermes' own Message Reactions setting on there, and does nothing when everything is already
+      in place. Off by default: Bot Forge never edits profiles it did not create unless asked.
   notify_email:
     type: str
     default: ""

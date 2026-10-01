@@ -6,7 +6,7 @@ from . import schemas, tools
 
 _SETTINGS = ("inherit_model", "fallback_model", "probe_local_models", "install_gateway",
              "allow_delete", "backup_before_delete", "suggest_connectors", "allow_secrets", "journal_enabled", "ack_reactions", "ack_tapback",
-             "workspace_survey", "workspace_roots", "notify_email", "notify_blocked")
+             "workspace_survey", "workspace_roots", "notify_email", "notify_blocked", "adopt_bots")
 
 
 def register(ctx):
@@ -67,7 +67,7 @@ def register(ctx):
     # clone — gets the reaction. The user does not care which door a Bot came through; they expect
     # all of them to behave the same. No-op when everything is already in place.
     try:
-        import forge as _forge
+        from . import forge as _forge
 
         companion.adopt_all(_forge.default_root(), settings())
     except Exception:  # never let adoption stop the plugin loading

@@ -788,6 +788,36 @@ class Manifest(unittest.TestCase):
                       if isinstance(v, dict) and "name" in v and "parameters" in v}
         self.assertEqual(set(manifest["provides_tools"]), registered)
 
+    def test_register_loads_as_a_package_like_hermes_does(self):
+        """Hermes imports the plugin as a package with only submodule_search_locations — the plugin dir
+        is never on sys.path, so a bare `import forge` anywhere on the register() path breaks loading."""
+        import subprocess
+        probe = (
+            "import importlib.util, sys, types\n"
+            "root = sys.argv[1]\n"
+            "sys.path[:] = [p for p in sys.path if p not in ('', root) and not p.startswith(root)]\n"
+            "ns = sys.modules.setdefault('hermes_plugins', types.ModuleType('hermes_plugins')); ns.__path__ = []\n"
+            "spec = importlib.util.spec_from_file_location('hermes_plugins.bot_forge', root + '/__init__.py',\n"
+            "                                              submodule_search_locations=[root])\n"
+            "mod = importlib.util.module_from_spec(spec); sys.modules[spec.name] = mod; spec.loader.exec_module(mod)\n"
+            "tools = []\n"
+            "class Ctx:\n"
+            "    def register_tool(self, **kw): tools.append(kw['name'])\n"
+            "    def register_cli_command(self, **kw): pass\n"
+            "    def register_hook(self, *a, **kw): pass\n"
+            "    def register_skill(self, *a, **kw): pass\n"
+            "    def get_config(self, key, default=None): return default\n"
+            "mod.register(Ctx())\n"
+            "print(len(tools))\n"
+        )
+        with tempfile.TemporaryDirectory() as t:
+            env = {k: v for k, v in __import__("os").environ.items() if k != "PYTHONPATH"}
+            env.update(HOME=t, LOCALAPPDATA=t)  # default_root() must not point at the real install
+            p = subprocess.run([sys.executable, "-c", probe, str(ROOT)], cwd=t, env=env,
+                               capture_output=True, text=True, timeout=60)
+        self.assertEqual(p.returncode, 0, p.stderr[-2000:])
+        self.assertEqual(p.stdout.strip(), "14")
+
     def test_versions_agree(self):
         manifest = yaml.safe_load(Path(ROOT / "plugin.yaml").read_text())
         skill = (ROOT / "skills" / "bot-forge" / "SKILL.md").read_text()
@@ -1324,11 +1354,12 @@ class CompanionInstall(unittest.TestCase):
             root = make_root(Path(t))
             stranger = self._bot(root, "made-elsewhere", "Elsewhere", meta=False)
             self.assertFalse(companion.marks_ready(stranger))
-            changed = companion.adopt_all(root)
+            changed = companion.adopt_all(root, {"adopt_bots": True})
             self.assertIn("made-elsewhere", [c["bot"] for c in changed])
             self.assertTrue(companion.marks_ready(stranger))
             self.assertTrue(companion.reactions_setting(stranger))
-            self.assertEqual(companion.adopt_all(root), [], "a second pass must change nothing")
+            self.assertEqual(companion.adopt_all(root, {"adopt_bots": True}), [],
+                             "a second pass must change nothing")
 
     def test_the_setting_is_switched_on_not_just_the_hook(self):
         """The half that is easy to miss: unset reads as off, and the Bot is silent."""
@@ -1347,8 +1378,12 @@ class CompanionInstall(unittest.TestCase):
         import companion
         with tempfile.TemporaryDirectory() as t:
             root = make_root(Path(t))
-            self._bot(root, "left-alone", "Left Alone")
+            left = self._bot(root, "left-alone", "Left Alone")
             self.assertEqual(companion.adopt_all(root, {"adopt_bots": False}), [])
+            # Opt-in: unset (Hermes' get_config returns None) must not touch other profiles either.
+            self.assertEqual(companion.adopt_all(root, {"adopt_bots": None}), [])
+            self.assertEqual(companion.adopt_all(root), [])
+            self.assertFalse(companion.marks_ready(left))
 
     def test_bots_without_the_hook_are_listed_with_a_reason(self):
         import companion
@@ -1623,6 +1658,46 @@ class OutboundMail(unittest.TestCase):
     class Outbox:
         def __init__(self): self.sent = []
         def __call__(self, config, message): self.sent.append((config, message))
+
+    def test_the_password_never_crosses_an_unverified_or_cleartext_link(self):
+        import smtplib
+        import ssl
+        from email.message import EmailMessage
+        from unittest import mock
+        import notify
+
+        calls = []
+
+        class FakeSMTP:
+            starttls_error = None
+            def __init__(self, *a, **kw): calls.append(("connect", a))
+            def __enter__(self): return self
+            def __exit__(self, *exc): return False
+            def ehlo(self): pass
+            def starttls(self, context=None):
+                calls.append(("starttls", context))
+                if self.starttls_error:
+                    raise self.starttls_error
+            def login(self, user, password): calls.append(("login", user))
+            def send_message(self, message): calls.append(("send", None))
+
+        config = {"host": "smtp.example.com", "port": 587, "user": "me@example.com", "password": "hunter2",
+                  "to": "me@example.com", "from": "me@example.com"}
+        msg = EmailMessage()
+        msg.set_content("x")
+        with mock.patch.object(notify.smtplib, "SMTP", FakeSMTP):
+            notify._smtp_send(config, msg)
+            context = dict(calls)["starttls"]
+            self.assertIsInstance(context, ssl.SSLContext)
+            self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+            self.assertTrue(context.check_hostname)
+            self.assertIn("login", [c[0] for c in calls])
+
+            calls.clear()
+            FakeSMTP.starttls_error = smtplib.SMTPNotSupportedError("STARTTLS extension not supported")
+            with self.assertRaises(smtplib.SMTPException):
+                notify._smtp_send(config, msg)
+            self.assertNotIn("login", [c[0] for c in calls], "no STARTTLS must mean no login")
 
     def test_a_blocker_reaches_the_user(self):
         import notify

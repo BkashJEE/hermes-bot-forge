@@ -23,6 +23,7 @@ import json
 import os
 import re
 import smtplib
+import ssl
 import time
 from email.message import EmailMessage
 from pathlib import Path
@@ -146,13 +147,19 @@ def compose_digest(waiting: dict) -> tuple:
 
 # ── sending ──────────────────────────────────────────────────────────────────
 def _smtp_send(config: dict, message: EmailMessage) -> None:
+    # Verify the server's certificate and hostname, and never send the password in cleartext:
+    # implicit TLS on 465, otherwise STARTTLS is required (a server or MITM that refuses the
+    # upgrade raises here, before login).
+    context = ssl.create_default_context()
+    if int(config["port"]) == 465:
+        with smtplib.SMTP_SSL(config["host"], config["port"], timeout=20, context=context) as smtp:
+            smtp.login(config["user"], config["password"])
+            smtp.send_message(message)
+        return
     with smtplib.SMTP(config["host"], config["port"], timeout=20) as smtp:
         smtp.ehlo()
-        try:
-            smtp.starttls()
-            smtp.ehlo()
-        except smtplib.SMTPException:
-            pass  # a server already on an implicit TLS port, or one that refuses the upgrade
+        smtp.starttls(context=context)
+        smtp.ehlo()
         smtp.login(config["user"], config["password"])
         smtp.send_message(message)
 

@@ -9,7 +9,10 @@ that ships with the Bot: two hooks, no tools, so a Bot gains the reaction and no
 import shutil
 from pathlib import Path
 
-import forge
+if __package__:
+    from . import forge
+else:
+    import forge
 
 MARKS_NAME = "bot-forge-marks"
 SOURCE = Path(__file__).resolve().parent / "marks"
@@ -158,7 +161,7 @@ def adopt_all(root: Path, settings: dict | None = None) -> list:
     expect all of them to behave the same. This runs on plugin load, does nothing when everything
     is already in place, and reports only what it changed.
     """
-    if (settings or {}).get("adopt_bots") is False:
+    if (settings or {}).get("adopt_bots") is not True:  # opt-in: never touch other profiles unasked
         return []
     root = Path(root)
     profiles = root / "profiles"

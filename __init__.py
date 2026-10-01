@@ -49,7 +49,10 @@ def register(ctx):
         parser.add_argument("--json", action="store_true", help="machine-readable output")
 
     def _doctor_handler(args):
-        import doctor
+        if __package__:
+            from . import doctor
+        else:
+            import doctor
         return doctor.cli(args)
 
     try:

@@ -104,9 +104,10 @@ def create_team(args: dict, settings: dict | None = None, **kwargs) -> str:
         return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
 
 
-def check_install(args: dict, **kwargs) -> str:
+def check_install(args: dict, settings: dict | None = None, **kwargs) -> str:
     try:
-        p = subprocess.run([sys.executable, str(PLUGIN_DIR / "doctor.py"), "--json"],
+        p = subprocess.run([sys.executable, str(PLUGIN_DIR / "doctor.py"), "--json",
+                            json.dumps(settings or {})],
                            capture_output=True, text=True, timeout=300)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": "check_install timed out"})

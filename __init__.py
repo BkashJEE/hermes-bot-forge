@@ -19,12 +19,13 @@ def register(ctx):
     ctx.register_tool(name="list_agents", toolset="bot_forge", schema=schemas.LIST_AGENTS,
                       handler=tools.list_agents, emoji="📋", description="List Hermes Bots on this machine")
     ctx.register_tool(name="check_install", toolset="bot_forge", schema=schemas.CHECK_INSTALL,
-                      handler=tools.check_install, emoji="🩹",
+                      handler=lambda args, **kw: tools.check_install(args, settings=settings(), **kw), emoji="🩹",
                       description="Check that Bot Forge itself is set up correctly (read-only)")
     ctx.register_tool(name="check_agents", toolset="bot_forge", schema=schemas.CHECK_AGENTS,
                       handler=tools.check_agents, emoji="🩺", description="Health check for all Bots (read-only)")
     ctx.register_tool(name="agent_journal", toolset="bot_forge", schema=schemas.AGENT_JOURNAL,
-                      handler=tools.agent_journal, emoji="📓",
+                      handler=lambda args, **kw: tools.agent_journal(args, settings=settings(), **kw),
+                      emoji="📓",
                       description="Enable, write, or read a Bot's factual work journal")
     ctx.register_tool(name="ask_agent", toolset="bot_forge", schema=schemas.ASK_AGENT,
                       handler=tools.ask_agent, emoji="📨",

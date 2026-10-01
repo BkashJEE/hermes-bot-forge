@@ -15,8 +15,10 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-import forge
-import portable
+if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
+    from . import forge, portable
+else:
+    import forge, portable
 
 JOURNAL_MARKER = "<!-- bot-forge-journal:v1 -->"
 JOURNAL_POLICY = f"""{JOURNAL_MARKER}

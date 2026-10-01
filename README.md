@@ -308,7 +308,7 @@ It uses the email Hermes already has (`EMAIL_SMTP_HOST` / `EMAIL_ADDRESS` / `EMA
 For the whole queue on a schedule rather than one blocker at a time:
 
 ```bash
-echo '{"action":"digest"}' | python3 ~/.hermes/plugins/bot-forge/notify.py
+python3 ~/.hermes/plugins/bot-forge/notify.py digest
 ```
 
 ### Cost and safety built in

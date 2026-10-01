@@ -28,7 +28,10 @@ import time
 from email.message import EmailMessage
 from pathlib import Path
 
-import forge
+if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
+    from . import forge
+else:
+    import forge
 
 STATE_REL = Path(".bot-forge") / "notify.json"
 DEFAULT_PORT = 587
@@ -246,8 +249,14 @@ def operate(spec: dict) -> dict:
 def main() -> None:
     import sys
 
-    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text()
-    result = operate(json.loads(raw or "{}"))
+    arg = sys.argv[1] if len(sys.argv) > 1 else "-"
+    if arg in ("digest", "status"):      # the documented form: no shell pipe to get one action
+        spec = {"action": arg}
+    elif arg == "-":
+        spec = json.loads(sys.stdin.read() or "{}")
+    else:
+        spec = json.loads(Path(arg).read_text())
+    result = operate(spec)
     print(json.dumps(result, indent=2))
     raise SystemExit(0 if result.get("ok") else 1)
 

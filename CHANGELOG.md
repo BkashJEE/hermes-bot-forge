@@ -3,6 +3,18 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2026-10-01
+
+### Fixed
+- **The plugin stopped loading at all in v0.15.0, and with it all 14 tools.** `register()` reached `companion.py`, whose module-level `import forge` was unprefixed; Hermes imports a plugin as a package without putting its directory on `sys.path`, so `ModuleNotFoundError` escaped `register()` and the loader dropped every tool and hook. The tests missed it because they add the plugin directory to `sys.path` themselves. Every in-package import now resolves package-relative, with a fallback for the modules that are also run as scripts, and a test asserts no bare in-package import can come back. Reported in catalog review by @teknium1.
+- **The SMTP password could be sent in the clear.** `starttls()` ran with no SSL context (no certificate or hostname verification) and a failed upgrade was swallowed, so `login()` could proceed unencrypted. TLS is now verified, implicit TLS is used on port 465, and a server that cannot do STARTTLS is refused before any credential is sent.
+- **The mail switches were ignored.** `agent_journal` was registered without the settings wrapper the other tools get, so its settings were always `{}` and `notify_blocked: false`, `notify_email: false` and a custom address never took effect — a blocked entry mailed the default address whenever SMTP was configured. `check_install` had the same gap and could report that a blocked Bot would email the user when they had switched that off.
+- **Adoption is opt-in.** `adopt_bots` defaulted to on while being absent from the settings list, so the opt-out could never fire and every load wrote into every profile on the machine, including ones Bot Forge never created. It now defaults to off and is honoured.
+- **Sharing a login copies it instead of symlinking.** A link made the Bot's profile *be* the root profile's credential store: a token refreshed or revoked in one silently rewrote the other. `extras/share_login.py` now copies `auth.json` at mode 0600, replaces a link left by an older version, and says it is a snapshot.
+
+### Added
+- `notify.py digest` and `notify.py status` as plain subcommands, so scheduling the digest needs no shell pipe.
+
 ## [0.15.0] - 2026-09-30
 
 ### Added

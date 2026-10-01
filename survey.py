@@ -28,7 +28,10 @@ import subprocess
 import time
 from pathlib import Path
 
-import forge
+if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
+    from . import forge
+else:
+    import forge
 
 WORKSPACE_MARKER = "<!-- bot-forge-workspace:v1 -->"
 INDEX_REL = Path(".bot-forge") / "workspace.json"

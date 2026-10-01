@@ -1831,5 +1831,66 @@ class OutboundMail(unittest.TestCase):
                              "other@example.com")
 
 
+class ReviewFollowUps(unittest.TestCase):
+    """The findings from the catalog review that the first fix did not cover."""
+
+    def test_every_in_package_import_survives_being_a_package(self):
+        """A bare `import forge` anywhere reachable from register() drops all 14 tools."""
+        import subprocess
+        root = Path(__file__).resolve().parent.parent
+        bare = subprocess.run(
+            ["grep", "-rn", r"^import \(forge\|manage\|journal\|portable\|companion\|survey"
+             r"\|doctor\|notify\|waiting\|acks\|tapback\|health\|schemas\|tools\)$",
+             "--include=*.py", "."],
+            cwd=root, capture_output=True, text=True).stdout.strip()
+        self.assertEqual(bare, "", f"unprefixed in-package imports remain:\n{bare}")
+
+    def test_the_journal_tool_is_given_the_real_settings(self):
+        """Without the wrapper its settings are always {}, so notify_blocked: false never fires."""
+        source = (Path(__file__).resolve().parent.parent / "__init__.py").read_text()
+        block = source[source.index('name="agent_journal"'):]
+        block = block[:block.index("description=")]
+        self.assertIn("settings=settings()", block)
+
+    def test_the_doctor_is_given_the_real_settings(self):
+        import doctor
+        import inspect
+        self.assertIn("settings", inspect.signature(doctor.check).parameters)
+        source = (Path(__file__).resolve().parent.parent / "doctor.py").read_text()
+        self.assertIn("notify.mail_config(root, settings)", source)
+
+    def test_sharing_a_login_copies_it_instead_of_linking(self):
+        """A symlink makes the Bot's profile *be* the root's credential store; a copy is a copy."""
+        import extras.share_login as share_login
+        with tempfile.TemporaryDirectory() as t:
+            root = Path(t)
+            (root / "auth.json").write_text('{"token": "abc"}')
+            bot = root / "profiles" / "quill"
+            bot.mkdir(parents=True)
+            (bot / "config.yaml").write_text("model: {}\n")
+            out = share_login.link(root, "quill")
+            dest = bot / "auth.json"
+            self.assertTrue(dest.is_file())
+            self.assertFalse(dest.is_symlink(), "must never be a live link to another profile")
+            self.assertEqual(dest.read_text(), '{"token": "abc"}')
+            self.assertEqual(oct(dest.stat().st_mode)[-3:], "600")
+            self.assertIn("copied", out)
+            # the source is untouched by anything done to the copy
+            dest.write_text('{"token": "replaced"}')
+            self.assertEqual((root / "auth.json").read_text(), '{"token": "abc"}')
+
+    def test_an_older_symlink_is_replaced_by_a_copy(self):
+        import extras.share_login as share_login
+        with tempfile.TemporaryDirectory() as t:
+            root = Path(t)
+            (root / "auth.json").write_text('{"token": "abc"}')
+            bot = root / "profiles" / "quill"
+            bot.mkdir(parents=True)
+            (bot / "config.yaml").write_text("model: {}\n")
+            (bot / "auth.json").symlink_to(root / "auth.json")   # left by an older version
+            share_login.link(root, "quill")
+            self.assertFalse((bot / "auth.json").is_symlink())
+
+
 if __name__ == "__main__":
     unittest.main()

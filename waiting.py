@@ -10,7 +10,10 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-import forge
+if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
+    from . import forge
+else:
+    import forge
 
 # `## <timestamp> · <status> · <title>` — written by journal.py
 ENTRY = re.compile(r"^##\s+(?P<stamp>\S+)\s+·\s+(?P<status>\w+)\s+·\s+(?P<title>.+)$", re.M)

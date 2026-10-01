@@ -3,6 +3,56 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.1] - 2026-10-01
+
+### Fixed
+- **The plugin stopped loading at all in v0.15.0, and with it all 14 tools.** `register()` reached `companion.py`, whose module-level `import forge` was unprefixed; Hermes imports a plugin as a package without putting its directory on `sys.path`, so `ModuleNotFoundError` escaped `register()` and the loader dropped every tool and hook. The tests missed it because they add the plugin directory to `sys.path` themselves. Every in-package import now resolves package-relative, with a fallback for the modules that are also run as scripts, and a test asserts no bare in-package import can come back. Reported in catalog review by @teknium1.
+- **The SMTP password could be sent in the clear.** `starttls()` ran with no SSL context (no certificate or hostname verification) and a failed upgrade was swallowed, so `login()` could proceed unencrypted. TLS is now verified, implicit TLS is used on port 465, and a server that cannot do STARTTLS is refused before any credential is sent.
+- **The mail switches were ignored.** `agent_journal` was registered without the settings wrapper the other tools get, so its settings were always `{}` and `notify_blocked: false`, `notify_email: false` and a custom address never took effect — a blocked entry mailed the default address whenever SMTP was configured. `check_install` had the same gap and could report that a blocked Bot would email the user when they had switched that off.
+- **Adoption is opt-in.** `adopt_bots` defaulted to on while being absent from the settings list, so the opt-out could never fire and every load wrote into every profile on the machine, including ones Bot Forge never created. It now defaults to off and is honoured.
+- **Sharing a login copies it instead of symlinking.** A link made the Bot's profile *be* the root profile's credential store: a token refreshed or revoked in one silently rewrote the other. `extras/share_login.py` now copies `auth.json` at mode 0600, replaces a link left by an older version, and says it is a snapshot.
+
+### Added
+- `notify.py digest` and `notify.py status` as plain subcommands, so scheduling the digest needs no shell pipe.
+
+## [0.15.0] - 2026-09-30
+
+### Added
+- **Every profile gets the reaction, however it was made.** A Bot created through Hermes' own New Agent dialog or `hermes profile create` never heard of this plugin, and stayed silent while Bot Forge's own Bots acknowledged. The plugin now adopts every live profile on load: it installs the hook and switches on Hermes' `message_reactions` setting, does nothing when both are already in place, and never blocks loading if a profile is broken. `adopt_bots: false` switches it off.
+- **The ending reaction says what happened, not just that something did** — 🚀 shipped, 📝 written, 📈 numbers, 🗓️ scheduled, 💡 found out, 🧹 cleaned up, with ✅ as the fallback. State still wins over kind: a draft that needs sign-off is ✋, and a write that ended in a failed deploy is ⚠️.
+
+### Fixed
+- **A new Bot could be created with the hook installed and still never react**, because `create_agent` set up the hook but not Hermes' `message_reactions` setting — and an unset value reads as off. Creation now does both.
+- The numbers rule never matched a percentage: the pattern ended in a word boundary right after `%`, which is already a non-word character, so `up 18%` silently fell through to the generic ✅.
+
+## [0.14.1] - 2026-09-30
+
+### Fixed
+- **A Bot in the profile that also runs Bot Forge itself never appeared to react at all.** Both the plugin and its `bot-forge-marks` companion register the same pair of turn hooks, so in a profile holding both, the reaction was placed twice — and Hermes reads a second identical emoji as a tapback toggle, clearing it. The reaction was being placed and instantly removed on every turn. The plugin now stands down when the companion is installed and enabled beside it, since the companion is the copy that ships inside every Bot.
+
+## [0.14.0] - 2026-09-29
+
+### Changed
+- **The pickup reaction now fits what was asked.** Every turn used to open with the same 👀, which only told the user the Bot was alive. The reaction is now chosen from the message itself — 🔧 a fix, 🔎 research, ✍️ writing, 📊 numbers, ⏳ something scheduled, 📋 a review, 🛠️ something to build, 👋 a greeting, 💬 a question — and falls back to 👀 when the ask is not recognisable rather than guessing. The end of the turn still replaces it with ✅ / ✋ / ⚠️, so the two sets are kept disjoint: Hermes clears a reaction when the same emoji is set twice.
+
+## [0.13.0] - 2026-09-28
+
+### Added
+- **A blocked Bot emails you instead of waiting to be asked.** `check_agents` gathers what needs you when you think to ask; this is the push half. When a Bot journals a `blocked` or `failed` entry it sends one plain-text message, and `notify.py --action digest` sends the whole queue on a schedule. It reuses the email Hermes already has (`EMAIL_SMTP_HOST` / `EMAIL_ADDRESS` / `EMAIL_PASSWORD`) — no new credential, no new service, nothing to sign up for. `notify_email` redirects it or switches it off; `notify_blocked` controls the per-blocker message.
+- `check_install` now reports whether a blocked Bot can reach you, or is waiting silently.
+
+### Security
+- **Outbound only, and the recipient is resolved from config alone** — never from a tool argument, a persona, or any text a model produced. A Bot can write to the user's own address and no other, so it cannot be talked into mailing a third party, and two Bots cannot start a reply loop. Nothing in the plugin reads a mailbox. Messages are rate limited per Bot, secret-scanned before sending, and skipped silently when mail is unconfigured or the server is unreachable — a failed send can never break a turn, a journal write, or a routine.
+
+## [0.12.1] - 2026-09-25
+
+### Fixed
+- **The survey is useful on a real machine, not just a tidy one.** Three faults, all found by running it against a workspace with ten roots and thirty near-identical checkouts:
+  - One crowded root ate the whole scan budget, so the nine roots after it were never looked at and a Bot was pointed at whatever sorted first. Each root now gets its own share.
+  - A directory with almost no words in it matched anything it shared one word with — a folder named `omarchy` scored a perfect 1.00 against a theming Bot on the strength of its own name. A place now needs real vocabulary and at least two shared terms before it can be recommended.
+  - Nested copies of the same checkout appeared three times; the shallowest path now wins.
+- **A job and a directory rarely use the same word for the same thing.** The job's vocabulary is widened with related terms before places are searched, so a Bot whose job says "x.com posts" finds the repo that holds that work even when it never uses the word "social", and an inbox Bot finds the repo that watches mail. The widening applies only to the job and only when matching places — never to the corpus, and never to the duplicate guard, which still compares what two Bots actually say.
+
 ## [0.12.0] - 2026-09-25
 
 ### Added

@@ -809,6 +809,36 @@ class Manifest(unittest.TestCase):
                       if isinstance(v, dict) and "name" in v and "parameters" in v}
         self.assertEqual(set(manifest["provides_tools"]), registered)
 
+    def test_register_loads_as_a_package_like_hermes_does(self):
+        """Hermes imports the plugin as a package with only submodule_search_locations — the plugin dir
+        is never on sys.path, so a bare `import forge` anywhere on the register() path breaks loading."""
+        import subprocess
+        probe = (
+            "import importlib.util, sys, types\n"
+            "root = sys.argv[1]\n"
+            "sys.path[:] = [p for p in sys.path if p not in ('', root) and not p.startswith(root)]\n"
+            "ns = sys.modules.setdefault('hermes_plugins', types.ModuleType('hermes_plugins')); ns.__path__ = []\n"
+            "spec = importlib.util.spec_from_file_location('hermes_plugins.bot_forge', root + '/__init__.py',\n"
+            "                                              submodule_search_locations=[root])\n"
+            "mod = importlib.util.module_from_spec(spec); sys.modules[spec.name] = mod; spec.loader.exec_module(mod)\n"
+            "tools = []\n"
+            "class Ctx:\n"
+            "    def register_tool(self, **kw): tools.append(kw['name'])\n"
+            "    def register_cli_command(self, **kw): pass\n"
+            "    def register_hook(self, *a, **kw): pass\n"
+            "    def register_skill(self, *a, **kw): pass\n"
+            "    def get_config(self, key, default=None): return default\n"
+            "mod.register(Ctx())\n"
+            "print(len(tools))\n"
+        )
+        with tempfile.TemporaryDirectory() as t:
+            env = {k: v for k, v in __import__("os").environ.items() if k != "PYTHONPATH"}
+            env.update(HOME=t, LOCALAPPDATA=t)  # default_root() must not point at the real install
+            p = subprocess.run([sys.executable, "-c", probe, str(ROOT)], cwd=t, env=env,
+                               capture_output=True, text=True, timeout=60)
+        self.assertEqual(p.returncode, 0, p.stderr[-2000:])
+        self.assertEqual(p.stdout.strip(), "14")
+
     def test_versions_agree(self):
         manifest = yaml.safe_load(Path(ROOT / "plugin.yaml").read_text())
         skill = (ROOT / "skills" / "bot-forge" / "SKILL.md").read_text()
@@ -1091,15 +1121,113 @@ class TapbackHooks(unittest.TestCase):
         ctx = self.FakeCtx()
         marks = self._marks(ctx)
         marks.on_turn_start(platform="desktop")
-        marks.on_turn_end(platform="desktop", assistant_response="Here is the draft.")
+        marks.on_turn_end(platform="desktop", assistant_response="All done.")
         self.assertEqual([a["emoji"] for _n, a in ctx.calls], [tapback.WORKING, tapback.DONE])
         self.assertEqual({n for n, _a in ctx.calls}, {"react_to_message"})
 
+    def test_the_pickup_reaction_fits_what_was_asked(self):
+        """One 👀 for everything says "I am alive"; this says "I understood what you asked"."""
+        import tapback
+        cases = {
+            "fix the failing build": "🔧",
+            "the deploy is broken": "🔧",
+            "research what our competitor shipped": "🔎",
+            "dig into the churn numbers": "🔎",
+            "draft the launch thread": "✍️",
+            "write me a newsletter": "✍️",
+            "how many followers did we gain?": "📊",
+            "compare last month's revenue": "📊",
+            "schedule a daily 8am digest": "⏳",
+            "remind me tomorrow at 9": "⏳",
+            "review this diff": "📋",
+            "build me a competitor watcher": "🛠️",
+            "set up a sandbox": "🛠️",
+            "thanks!": "👋",
+            "hey": "👋",
+            "why did it fail?": "💬",
+            "what is bot forge?": "💬",
+        }
+        for message, expected in cases.items():
+            self.assertEqual(tapback.pickup_emoji(message), expected, message)
+
+    def test_an_unreadable_ask_still_gets_picked_up(self):
+        import tapback
+        for message in ("ok go", "", None, "   ", 42):
+            self.assertEqual(tapback.pickup_emoji(message), tapback.WORKING, repr(message))
+
+    def test_the_message_is_read_whatever_shape_it_arrives_in(self):
+        import tapback
+        self.assertEqual(tapback.pickup_emoji({"content": "fix the build"}), "🔧")
+        self.assertEqual(tapback.pickup_emoji({"text": "draft a post"}), "✍️")
+        self.assertEqual(tapback.pickup_emoji(
+            {"content": [{"type": "text", "text": "review this diff"}]}), "📋")
+
+    def test_a_pickup_never_collides_with_an_outcome(self):
+        """Hermes clears a reaction when the same emoji is set twice, so the two sets must not meet."""
+        import tapback
+        pickups = {emoji for emoji, _pattern in tapback.PICKUP} | {tapback.WORKING}
+        outcomes = ({emoji for emoji, _pattern in tapback.OUTCOME}
+                    | {tapback.DONE, tapback.BLOCKED, tapback.NEEDS_YOU})
+        self.assertEqual(pickups & outcomes, set())
+
+    def test_the_turn_start_reaction_comes_from_the_message(self):
+        import tapback
+        ctx = self.FakeCtx()
+        marks = self._marks(ctx)
+        marks.on_turn_start(platform="desktop", user_message="fix the failing build")
+        marks.on_turn_end(platform="desktop", assistant_response="Done — the build is green.")
+        self.assertEqual([a["emoji"] for _n, a in ctx.calls], ["🔧", tapback.DONE])
+
+    def test_the_plugin_stands_down_when_the_companion_is_here(self):
+        """Two placements of the same emoji cancel — Hermes reads that as a tapback toggle."""
+        import companion as plugin
+        with tempfile.TemporaryDirectory() as tmp:
+            profile = Path(tmp) / "profiles" / "ceo"
+            forge_dir = profile / "plugins" / "bot-forge"
+            marks_dir = profile / "plugins" / "bot-forge-marks"
+            forge_dir.mkdir(parents=True)
+            self.assertFalse(plugin.companion_running(forge_dir), "no companion installed")
+
+            marks_dir.mkdir(parents=True)
+            (marks_dir / "plugin.yaml").write_text("name: bot-forge-marks\n")
+            (profile / "config.yaml").write_text(yaml.safe_dump(
+                {"plugins": {"enabled": ["bot-forge", "bot-forge-marks"]}}))
+            self.assertTrue(plugin.companion_running(forge_dir), "installed and enabled")
+
+            (profile / "config.yaml").write_text(yaml.safe_dump(
+                {"plugins": {"enabled": ["bot-forge"]}}))
+            self.assertFalse(plugin.companion_running(forge_dir),
+                             "installed but switched off — this plugin must cover the reaction")
+
     def test_outcome_reads_the_reply(self):
         import tapback
-        self.assertEqual(tapback.outcome_emoji("Done — draft saved."), tapback.DONE)
+        self.assertEqual(tapback.outcome_emoji("All done."), tapback.DONE)
         self.assertEqual(tapback.outcome_emoji("I can't publish for you."), tapback.BLOCKED)
         self.assertEqual(tapback.outcome_emoji("Ready. Shall I post it?"), tapback.NEEDS_YOU)
+
+    def test_the_ending_reaction_says_what_happened(self):
+        """"Done" is the fallback, not the answer: the reply usually says what kind of done."""
+        import tapback
+        cases = {
+            "Fixed and deployed — the build is green.": "🚀",
+            "Published the thread just now.": "🚀",
+            "Here's the draft, five posts.": "📝",
+            "I rewrote the opening line.": "📝",
+            "You gained 412 followers, up 18% on last week.": "📈",
+            "Here is the breakdown by source.": "📈",
+            "Scheduled for every morning at 8.": "🗓️",
+            "Turns out the token expired overnight.": "💡",
+            "Removed 14 stale sessions.": "🧹",
+            "All done.": "✅",
+        }
+        for reply, expected in cases.items():
+            self.assertEqual(tapback.outcome_emoji(reply), expected, reply)
+
+    def test_state_beats_the_kind_of_work(self):
+        """A draft that needs sign-off is ✋, not 📝 — one needs the user, the other does not."""
+        import tapback
+        self.assertEqual(tapback.outcome_emoji("Here's the draft — shall I post it?"), tapback.NEEDS_YOU)
+        self.assertEqual(tapback.outcome_emoji("I wrote it but the deploy failed."), tapback.BLOCKED)
 
     def test_an_error_payload_is_a_failure_not_a_success(self):
         """The bug that hid a reaction that never appeared: dispatch returns errors as a value."""
@@ -1239,6 +1367,44 @@ class CompanionInstall(unittest.TestCase):
         self.assertEqual((root / "tapback.py").read_text(),
                          (companion.SOURCE / "tapback.py").read_text(),
                          "marks/tapback.py has drifted — copy tapback.py over it")
+
+    def test_a_profile_made_any_other_way_is_adopted(self):
+        """A Bot from Hermes' own New Agent dialog never heard of this plugin — it still reacts."""
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            stranger = self._bot(root, "made-elsewhere", "Elsewhere", meta=False)
+            self.assertFalse(companion.marks_ready(stranger))
+            changed = companion.adopt_all(root, {"adopt_bots": True})
+            self.assertIn("made-elsewhere", [c["bot"] for c in changed])
+            self.assertTrue(companion.marks_ready(stranger))
+            self.assertTrue(companion.reactions_setting(stranger))
+            self.assertEqual(companion.adopt_all(root, {"adopt_bots": True}), [],
+                             "a second pass must change nothing")
+
+    def test_the_setting_is_switched_on_not_just_the_hook(self):
+        """The half that is easy to miss: unset reads as off, and the Bot is silent."""
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            d = self._bot(root, "quiet", "Quiet")
+            self.assertFalse(companion.reactions_setting(d))
+            out = companion.ensure_reactions(d)
+            self.assertTrue(out["ok"])
+            self.assertTrue(out["setting"])
+            self.assertTrue(companion.reactions_setting(d))
+            self.assertFalse(companion.ensure_reactions(d)["setting"], "idempotent")
+
+    def test_adoption_can_be_switched_off(self):
+        import companion
+        with tempfile.TemporaryDirectory() as t:
+            root = make_root(Path(t))
+            left = self._bot(root, "left-alone", "Left Alone")
+            self.assertEqual(companion.adopt_all(root, {"adopt_bots": False}), [])
+            # Opt-in: unset (Hermes' get_config returns None) must not touch other profiles either.
+            self.assertEqual(companion.adopt_all(root, {"adopt_bots": None}), [])
+            self.assertEqual(companion.adopt_all(root), [])
+            self.assertFalse(companion.marks_ready(left))
 
     def test_bots_without_the_hook_are_listed_with_a_reason(self):
         import companion
@@ -1491,6 +1657,260 @@ class WorkspaceSurvey(unittest.TestCase):
         import survey
         self.assertGreater(survey.weight("social-media"), survey.weight("media"))
         self.assertGreater(survey.weight("x.com"), survey.weight("post"))
+
+
+class OutboundMail(unittest.TestCase):
+    """A Bot tells you it is blocked. It cannot tell anyone else anything."""
+
+    def _root(self, tmp, **env):
+        root = make_root(Path(tmp))
+        lines = {"EMAIL_SMTP_HOST": "smtp.example.com", "EMAIL_ADDRESS": "me@example.com",
+                 "EMAIL_PASSWORD": "hunter2", **env}
+        (root / ".env").write_text("\n".join(f"{k}={v}" for k, v in lines.items() if v) + "\n")
+        return root
+
+    def _bot(self, root, name="marlow", title="Marlow"):
+        d = root / "profiles" / name
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}))
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}))
+        return d
+
+    class Outbox:
+        def __init__(self): self.sent = []
+        def __call__(self, config, message): self.sent.append((config, message))
+
+    def test_the_password_never_crosses_an_unverified_or_cleartext_link(self):
+        import smtplib
+        import ssl
+        from email.message import EmailMessage
+        from unittest import mock
+        import notify
+
+        calls = []
+
+        class FakeSMTP:
+            starttls_error = None
+            def __init__(self, *a, **kw): calls.append(("connect", a))
+            def __enter__(self): return self
+            def __exit__(self, *exc): return False
+            def ehlo(self): pass
+            def starttls(self, context=None):
+                calls.append(("starttls", context))
+                if self.starttls_error:
+                    raise self.starttls_error
+            def login(self, user, password): calls.append(("login", user))
+            def send_message(self, message): calls.append(("send", None))
+
+        config = {"host": "smtp.example.com", "port": 587, "user": "me@example.com", "password": "hunter2",
+                  "to": "me@example.com", "from": "me@example.com"}
+        msg = EmailMessage()
+        msg.set_content("x")
+        with mock.patch.object(notify.smtplib, "SMTP", FakeSMTP):
+            notify._smtp_send(config, msg)
+            context = dict(calls)["starttls"]
+            self.assertIsInstance(context, ssl.SSLContext)
+            self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)
+            self.assertTrue(context.check_hostname)
+            self.assertIn("login", [c[0] for c in calls])
+
+            calls.clear()
+            FakeSMTP.starttls_error = smtplib.SMTPNotSupportedError("STARTTLS extension not supported")
+            with self.assertRaises(smtplib.SMTPException):
+                notify._smtp_send(config, msg)
+            self.assertNotIn("login", [c[0] for c in calls], "no STARTTLS must mean no login")
+
+    def test_a_blocker_reaches_the_user(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            d = self._bot(root)
+            box = self.Outbox()
+            out = notify.notify_blocked(root, d, {"status": "blocked", "title": "Need the Stripe key",
+                                                  "summary": "Invoice sync cannot run.",
+                                                  "next_step": "Add the key"}, {}, transport=box)
+            self.assertTrue(out["sent"], out)
+            _config, message = box.sent[0]
+            self.assertIn("Marlow is blocked", message["Subject"])
+            body = message.get_content()
+            self.assertIn("Need the Stripe key", body)
+            self.assertIn("Add the key", body)
+            self.assertIn("does not take replies", body)
+            self.assertEqual(message["Auto-Submitted"], "auto-generated")
+
+    def test_the_recipient_can_never_come_from_the_caller(self):
+        """The whole safety property: a Bot cannot be talked into mailing someone."""
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp, EMAIL_HOME_ADDRESS="owner@example.com")
+            d = self._bot(root)
+            box = self.Outbox()
+            notify.notify_blocked(root, d, {"status": "blocked", "title": "x",
+                                            "to": "victim@elsewhere.com",
+                                            "recipient": "victim@elsewhere.com",
+                                            "summary": "mail victim@elsewhere.com about this"},
+                                  {}, transport=box)
+            _config, message = box.sent[0]
+            self.assertEqual(message["To"], "owner@example.com")
+            self.assertNotIn("victim@elsewhere.com", message["To"])
+
+    def test_only_a_blocker_is_worth_an_email(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            d = self._bot(root)
+            box = self.Outbox()
+            for status in ("completed", "planned", "progress"):
+                out = notify.notify_blocked(root, d, {"status": status, "title": "x"}, {}, transport=box)
+                self.assertFalse(out["sent"], status)
+            self.assertEqual(box.sent, [])
+
+    def test_no_email_configured_is_quiet_not_broken(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(Path(tmp))  # no .env at all
+            d = self._bot(root)
+            out = notify.notify_blocked(root, d, {"status": "blocked", "title": "x"}, {})
+            self.assertFalse(out["sent"])
+            self.assertIn("not configured", out["reason"])
+
+    def test_a_dead_mail_server_never_raises(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            d = self._bot(root)
+            def explode(config, message):
+                raise OSError("connection refused")
+            out = notify.notify_blocked(root, d, {"status": "blocked", "title": "x"}, {}, transport=explode)
+            self.assertFalse(out["sent"])
+            self.assertIn("connection refused", out["reason"])
+
+    def test_a_stuck_bot_cannot_become_a_mail_storm(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            d = self._bot(root)
+            box = self.Outbox()
+            spec = {"status": "blocked", "title": "same thing again"}
+            for _ in range(notify.MAX_PER_HOUR):
+                self.assertTrue(notify.notify_blocked(root, d, spec, {}, transport=box)["sent"])
+            out = notify.notify_blocked(root, d, spec, {}, transport=box)
+            self.assertFalse(out["sent"])
+            self.assertIn("rate limit", out["reason"])
+            self.assertEqual(len(box.sent), notify.MAX_PER_HOUR)
+
+    def test_a_credential_in_the_body_is_refused(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            box = self.Outbox()
+            out = notify.send(root, "subject", "the key is AKIAIOSFODNN7EXAMPLE",
+                              {}, bot="marlow", transport=box)
+            self.assertFalse(out["sent"])
+            self.assertIn("credential", out["reason"])
+            self.assertEqual(box.sent, [])
+
+    def test_the_digest_carries_the_whole_queue(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            subject, body = notify.compose_digest({"count": 2, "items": [
+                {"display_name": "Marlow", "title": "Need the Stripe key", "age_days": 4.0,
+                 "detail": "invoice sync"},
+                {"display_name": "Nova", "title": "Draft could not publish", "age_days": 0.5, "detail": ""}]})
+            self.assertIn("2 waiting on you", subject)
+            self.assertIn("Marlow: Need the Stripe key", body)
+            self.assertIn("(4.0d)", body)
+            self.assertIn("Nova", body)
+
+    def test_an_empty_queue_sends_nothing(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            box = self.Outbox()
+            out = notify.notify_waiting(root, {}, transport=box)
+            self.assertFalse(out["sent"])
+            self.assertEqual(box.sent, [])
+
+    def test_it_can_be_switched_off(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp)
+            d = self._bot(root)
+            box = self.Outbox()
+            off = notify.notify_blocked(root, d, {"status": "blocked", "title": "x"},
+                                        {"notify_blocked": False}, transport=box)
+            self.assertFalse(off["sent"])
+            self.assertEqual(notify.mail_config(root, {"notify_email": False}), {})
+
+    def test_a_configured_address_wins_over_the_mailbox(self):
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._root(tmp, EMAIL_HOME_ADDRESS="home@example.com")
+            self.assertEqual(notify.mail_config(root, {})["to"], "home@example.com")
+            self.assertEqual(notify.mail_config(root, {"notify_email": "other@example.com"})["to"],
+                             "other@example.com")
+
+
+class ReviewFollowUps(unittest.TestCase):
+    """The findings from the catalog review that the first fix did not cover."""
+
+    def test_every_in_package_import_survives_being_a_package(self):
+        """A bare `import forge` anywhere reachable from register() drops all 14 tools."""
+        import subprocess
+        root = Path(__file__).resolve().parent.parent
+        bare = subprocess.run(
+            ["grep", "-rn", r"^import \(forge\|manage\|journal\|portable\|companion\|survey"
+             r"\|doctor\|notify\|waiting\|acks\|tapback\|health\|schemas\|tools\)$",
+             "--include=*.py", "."],
+            cwd=root, capture_output=True, text=True).stdout.strip()
+        self.assertEqual(bare, "", f"unprefixed in-package imports remain:\n{bare}")
+
+    def test_the_journal_tool_is_given_the_real_settings(self):
+        """Without the wrapper its settings are always {}, so notify_blocked: false never fires."""
+        source = (Path(__file__).resolve().parent.parent / "__init__.py").read_text()
+        block = source[source.index('name="agent_journal"'):]
+        block = block[:block.index("description=")]
+        self.assertIn("settings=settings()", block)
+
+    def test_the_doctor_is_given_the_real_settings(self):
+        import doctor
+        import inspect
+        self.assertIn("settings", inspect.signature(doctor.check).parameters)
+        source = (Path(__file__).resolve().parent.parent / "doctor.py").read_text()
+        self.assertIn("notify.mail_config(root, settings)", source)
+
+    def test_sharing_a_login_copies_it_instead_of_linking(self):
+        """A symlink makes the Bot's profile *be* the root's credential store; a copy is a copy."""
+        import extras.share_login as share_login
+        with tempfile.TemporaryDirectory() as t:
+            root = Path(t)
+            (root / "auth.json").write_text('{"token": "abc"}')
+            bot = root / "profiles" / "quill"
+            bot.mkdir(parents=True)
+            (bot / "config.yaml").write_text("model: {}\n")
+            out = share_login.link(root, "quill")
+            dest = bot / "auth.json"
+            self.assertTrue(dest.is_file())
+            self.assertFalse(dest.is_symlink(), "must never be a live link to another profile")
+            self.assertEqual(dest.read_text(), '{"token": "abc"}')
+            self.assertEqual(oct(dest.stat().st_mode)[-3:], "600")
+            self.assertIn("copied", out)
+            # the source is untouched by anything done to the copy
+            dest.write_text('{"token": "replaced"}')
+            self.assertEqual((root / "auth.json").read_text(), '{"token": "abc"}')
+
+    def test_an_older_symlink_is_replaced_by_a_copy(self):
+        import extras.share_login as share_login
+        with tempfile.TemporaryDirectory() as t:
+            root = Path(t)
+            (root / "auth.json").write_text('{"token": "abc"}')
+            bot = root / "profiles" / "quill"
+            bot.mkdir(parents=True)
+            (bot / "config.yaml").write_text("model: {}\n")
+            (bot / "auth.json").symlink_to(root / "auth.json")   # left by an older version
+            share_login.link(root, "quill")
+            self.assertFalse((bot / "auth.json").is_symlink())
 
 
 if __name__ == "__main__":

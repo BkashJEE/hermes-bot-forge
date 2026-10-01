@@ -14,7 +14,10 @@ import sys
 import time
 from pathlib import Path
 
-import forge
+if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
+    from . import forge
+else:
+    import forge
 
 PLUGIN_DIR = Path(__file__).resolve().parent
 OAUTH_PROVIDERS = {"openai-codex", "anthropic", "anthropic-oauth", "xai", "nous"}
@@ -90,8 +93,11 @@ def _proc_start(pid: int) -> float:
         return 0.0
 
 
-def check(root: Path | None = None) -> dict:
+def check(root: Path | None = None, settings: dict | None = None) -> dict:
+    """`settings` are the plugin's real config: without them the mail line reports on `{}` and can
+    tell the user a blocked Bot will email them when they have switched that off."""
     root = Path(root or forge.default_root())
+    settings = settings or {}
     checks, steps = [], []
 
     enabled, missing = [], []
@@ -191,6 +197,14 @@ def check(root: Path | None = None) -> dict:
             pass
         checks.append({"check": "reactions", "status": OK if not missing else WARN, "detail": detail})
 
+    import notify
+    mail = notify.mail_config(root, settings)
+    checks.append({"check": "mail", "status": OK if mail else WARN,
+                   "detail": (f"a blocked Bot will email {mail['to']} via {mail['host']}" if mail else
+                              "no email configured — a blocked Bot waits silently until you ask. "
+                              "Set EMAIL_SMTP_HOST, EMAIL_ADDRESS and EMAIL_PASSWORD in Hermes to "
+                              "have Bots tell you")})
+
     import portable
     checks.append({"check": "templates", "status": OK,
                    "detail": ", ".join(sorted(portable.bundled_templates()))})
@@ -238,7 +252,12 @@ def cli(args=None) -> int:
 
 def main():
     as_json = "--json" in sys.argv
-    result = check()
+    raw = next((a for a in sys.argv[1:] if a.startswith("{")), "")
+    try:
+        settings = json.loads(raw) if raw else {}
+    except ValueError:
+        settings = {}
+    result = check(settings=settings)
     print(json.dumps(result, indent=2) if as_json else render(result))
     sys.exit(0 if result["ok"] else 1)
 

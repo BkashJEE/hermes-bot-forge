@@ -9,7 +9,10 @@ that ships with the Bot: two hooks, no tools, so a Bot gains the reaction and no
 import shutil
 from pathlib import Path
 
-import forge
+if __package__:
+    from . import forge
+else:
+    import forge
 
 MARKS_NAME = "bot-forge-marks"
 SOURCE = Path(__file__).resolve().parent / "marks"
@@ -93,3 +96,85 @@ def bots_without_marks(root: Path) -> list:
                                "not enabled" if not is_enabled(pdir) else
                                f"version {have}, expected {marks_version()}")})
     return out
+
+
+def companion_running(plugin_dir: Path) -> bool:
+    """True when `bot-forge-marks` is installed and enabled beside this plugin.
+
+    Both register the same pair of turn hooks, and Hermes treats setting the same emoji twice on a
+    message as a tapback toggle — so with both loaded every reaction is placed and immediately
+    cleared, and the user sees nothing at all. The companion wins that tie: it ships inside every
+    Bot, including the profile that creates them, so it is the copy that is always present.
+    """
+    sibling = Path(plugin_dir).parent / MARKS_NAME
+    if not (sibling / "plugin.yaml").exists():
+        return False
+    try:
+        import yaml
+
+        data = yaml.safe_load((Path(plugin_dir).parent.parent / "config.yaml").read_text()) or {}
+    except Exception:
+        return True  # installed but the config cannot be read: never risk double-placing
+    return MARKS_NAME in ((data.get("plugins") or {}).get("enabled") or [])
+
+
+# ── adoption ─────────────────────────────────────────────────────────────────
+def reactions_setting(pdir: Path) -> bool:
+    """Hermes' own Settings → Appearance → Message Reactions, for this profile."""
+    display = forge.load_yaml(Path(pdir) / "config.yaml").get("display") or {}
+    return display.get("message_reactions") is True
+
+
+def enable_reactions_setting(pdir: Path) -> bool:
+    """Switch the setting on. Unset means off in Hermes, and a Bot born without it is silent.
+
+    This is the half that is easy to miss: the hook can be installed, enabled and running, and the
+    Bot still never reacts, because Hermes reads `message_reactions` as False when it is absent.
+    """
+    path = Path(pdir) / "config.yaml"
+    cfg = forge.load_yaml(path)
+    if not cfg or (cfg.get("display") or {}).get("message_reactions") is True:
+        return False
+    display = dict(cfg.get("display") or {})
+    display["message_reactions"] = True
+    cfg["display"] = display
+    forge.dump_yaml(path, cfg)
+    return True
+
+
+def ensure_reactions(pdir: Path) -> dict:
+    """Everything a profile needs to acknowledge a message, in one idempotent call."""
+    pdir = Path(pdir)
+    installed = install_marks(pdir)
+    if not installed.get("ok"):
+        return {"ok": False, "bot": pdir.name, "error": installed.get("error")}
+    return {"ok": True, "bot": pdir.name,
+            "hook": bool(installed.get("copied")), "switched_on": bool(installed.get("enabled")),
+            "setting": enable_reactions_setting(pdir)}
+
+
+def adopt_all(root: Path, settings: dict | None = None) -> list:
+    """Give every profile the reaction, including ones this plugin did not create.
+
+    A Bot made through Hermes' own New Agent dialog, or a profile created on the command line, has
+    no idea this plugin exists — and the user does not care which door a Bot came through; they
+    expect all of them to behave the same. This runs on plugin load, does nothing when everything
+    is already in place, and reports only what it changed.
+    """
+    if (settings or {}).get("adopt_bots") is not True:  # opt-in: never touch other profiles unasked
+        return []
+    root = Path(root)
+    profiles = root / "profiles"
+    changed = []
+    for pdir in sorted(profiles.iterdir()) if profiles.is_dir() else []:
+        if not forge.is_live_profile(pdir):
+            continue
+        if marks_ready(pdir) and reactions_setting(pdir):
+            continue
+        try:
+            result = ensure_reactions(pdir)
+        except Exception as exc:  # one broken profile must never stop the others
+            result = {"ok": False, "bot": pdir.name, "error": f"{type(exc).__name__}: {exc}"[:120]}
+        if result.get("ok") is False or any(result.get(k) for k in ("hook", "switched_on", "setting")):
+            changed.append(result)
+    return changed

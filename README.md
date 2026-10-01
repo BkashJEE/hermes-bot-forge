@@ -217,7 +217,7 @@ Every new Bot starts its reply with one emoji for the state of your request:
 | ⚠️ | blocked, or something failed |
 | ⏳ | scheduled for later |
 
-**In Hermes Desktop the same status lands on your own message as a tapback**, the moment you send it: 👀 while the Bot works, then ✅ / ✋ / ⚠️ for how it ended. The reaction is placed by a hook, not by the model — and because a Hermes hook only runs in the profile running the turn, that hook ships *inside each Bot* as a tiny companion plugin (`bot-forge-marks`: two hooks, no tools, so a Bot never gains the power to create or delete Bots). New Bots get it automatically; for a Bot made before it, ask an agent to *"turn on reactions for <name>"*. It needs *Settings → Appearance → Message Reactions* on, and switches off with `ack_tapback: false`. `check_install` reports which Bots can react and which cannot.
+**In Hermes Desktop a reaction lands on your own message as a tapback**, the moment you send it — and it fits what you asked: 🔧 for a fix, 🔎 for research, ✍️ for writing, 📊 for numbers, ⏳ for something scheduled, 📋 for a review, 🛠️ for something to build, 💬 for a question, 👀 when it can't tell. Then it becomes ✅ / ✋ / ⚠️ for how the turn ended. The reaction is placed by a hook, not by the model — and because a Hermes hook only runs in the profile running the turn, that hook ships *inside each Bot* as a tiny companion plugin (`bot-forge-marks`: two hooks, no tools, so a Bot never gains the power to create or delete Bots). New Bots get it automatically; for a Bot made before it, ask an agent to *"turn on reactions for <name>"*. It needs *Settings → Appearance → Message Reactions* on, and switches off with `ack_tapback: false`. `check_install` reports which Bots can react and which cannot.
 
 Everywhere else, the state rides on the reply: one emoji, at the very start, then the answer as normal — it is never the whole reply. Because it rides on the reply itself, it works the same in Hermes Desktop, an editor client, the CLI, a cron run or a messaging platform.
 
@@ -282,6 +282,34 @@ It scores the Bot's own SOUL.md and one-job against the directory Hermes is runn
 **It also refuses to build a Bot you already have.** If an existing Bot's job covers the new one, `create_agent` stops and names it, so a roster of twenty Bots doesn't quietly become a roster of twenty overlapping ones.
 
 Read-only and shallow — directory names, git remotes, and the head of a README / AGENTS.md / CLAUDE.md. Never your source files, never your home directory unless you point `workspace_roots` at it, and anything that looks like a credential never reaches a Bot's memory. Off with `workspace_survey: false`.
+
+### A blocked Bot tells you
+
+The waiting queue answers *when you ask*. This is the other half: when a Bot records a blocker, it emails you.
+
+```
+[Bot Forge] Marlow is blocked — Need the Stripe API key
+
+Marlow stopped and needs you.
+
+  Need the Stripe API key
+
+Invoice sync cannot run without a read-only key.
+
+Next step: add the key, then rerun
+
+Reply to Marlow in Hermes — this address does not take replies.
+```
+
+It uses the email Hermes already has (`EMAIL_SMTP_HOST` / `EMAIL_ADDRESS` / `EMAIL_PASSWORD`), so there is nothing new to configure and no new credential anywhere. Set `notify_email` to send somewhere other than your own mailbox, or `false` to switch it off.
+
+**Outbound only, on purpose.** The recipient is resolved from your config and nothing else — never from a tool call, a persona, or anything a model wrote. A Bot can write to your address and no other, so it cannot be talked into mailing a stranger and two Bots cannot reply to each other forever. Nothing here reads a mailbox. Messages are rate limited per Bot so a stuck routine can't become a mail storm, secret-scanned before they leave, and skipped in silence when mail isn't set up — a mail server being down never breaks a turn.
+
+For the whole queue on a schedule rather than one blocker at a time:
+
+```bash
+python3 ~/.hermes/plugins/bot-forge/notify.py digest
+```
 
 ### Cost and safety built in
 

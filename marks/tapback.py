@@ -19,11 +19,28 @@ Two things this has to get right, both learned the hard way:
 """
 
 import json
+import re
 
 WORKING = "👀"
 DONE = "✅"
 BLOCKED = "⚠️"
 NEEDS_YOU = "✋"
+
+# What the Bot just picked up, read from the message itself. One 👀 for everything says only "I am
+# alive"; this says "I understood what you asked" — which is the whole point of reacting before the
+# answer exists. First match wins, so the more specific asks come first, and anything unrecognised
+# falls back to 👀 rather than guessing.
+PICKUP = (
+    ("🔧", r"\b(fix|bug|broken|crash|error|failing|fails|debug|regress|not work|doesn'?t work)"),
+    ("🔎", r"\b(research|find|search|look up|look into|investigat|check (on|the|if|whether)|who is|what'?s new|dig into|digging)"),
+    ("✍️", r"\b(write|writing|draft|post|thread|tweet|blog|newsletter|caption|copy|rephrase|reword)"),
+    ("📊", r"\b(report|analys|analyz|metric|number|revenue|cost|budget|compare|forecast|how many|how much)"),
+    ("⏳", r"\b(schedule|remind|every (day|morning|week|monday)|daily|weekly|cron|tomorrow|later|at \d)"),
+    ("📋", r"\b(review|read (this|the|through)|look at|take a look|check this|feedback on|pr #?\d|diff)"),
+    ("🛠️", r"\b(build|create|make me|implement|add|set ?up|ship|deploy|refactor|migrat|install)"),
+    ("👋", r"^\s*(hi|hey|hello|yo|gm|good morning|good evening|thanks|thank you|ta|nice|great|perfect)\b"),
+    ("💬", r"(\?\s*$|^\s*(what|why|how|when|where|who|which|is|are|can|should|do|does|did)\b)"),
+)
 
 # Only these surfaces have the reaction tool (tui_gateway/server.py::_gui_surface_toolsets).
 REACTING_PLATFORMS = {"desktop"}
@@ -31,14 +48,59 @@ BLOCKED_HINTS = ("i can't", "i cannot", "unable to", "blocked", "failed", "error
 APPROVAL_HINTS = ("your approval", "before i ", "shall i", "do you want me to", "confirm first",
                   "let me know if you want")
 
+# How the turn ended, read from the reply — the answer to "and then what happened?". State comes
+# first (blocked, waiting on you), because that matters more than what kind of work it was. Every
+# emoji here is absent from PICKUP on purpose: Hermes clears a reaction when the same one is set
+# twice, so an outcome that could equal its own pickup would erase itself.
+OUTCOME = (
+    ("🚀", r"\b(shipped|deployed|merged|published|posted|released|live now|went out|sent it)\b"),
+    ("📝", r"\b(draft(ed)?|wrote|written|rewrote|here'?s the (post|thread|copy|draft)|word(ed|ing))\b"),
+    # `\d+%` must sit outside the \b-wrapped group: a trailing \b after "%" can never match,
+    # because "%" is already a non-word character, and it silently killed the whole alternative.
+    ("📈", r"\d+\s?%|\b(report|breakdown|totals?|averag|trend|grew|dropped|compared|up \d|down \d)\b"),
+    ("🗓️", r"\b(scheduled|booked|set (it )?for|every (day|morning|week)|cron|routine added)\b"),
+    ("💡", r"\b(turns out|found (that|it)|the answer|it looks like|the reason|because)\b"),
+    ("🧹", r"\b(cleaned|removed|deleted|tidied|archived|closed (it|them)|nothing left)\b"),
+)
+
+
+def _text(message) -> str:
+    """The user's words, whatever shape the host handed them in."""
+    if isinstance(message, str):
+        return message
+    if isinstance(message, dict):
+        content = message.get("content") or message.get("text") or ""
+        if isinstance(content, list):  # content blocks
+            content = " ".join(b.get("text", "") for b in content if isinstance(b, dict))
+        return content if isinstance(content, str) else ""
+    return str(getattr(message, "content", "") or "")
+
+
+def pickup_emoji(user_message) -> str:
+    """The kind of work that just arrived, from what the user actually wrote."""
+    text = _text(user_message).strip().lower()[:400]
+    if not text:
+        return WORKING
+    for emoji, pattern in PICKUP:
+        if re.search(pattern, text):
+            return emoji
+    return WORKING
+
 
 def outcome_emoji(reply: str) -> str:
-    """The state a finished turn ended in, read from what the Bot actually said."""
+    """What the turn ended in, read from what the Bot actually said.
+
+    State wins over kind: a Bot that wrote a draft but needs approval is ✋, not 📝, because the
+    user has to do something about the first and nothing about the second.
+    """
     text = (reply or "").strip().lower()[:600]
     if any(h in text for h in APPROVAL_HINTS):
         return NEEDS_YOU
     if any(h in text for h in BLOCKED_HINTS):
         return BLOCKED
+    for emoji, pattern in OUTCOME:
+        if re.search(pattern, text):
+            return emoji
     return DONE
 
 
@@ -112,9 +174,9 @@ class Tapback:
     def _on(self, platform) -> bool:
         return should_react(platform, self._setting()) and reactions_allowed()
 
-    def on_turn_start(self, platform=None, **kwargs):
+    def on_turn_start(self, platform=None, user_message=None, **kwargs):
         if self._on(platform):
-            self._react(WORKING)
+            self._react(pickup_emoji(user_message))
         return None
 
     def on_turn_end(self, platform=None, assistant_response=None, **kwargs):

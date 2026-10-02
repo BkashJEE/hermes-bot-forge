@@ -556,7 +556,10 @@ def attach(pdir: Path, result: dict) -> bool:
     block = memory_block(result)
     if not block:
         return False
-    import portable
+    if __package__:
+        from . import portable
+    else:
+        import portable
 
     if portable.scan_text(block)["verdict"] == "BLOCK":
         return False  # a path that looks like a credential never reaches memory

@@ -84,7 +84,10 @@ def _gateways(root: Path) -> dict:
 
 def _journal_status(pdir: Path) -> dict:
     """Small, read-only journal summary; entry bodies stay out of health reports."""
-    import journal
+    if __package__:
+        from . import journal
+    else:
+        import journal
 
     folder = pdir / "journal"
     files = sorted(folder.glob("????-??-??.md")) if folder.is_dir() and not folder.is_symlink() else []
@@ -99,7 +102,10 @@ def _journal_status(pdir: Path) -> dict:
 
 
 def _acks_enabled(pdir: Path) -> bool:
-    import acks
+    if __package__:
+        from . import acks
+    else:
+        import acks
     return acks.acks_enabled(pdir)
 
 
@@ -172,7 +178,10 @@ def check(s: dict) -> dict:
         bots = [d for d in bots if matches(d)]
         if not bots:
             return {"ok": False, "error": f"no Bot named '{s['name']}'"}
-    import waiting
+    if __package__:
+        from . import waiting
+    else:
+        import waiting
     gateways = _gateways(root)
     report = [check_bot(d, gateways, now) for d in bots]
     pending = waiting.waiting_on_user(root)

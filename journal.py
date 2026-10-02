@@ -108,7 +108,10 @@ def enable_journal(pdir: Path) -> dict:
     changed = JOURNAL_MARKER not in text
     backup = ""
     if changed:
-        import manage
+        if __package__:
+            from . import manage
+        else:
+            import manage
 
         backup = manage._backup(pdir, "SOUL.md")
         text = _drop_orphan_policy(text)
@@ -220,7 +223,10 @@ def read_entries(pdir: Path, spec: dict) -> dict:
 
 
 def _target(root: Path, spec: dict) -> Path:
-    import manage
+    if __package__:
+        from . import manage
+    else:
+        import manage
 
     name = str(spec.get("name") or spec.get("launch_profile") or "").strip()
     if not name or name == "default":
@@ -240,7 +246,10 @@ def operate(spec: dict) -> dict:
             # The queue is a pull; this is the push. A mail failure must never affect the entry
             # that was already written, so it is reported alongside, never raised.
             try:
-                import notify
+                if __package__:
+                    from . import notify
+                else:
+                    import notify
 
                 result["notified"] = notify.notify_blocked(root, pdir, spec, spec.get("settings") or {})
             except Exception as exc:

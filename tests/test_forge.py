@@ -1877,15 +1877,63 @@ class ReviewFollowUps(unittest.TestCase):
     """The findings from the catalog review that the first fix did not cover."""
 
     def test_every_in_package_import_survives_being_a_package(self):
-        """A bare `import forge` anywhere reachable from register() drops all 14 tools."""
+        """A bare in-package import drops all 14 tools when Hermes loads this as a package.
+
+        Both forms matter and the first audit only caught one: a module-level `import forge`, and a
+        deferred `import doctor` inside a function. The deferred one is harmless in a module that
+        only ever runs as a script, and fatal in one that runs in-process — which is why the rule
+        here is every occurrence, not every reachable occurrence.
+        """
+        import re
+        root = Path(__file__).resolve().parent.parent
+        modules = ("forge", "manage", "journal", "portable", "companion", "survey", "doctor",
+                   "notify", "waiting", "acks", "tapback", "health", "schemas", "tools", "team")
+        bare = re.compile(r"^(\s*)import (" + "|".join(modules) + r")$")
+        offenders = []
+        for path in sorted(root.glob("*.py")) + sorted((root / "extras").glob("*.py")):
+            lines = path.read_text().splitlines()
+            for i, line in enumerate(lines):
+                if bare.match(line) and (i == 0 or lines[i - 1].strip() != "else:"):
+                    offenders.append(f"{path.name}:{i + 1}: {line.strip()}")
+        self.assertEqual(offenders, [], "unprefixed in-package imports remain:\n"
+                                        + "\n".join(offenders))
+
+    def test_the_plugin_works_when_loaded_from_anywhere(self):
+        """Hermes loads the plugin as a package from its own working directory, not the plugin's.
+
+        Running the probe from inside the repo passes even when it should not, because the current
+        directory is on sys.path and every bare import resolves. This runs it from elsewhere.
+        """
         import subprocess
         root = Path(__file__).resolve().parent.parent
-        bare = subprocess.run(
-            ["grep", "-rn", r"^import \(forge\|manage\|journal\|portable\|companion\|survey"
-             r"\|doctor\|notify\|waiting\|acks\|tapback\|health\|schemas\|tools\)$",
-             "--include=*.py", "."],
-            cwd=root, capture_output=True, text=True).stdout.strip()
-        self.assertEqual(bare, "", f"unprefixed in-package imports remain:\n{bare}")
+        probe = (
+            "import importlib.util, sys\n"
+            f"p = {str(root)!r}\n"
+            "spec = importlib.util.spec_from_file_location('bf', p + '/__init__.py',"
+            " submodule_search_locations=[p])\n"
+            "m = importlib.util.module_from_spec(spec); sys.modules['bf'] = m\n"
+            "spec.loader.exec_module(m)\n"
+            "class Ctx:\n"
+            "    def __init__(self): self.cli = {}; self.tools = []\n"
+            "    def register_tool(self, name=None, **k): self.tools.append(name)\n"
+            "    def register_hook(self, *a, **k): pass\n"
+            "    def register_skill(self, *a, **k): pass\n"
+            "    def register_cli_command(self, name=None, handler_fn=None, **k):"
+            " self.cli[name] = handler_fn\n"
+            "    def get_config(self, key, default=None): return default\n"
+            "    def dispatch_tool(self, *a, **k): return '{}'\n"
+            "c = Ctx(); m.register(c)\n"
+            "assert len(c.tools) == 14, c.tools\n"
+            "import io, contextlib\n"
+            "class A: json = True\n"
+            "with contextlib.redirect_stdout(io.StringIO()): c.cli['bot-forge-doctor'](A())\n"
+            "print('ok')\n"
+        )
+        with tempfile.TemporaryDirectory() as elsewhere:
+            out = subprocess.run([sys.executable, "-c", probe], cwd=elsewhere,
+                                 capture_output=True, text=True, timeout=300)
+        self.assertEqual(out.returncode, 0, out.stderr[-900:])
+        self.assertIn("ok", out.stdout)
 
     def test_the_journal_tool_is_given_the_real_settings(self):
         """Without the wrapper its settings are always {}, so notify_blocked: false never fires."""

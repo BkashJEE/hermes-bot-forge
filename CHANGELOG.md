@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.2] - 2026-10-01
+
+### Fixed
+- **`hermes bot-forge-doctor` failed with `ModuleNotFoundError: doctor`.** v0.15.1 converted every module-level in-package import, but not the deferred ones inside functions — and the doctor CLI command is registered in-process, so its `import doctor` resolved only when the gateway happened to be running from the plugin's own directory. Twenty-eight deferred imports across nine modules are now package-aware. Reported as the same class of problem in #21 by @samideckers-cmd, five days before the catalog review found the module-level case.
+- The import test now checks both forms. The first version grepped for `^import x` only, so a deferred `import doctor` passed it, and a probe run from inside the repo passed as well because the current directory is on `sys.path`. It now scans every occurrence and loads the plugin as a package from a different working directory, the way Hermes does.
+
 ## [0.15.1] - 2026-10-01
 
 ### Fixed

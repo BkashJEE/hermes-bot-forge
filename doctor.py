@@ -170,7 +170,10 @@ def check(root: Path | None = None, settings: dict | None = None) -> dict:
                  "none installed — Bots share this machine's shell (install Docker for per-Bot isolation)"
         checks.append({"check": "sandboxes", "status": WARN, "detail": detail})
 
-    import acks
+    if __package__:
+        from . import acks
+    else:
+        import acks
     bots = [p for _n, p in _profiles(root)[1:]]
     acking = [p.name for p in bots if acks.acks_enabled(p)]
     if bots:
@@ -180,7 +183,10 @@ def check(root: Path | None = None, settings: dict | None = None) -> dict:
                                  + (f" — {', '.join(silent)} predate the feature: ask an agent to "
                                     f"\"turn on acknowledgements for <name>\"" if silent else "")})
 
-    import companion
+    if __package__:
+        from . import companion
+    else:
+        import companion
     missing = companion.bots_without_marks(root)
     forged = [p for p in bots if (forge.load_yaml(p / "profile.yaml").get("ui_meta") or {}).get("hermes-bots")]
     if forged:
@@ -190,14 +196,20 @@ def check(root: Path | None = None, settings: dict | None = None) -> dict:
             detail += " — " + ", ".join(f"{m['display_name']} ({m['reason']})" for m in missing[:4]) + \
                       "; ask an agent to \"turn on reactions for <name>\""
         try:
-            import tapback
+            if __package__:
+                from . import tapback
+            else:
+                import tapback
             if tapback.reactions_setting() is False:
                 detail += ". Message Reactions is off in Settings → Appearance, so none of them will show"
         except Exception:
             pass
         checks.append({"check": "reactions", "status": OK if not missing else WARN, "detail": detail})
 
-    import notify
+    if __package__:
+        from . import notify
+    else:
+        import notify
     mail = notify.mail_config(root, settings)
     checks.append({"check": "mail", "status": OK if mail else WARN,
                    "detail": (f"a blocked Bot will email {mail['to']} via {mail['host']}" if mail else
@@ -205,7 +217,10 @@ def check(root: Path | None = None, settings: dict | None = None) -> dict:
                               "Set EMAIL_SMTP_HOST, EMAIL_ADDRESS and EMAIL_PASSWORD in Hermes to "
                               "have Bots tell you")})
 
-    import portable
+    if __package__:
+        from . import portable
+    else:
+        import portable
     checks.append({"check": "templates", "status": OK,
                    "detail": ", ".join(sorted(portable.bundled_templates()))})
 

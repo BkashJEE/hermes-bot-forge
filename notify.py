@@ -179,7 +179,10 @@ def send(root: Path, subject: str, body: str, settings: dict | None = None, bot:
     if not _rate_ok(root, bot, now):
         return {"sent": False, "reason": f"rate limit: {MAX_PER_HOUR} messages an hour for {bot}"}
 
-    import portable
+    if __package__:
+        from . import portable
+    else:
+        import portable
 
     body = body[:MAX_BODY]
     scan = portable.scan_text(f"{subject}\n{body}")
@@ -220,7 +223,10 @@ def notify_blocked(root: Path, pdir: Path, spec: dict, settings: dict | None = N
 def notify_waiting(root: Path, settings: dict | None = None, transport=None,
                    now: float | None = None) -> dict:
     """The digest: everything still waiting, in one message. Nothing waiting, nothing sent."""
-    import waiting
+    if __package__:
+        from . import waiting
+    else:
+        import waiting
 
     queue = waiting.waiting_on_user(Path(root))
     subject, body = compose_digest(queue)

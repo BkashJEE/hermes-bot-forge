@@ -398,6 +398,14 @@ hermes plugins validate .
 hermes plugins doctor .
 ```
 
+## Thanks
+
+People outside this repo who found things in it, and what they found:
+
+- **[@samideckers-cmd](https://github.com/samideckers-cmd)** — that `ask_agent` forwarded the caller's whole environment to a different Bot, so a gateway holding the main profile's `.env` handed those secrets to a Bot with its own credentials (#22, shipped in v0.15.2). Also reported, in #21 on 26 September, that bare in-package imports break when Hermes loads the plugin as a package — five days before the same bug shipped in v0.15.0 and dropped all 14 tools. Both fixes reached `main` through rebuilt branches, so git records them under the maintainer's name; the work is theirs.
+- **[@teknium1](https://github.com/teknium1)** — the catalog review that caught the v0.15.0 load failure before it was listed, an SMTP path that could send a password in cleartext, mail switches that silently did nothing, adoption writing into every profile on load, and a credential store shared between profiles by symlink (#28 and the fixes in #29).
+- **[@sealca](https://github.com/sealca)** — reuse-first provisioning and multiplex readiness (#24).
+
 ## License
 
 MIT © Bikash Joshi

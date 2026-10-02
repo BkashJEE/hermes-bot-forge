@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.3] - 2026-10-02
+
+### Changed
+- Credited the people outside this repo who found what is fixed in 0.15.1 and 0.15.2. Both of @samideckers-cmd's fixes reached `main` through rebuilt branches rather than their own commits, so git attributes their work to the maintainer; README now records what each person found.
+
 ## [0.15.2] - 2026-10-01
 
 ### Fixed

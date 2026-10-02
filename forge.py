@@ -243,6 +243,24 @@ You are **{s['display_name']}**, the {s['role']} of this Hermes deployment (prof
 SANDBOXES = ("local", "docker", "singularity", "apptainer")
 
 
+def gateway_state(returncode: int, output: str) -> str:
+    """What actually happened when we asked for a gateway — not what the exit code implies.
+
+    Current Hermes serves every profile from one multiplexed host gateway, so `gateway install`
+    exits 0 while installing nothing and telling you `--force` would be needed. Reporting that as
+    "started" put a background service in the result that does not exist. A Bot served by the host
+    gateway is working; it just is not working the way we claimed.
+    """
+    text = (output or "").lower()
+    if returncode != 0:
+        return "not started"
+    if "--force" in text and ("multiplex" in text or "already serves" in text or "host gateway" in text):
+        return "served by the host gateway"
+    if "already" in text and "serves" in text:
+        return "served by the host gateway"
+    return "started"
+
+
 def sandbox_error(sandbox: str) -> str:
     """Refuse a sandbox this machine cannot actually run, before a half-usable Bot exists."""
     sandbox = (sandbox or "local").strip().lower()
@@ -651,7 +669,9 @@ def forge(s: dict) -> dict:
         gateway = "skipped"
         if settings["install_gateway"] and os.name != "nt":
             gw = run(root, "-p", profile_id, "gateway", "install", "--start-now", "--start-on-login", check=False, timeout=120)
-            gateway = "started" if gw.returncode == 0 else f"not started: {clean(gw.stderr or gw.stdout)[-200:]}"
+            gateway = gateway_state(gw.returncode, f"{gw.stdout}\n{gw.stderr}")
+            if gateway == "not started":
+                gateway = f"not started: {clean(gw.stderr or gw.stdout)[-200:]}"
 
         connect_next = []
         if settings.get("suggest_connectors", True):

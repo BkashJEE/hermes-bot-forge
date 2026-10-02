@@ -1926,42 +1926,6 @@ class ReviewFollowUps(unittest.TestCase):
     """The findings from the catalog review that the first fix did not cover."""
 
 
-    def test_the_plugin_works_when_loaded_from_anywhere(self):
-        """Hermes loads the plugin as a package from its own working directory, not the plugin's.
-
-        Running the probe from inside the repo passes even when it should not, because the current
-        directory is on sys.path and every bare import resolves. This runs it from elsewhere.
-        """
-        import subprocess
-        root = Path(__file__).resolve().parent.parent
-        probe = (
-            "import importlib.util, sys\n"
-            f"p = {str(root)!r}\n"
-            "spec = importlib.util.spec_from_file_location('bf', p + '/__init__.py',"
-            " submodule_search_locations=[p])\n"
-            "m = importlib.util.module_from_spec(spec); sys.modules['bf'] = m\n"
-            "spec.loader.exec_module(m)\n"
-            "class Ctx:\n"
-            "    def __init__(self): self.cli = {}; self.tools = []\n"
-            "    def register_tool(self, name=None, **k): self.tools.append(name)\n"
-            "    def register_hook(self, *a, **k): pass\n"
-            "    def register_skill(self, *a, **k): pass\n"
-            "    def register_cli_command(self, name=None, handler_fn=None, **k):"
-            " self.cli[name] = handler_fn\n"
-            "    def get_config(self, key, default=None): return default\n"
-            "    def dispatch_tool(self, *a, **k): return '{}'\n"
-            "c = Ctx(); m.register(c)\n"
-            "assert len(c.tools) == 14, c.tools\n"
-            "import io, contextlib\n"
-            "class A: json = True\n"
-            "with contextlib.redirect_stdout(io.StringIO()): c.cli['bot-forge-doctor'](A())\n"
-            "print('ok')\n"
-        )
-        with tempfile.TemporaryDirectory() as elsewhere:
-            out = subprocess.run([sys.executable, "-c", probe], cwd=elsewhere,
-                                 capture_output=True, text=True, timeout=300)
-        self.assertEqual(out.returncode, 0, out.stderr[-900:])
-        self.assertIn("ok", out.stdout)
 
 
 

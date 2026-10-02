@@ -148,6 +148,17 @@ plugins:
 | `backup_before_delete` | `true` | Export the Bot to a `.tar.gz` before deleting it, so it can be restored. If the backup fails, the delete is refused. |
 | `allow_secrets` | `false` | Let `share_agent` write / `import_agent` accept a template the secret scanner marked BLOCK. Operator-only; the model cannot pass it as an argument. |
 | `suggest_connectors` | `true` | After building a Bot, suggest matching servers from Hermes' MCP catalog. Suggestion only — connecting an account always needs you. |
+| `inherit_plugins` | `[]` | Plugins from your main profile to copy into every new Bot, by name, or `["all"]` for every plugin enabled there. Off by default — see *Plugins in a Bot*. |
+
+### Plugins in a Bot
+
+A new Bot is a clone of your main profile's config, and that config lists the plugins you have enabled — but Hermes keeps plugin directories per profile and `profile create --clone-from` does not copy them, so a plugin you run on your main profile is *enabled but inert* in every Bot: named in its `config.yaml`, never loaded. Nothing breaks, so nothing said so. That is the right default — a Bot should get only what it was asked for — and now it is a choice:
+
+- `inherit_plugins: ["my-style-plugin"]` in the settings above carries those plugins into every new Bot; `["all"]` carries every plugin enabled on your main profile.
+- `create_agent(..., inherit_plugins: [...])` does it for one Bot, and `update_agent(name, inherit_plugins: [...])` for a Bot you already have.
+- `check_agents` flags a Bot whose config names a plugin that is not installed in it.
+
+A copied plugin is enabled in the Bot's config and gets its own `plugin-data`. Bot Forge itself is never copied into a Bot (a Bot must not be able to create or delete Bots), the reaction companion is installed on its own path, and no `.env`, key or credential file travels with a plugin — a plugin that needs a secret needs you to set it in that Bot, once.
 
 ### Optional: share one login across Bots
 

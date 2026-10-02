@@ -58,6 +58,11 @@ CREATE_AGENT = {
                 "and memory as hard checkpoints.")},
             "reports_to": {"type": "string", "description": (
                 "profile name of the Bot it escalates scope and priority calls to (its chief of staff), e.g. 'ceo'")},
+            "inherit_plugins": {"type": "array", "items": {"type": "string"}, "description": (
+                "plugins installed on the user's main profile to copy into this Bot, by name (e.g. a persona or "
+                "style plugin the user wants every Bot to have), or ['all'] for every plugin enabled there. Off "
+                "by default: a Bot gets only the plugins it was asked for. Bot Forge itself is never copied, and "
+                "no credentials travel with a plugin. Only pass it when the user asked for a plugin in the Bot.")},
             "routines": {
                 "type": "array",
                 "description": "optional recurring jobs, only when the job is naturally recurring",
@@ -134,6 +139,10 @@ UPDATE_AGENT = {
             "ack_tapback": {"type": "boolean", "description": (
                 "true installs the reaction hook inside this Bot so it can tapback the user's own message in the "
                 "desktop app; needed once for a Bot created before that shipped")},
+            "inherit_plugins": {"type": "array", "items": {"type": "string"}, "description": (
+                "copy these plugins from the user's main profile into this Bot and enable them (['all'] for every "
+                "one enabled there) — the fix when check_agents flags plugins as enabled but not installed. "
+                "Bot Forge itself and credentials are never copied.")},
             "model": {"type": "object", "description": "model block {default, provider, base_url} — only when asked"},
             "add_routines": {"type": "array", "items": {
                 "type": "object",
@@ -320,8 +329,9 @@ CHECK_AGENTS = {
         "Health check for the user's Bots — read-only. Reports each Bot's model, gateway, routines with estimated "
         "runs per day, days since last used, and flags: routines that run too often (every run costs a model "
         "call), paused or never-run routines, unused Bots, a SOUL.md missing the Bot's own name or approval "
-        "checkpoints. It also returns `waiting_on_you`: everything a Bot got blocked on and wrote in its "
-        "journal that nobody has answered yet — report those FIRST, oldest ones by name, because the user "
+        "checkpoints, plugins enabled in its config that are not installed in it (enabled but inert — fix with "
+        "update_agent's inherit_plugins). It also returns `waiting_on_you`: everything a Bot got blocked on and "
+        "wrote in its journal that nobody has answered yet — report those FIRST, oldest ones by name, because the user "
         "cannot see them without asking. Use when the user asks 'how are my bots doing' or 'what needs me', "
         "during a weekly review, or before adding more routines. Suggest fixes; don't apply them without asking."
     ),

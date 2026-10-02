@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.15.4
+version: 0.16.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -94,6 +94,9 @@ In the **desktop app** a reaction also lands on the user's own message as a tapb
 The result's `workspace` block is what you report: `fits` (the places it belongs, most relevant first), `covered_by` (Bots already working in that territory), `skills_here` (already installed and worth giving it), `next_steps`. Give the user the top fit and at most two next steps — not the whole list.
 
 **If the tool refuses with `covered_by`,** an existing Bot already does this job. Do not retry blindly. Tell the user which Bot holds it and offer the two real choices: a narrower job for the new Bot, or `update_agent` on the existing one. Only pass `allow_overlap: true` after they say they want both.
+
+## Plugins in a Bot
+A new Bot's config lists the same plugins as the user's main profile, but the plugin directories are not cloned, so those plugins never load in it. That is on purpose: a Bot gets only what it was asked for. When the user wants a plugin in the Bot — "every Bot should have my style plugin", "give Nova the bookmarks plugin" — pass `inherit_plugins: ["<name>"]` to `create_agent` (or `["all"]` for everything enabled on the main profile), or `update_agent(name, inherit_plugins: [...])` for a Bot that already exists. Bot Forge itself is never copied into a Bot and no credential file travels with a plugin; a plugin that needs a key still needs the user to set it in that Bot. `check_agents` flags a Bot whose config names a plugin that is not installed in it ("enabled but not installed"); the fix is the same `update_agent` call, or leaving it alone if the user never wanted that plugin there.
 
 ## Sandboxes
 Any Bot you give `terminal` or `code_execution` should get `sandbox: "docker"` so its shell runs in a container instead of on the user's machine — say so in your reply. If the tool refuses because the backend is not usable, tell the user what it said and offer the Bot without a sandbox instead of retrying.

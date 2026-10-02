@@ -1922,6 +1922,28 @@ class OutboundMail(unittest.TestCase):
                              "other@example.com")
 
 
+class GatewayReporting(unittest.TestCase):
+    """What create_agent claims about the gateway has to be what happened."""
+
+    def test_the_multiplexer_is_not_reported_as_a_started_service(self):
+        """Real output from `hermes -p <bot> gateway install` on a multiplexed host: exit 0,
+        nothing installed. Calling that "started" put a service in the result that did not exist."""
+        real = ("A host gateway already serves this profile.\n"
+                "  (HERMES_HOME outside profiles/) needs --force:  hermes -p ruthcfo gateway "
+                "install --force\n\n  Temporary compatibility path while multiplexing gaps are "
+                "closed: set gateway.standalone: true")
+        self.assertEqual(forge.gateway_state(0, real), "served by the host gateway")
+
+    def test_a_real_install_still_reads_as_started(self):
+        self.assertEqual(
+            forge.gateway_state(0, "Installed hermes-gateway-quill.service and started it"),
+            "started")
+
+    def test_a_failure_is_never_dressed_up(self):
+        self.assertEqual(forge.gateway_state(1, "permission denied"), "not started")
+        self.assertEqual(forge.gateway_state(2, ""), "not started")
+
+
 class ReviewFollowUps(unittest.TestCase):
     """The findings from the catalog review that the first fix did not cover."""
 

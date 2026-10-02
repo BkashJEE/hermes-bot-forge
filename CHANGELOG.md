@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.15.4] - 2026-10-02
+
+### Fixed
+- **`create_agent` claimed it had started a background gateway when it had not.** Current Hermes serves every profile from one multiplexed host gateway, so `hermes -p <bot> gateway install` exits 0 while installing nothing and saying `--force` would be needed. The result mapped exit 0 to "started", putting a service in the report that does not exist. It now says `served by the host gateway` when that is what happened, keeps `started` for a real install, and never dresses up a failure. The underlying point — that a successful creation should not claim more than it did — is from #24 by @sealca.
+
 ## [0.15.3] - 2026-10-02
 
 ### Changed

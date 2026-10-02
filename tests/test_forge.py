@@ -1,11 +1,14 @@
 """Unit tests for the pure parts of bot-forge. Run: python -m unittest discover -s tests"""
 
 import json
+import os
 import sqlite3
+import subprocess
 import sys
 import tempfile
 import time
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,6 +52,45 @@ def make_root(tmp: Path, profiles=(), titles=None, root_display=None):
         if titles and name in titles:
             (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": titles[name]}}}))
     return root
+
+
+class AskAgentEnvironment(unittest.TestCase):
+    def test_profile_root_and_secrets_are_not_inherited(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(Path(tmp), profiles=("kairo",))
+            with mock.patch.object(tools, "hermes_root", return_value=root), \
+                 mock.patch.dict(os.environ, {"HOME": "/different-user",
+                                              "HERMES_HOME": "/caller/profiles/other",
+                                              "PRIVATE_TOKEN": "do-not-inherit"}), \
+                 mock.patch.object(tools.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "done", "")) as run:
+                result = json.loads(tools.ask_agent({"name": "kairo", "message": "Review only"}))
+            self.assertTrue(result["ok"])
+            args, kwargs = run.call_args
+            self.assertEqual(args[0][:3], ["hermes", "-p", "kairo"])
+            self.assertEqual(kwargs["env"]["HERMES_HOME"], str(root))
+            self.assertNotIn("PRIVATE_TOKEN", kwargs["env"])
+            self.assertEqual(kwargs["env"]["HOME"], "/different-user")
+
+    def test_the_bot_can_still_reach_the_network_and_its_vault(self):
+        """An allowlist that is too narrow fails silently: the Bot simply cannot reach the model
+        behind a proxy, or cannot find keys kept in 1Password or Bitwarden."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(Path(tmp), profiles=("kairo",))
+            carried = {"HTTPS_PROXY": "http://proxy.corp:3128", "NO_PROXY": "localhost",
+                       "NODE_EXTRA_CA_CERTS": "/etc/ssl/corp.pem",
+                       "XDG_CONFIG_HOME": "/home/u/.config"}
+            with mock.patch.object(tools, "hermes_root", return_value=root), \
+                 mock.patch.dict(os.environ, {**carried, "SSH_AUTH_SOCK": "/run/agent.sock",
+                                              "OPENAI_API_KEY": "sk-do-not-inherit"}), \
+                 mock.patch.object(tools.subprocess, "run",
+                                   return_value=subprocess.CompletedProcess([], 0, "done", "")) as run:
+                tools.ask_agent({"name": "kairo", "message": "Review only"})
+            env = run.call_args.kwargs["env"]
+            for key, value in carried.items():
+                self.assertEqual(env.get(key), value, key)
+            # reaching the network is not the same as carrying authority
+            self.assertNotIn("SSH_AUTH_SOCK", env)
+            self.assertNotIn("OPENAI_API_KEY", env)
 
 
 class Names(unittest.TestCase):

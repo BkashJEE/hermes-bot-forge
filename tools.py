@@ -222,7 +222,31 @@ def ask_agent(args: dict, **kwargs) -> str:
         return json.dumps({"ok": False, "error": "need a valid profile name and a message"})
     if name != "default" and not (root / "profiles" / name / "config.yaml").exists():
         return json.dumps({"ok": False, "error": f"no Bot named '{name}' (see list_agents)"})
-    env = {k: v for k, v in os.environ.items() if k != "HERMES_HOME"}
+    # The caller may have loaded its entire .env (or a routed profile's secrets).
+    # Never forward that process environment to another Bot. The CLI loads the
+    # target profile's own .env and auth.json after -p resolves its home.
+    safe_keys = (
+        # process essentials
+        "PATH", "HOME", "LANG", "LC_ALL", "TZ", "TERM", "TMPDIR",
+        "SYSTEMROOT", "WINDIR", "PATHEXT", "VIRTUAL_ENV",
+        # how this machine reaches the network and trusts certificates. Dropping these does not
+        # fail loudly — the Bot simply cannot reach the model behind a corporate proxy, or rejects
+        # a TLS-inspecting one. Read by utils.py, agent/proxy_bypass.py, agent/process_bootstrap.py
+        # and the model-provider plugins.
+        "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE",
+        "NODE_EXTRA_CA_CERTS",
+        "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY",
+        "http_proxy", "https_proxy", "no_proxy", "all_proxy",
+        # where this machine keeps config and data. Hermes resolves 1Password and Bitwarden secret
+        # sources through these (agent/secret_sources/, agent/vault_backends/), so without them a
+        # Bot whose keys live in a vault cannot find them.
+        "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME",
+    )
+    # Deliberately absent: SSH_AUTH_SOCK, GPG_AGENT_INFO and anything else that hands the child a
+    # live handle to the caller's own credentials. This list is for reaching the network and
+    # finding config, never for carrying authority.
+    env = {k: os.environ[k] for k in safe_keys if k in os.environ}
+    env["HERMES_HOME"] = str(root)  # -p resolves under this root, independent of caller HOME
     try:
         p = subprocess.run(["hermes", "-p", name, "chat", "-Q", "--max-turns", "30", "-q", message],
                            capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=900, env=env)

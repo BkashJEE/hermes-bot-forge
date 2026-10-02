@@ -144,9 +144,9 @@ def check(root: Path | None = None, settings: dict | None = None) -> dict:
     for name, pdir in enabled or _profiles(root)[:1]:
         model = (forge.load_yaml(pdir / "config.yaml").get("model") or {})
         provider, model_id = model.get("provider", ""), model.get("default", "")
-        settings = (((forge.load_yaml(pdir / "config.yaml").get("plugins") or {}).get("entries") or {})
+        profile_settings = (((forge.load_yaml(pdir / "config.yaml").get("plugins") or {}).get("entries") or {})
                     .get("bot-forge") or {}).get("settings") or {}
-        has_fallback = bool(settings.get("fallback_model") or settings.get("probe_local_models"))
+        has_fallback = bool(profile_settings.get("fallback_model") or profile_settings.get("probe_local_models"))
         if provider in OAUTH_PROVIDERS and not has_fallback:
             checks.append({"check": f"model ({name})", "status": WARN,
                            "detail": f"{model_id} signs in per profile, so a new Bot needs `hermes -p <bot> auth add "
@@ -211,8 +211,10 @@ def check(root: Path | None = None, settings: dict | None = None) -> dict:
     else:
         import notify
     mail = notify.mail_config(root, settings)
-    checks.append({"check": "mail", "status": OK if mail else WARN,
-                   "detail": (f"a blocked Bot will email {mail['to']} via {mail['host']}" if mail else
+    disabled = (settings or {}).get("notify_blocked") is False or (settings or {}).get("notify_email") is False
+    checks.append({"check": "mail", "status": OK if mail and not disabled else WARN,
+                   "detail": ("blocked-Bot email notifications are disabled in plugin settings" if disabled else
+                              f"a blocked Bot will email {mail['to']} via {mail['host']}" if mail else
                               "no email configured — a blocked Bot waits silently until you ask. "
                               "Set EMAIL_SMTP_HOST, EMAIL_ADDRESS and EMAIL_PASSWORD in Hermes to "
                               "have Bots tell you")})
@@ -256,8 +258,8 @@ def render(result: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def cli(args=None) -> int:
-    result = check()
+def cli(args=None, settings: dict | None = None) -> int:
+    result = check(settings=settings)
     if getattr(args, "json", False):
         print(json.dumps(result, indent=2))
     else:
@@ -267,11 +269,7 @@ def cli(args=None) -> int:
 
 def main():
     as_json = "--json" in sys.argv
-    raw = next((a for a in sys.argv[1:] if a.startswith("{")), "")
-    try:
-        settings = json.loads(raw) if raw else {}
-    except ValueError:
-        settings = {}
+    settings = json.loads(sys.stdin.read()) if "--settings-stdin" in sys.argv else None
     result = check(settings=settings)
     print(json.dumps(result, indent=2) if as_json else render(result))
     sys.exit(0 if result["ok"] else 1)

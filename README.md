@@ -157,7 +157,7 @@ The plugin itself never touches credentials. If you want OAuth models to work in
 python extras/share_login.py <bot-name>
 ```
 
-It points that Bot's `auth.json`/`auth.lock` at the root profile's. Hermes deliberately gives every profile its own login, so understand the trade-off first: a logout in any linked Bot affects all of them, every linked Bot can use every provider login in your root profile, and a Hermes update may undo the links. POSIX only. Undo with `rm <profile>/auth.json <profile>/auth.lock`.
+It copies the root profile's `auth.json` into an independent file with permissions `0600`. It never copies or links `auth.lock`, and removes a destination lock symlink left by the older helper. Existing destination credential links are replaced without writing through them; linked profile directories are refused. Each selected Bot receives every provider login in the copied file. OAuth refresh tokens can still compete at the provider, so signing each Bot in independently is recommended. POSIX only. Remove the copied `<profile>/auth.json` to discard that Bot's copy.
 
 ---
 

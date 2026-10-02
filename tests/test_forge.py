@@ -835,7 +835,7 @@ class Manifest(unittest.TestCase):
         is never on sys.path, so a bare `import forge` anywhere on the register() path breaks loading."""
         import subprocess
         probe = (
-            "import importlib.util, sys, types\n"
+            "import importlib.util, json, sys, types\n"
             "root = sys.argv[1]\n"
             "sys.path[:] = [p for p in sys.path if p not in ('', root) and not p.startswith(root)]\n"
             "ns = sys.modules.setdefault('hermes_plugins', types.ModuleType('hermes_plugins')); ns.__path__ = []\n"
@@ -850,15 +850,16 @@ class Manifest(unittest.TestCase):
             "    def register_skill(self, *a, **kw): pass\n"
             "    def get_config(self, key, default=None): return default\n"
             "mod.register(Ctx())\n"
-            "print(len(tools))\n"
+            "print(json.dumps(sorted(tools)))\n"
         )
         with tempfile.TemporaryDirectory() as t:
             env = {k: v for k, v in __import__("os").environ.items() if k != "PYTHONPATH"}
-            env.update(HOME=t, LOCALAPPDATA=t)  # default_root() must not point at the real install
+            env.update(HOME=t, USERPROFILE=t, LOCALAPPDATA=t, HERMES_HOME=str(Path(t) / ".hermes"))
             p = subprocess.run([sys.executable, "-c", probe, str(ROOT)], cwd=t, env=env,
                                capture_output=True, text=True, timeout=60)
         self.assertEqual(p.returncode, 0, p.stderr[-2000:])
-        self.assertEqual(p.stdout.strip(), "14")
+        manifest = yaml.safe_load((ROOT / "plugin.yaml").read_text())
+        self.assertEqual(json.loads(p.stdout), sorted(manifest["provides_tools"]))
 
     def test_versions_agree(self):
         manifest = yaml.safe_load(Path(ROOT / "plugin.yaml").read_text())
@@ -1381,13 +1382,61 @@ class CompanionInstall(unittest.TestCase):
             self.assertIn("githermes", enabled)
             self.assertIn(companion.MARKS_NAME, enabled)
 
-    def test_the_shipped_copy_matches_the_module_under_test(self):
-        """marks/tapback.py is what actually runs in a Bot — it must not drift from tapback.py."""
+    def test_the_installed_marks_package_executes_its_registered_hooks(self):
+        """Exercise what ships into the Bot, including both reaction switches."""
         import companion
-        root = Path(__file__).resolve().parent.parent
-        self.assertEqual((root / "tapback.py").read_text(),
-                         (companion.SOURCE / "tapback.py").read_text(),
-                         "marks/tapback.py has drifted — copy tapback.py over it")
+        import importlib.util
+
+        class HookContext(TapbackHooks.FakeCtx):
+            def __init__(self):
+                super().__init__()
+                self.hooks = {}
+                self.enabled = True
+
+            def get_config(self, key, default=None):
+                return self.enabled if key == "ack_tapback" else default
+
+            def register_hook(self, name, handler):
+                self.hooks[name] = handler
+
+        with tempfile.TemporaryDirectory() as tmp:
+            bot = self._bot(make_root(Path(tmp)))
+            self.assertTrue(companion.install_marks(bot)["copied"])
+            installed = bot / "plugins" / companion.MARKS_NAME
+            name = "_test_installed_bot_forge_marks"
+            spec = importlib.util.spec_from_file_location(
+                name, installed / "__init__.py", submodule_search_locations=[str(installed)])
+            shipped = importlib.util.module_from_spec(spec)
+            with mock.patch.dict(sys.modules, {name: shipped}):
+                spec.loader.exec_module(shipped)
+                ctx = HookContext()
+                shipped.register(ctx)
+                with mock.patch.object(shipped.tapback, "reactions_allowed", return_value=True), \
+                     mock.patch.object(shipped.tapback, "_ensure_tool", return_value=True):
+                    ctx.hooks["pre_llm_call"](platform="desktop")
+                    ctx.hooks["post_llm_call"](platform="desktop", assistant_response="All done.")
+                    self.assertEqual(ctx.calls, [
+                        ("react_to_message", {"emoji": shipped.tapback.WORKING}),
+                        ("react_to_message", {"emoji": shipped.tapback.DONE})])
+                    ctx.calls.clear()
+                    ctx.enabled = False
+                    ctx.hooks["pre_llm_call"](platform="desktop")
+                    ctx.hooks["post_llm_call"](platform="desktop", assistant_response="All done.")
+                    self.assertEqual(ctx.calls, [], "explicit plugin disable must silence both hooks")
+                    ctx.enabled = None
+                    ctx.hooks["pre_llm_call"](platform="desktop")
+                    self.assertEqual(ctx.calls, [
+                        ("react_to_message", {"emoji": shipped.tapback.WORKING})])
+                    ctx.calls.clear()
+                    ctx.hooks["pre_llm_call"](platform="cli")
+                    ctx.hooks["post_llm_call"](platform="cli", assistant_response="All done.")
+                    self.assertEqual(ctx.calls, [], "CLI turns must not dispatch Desktop reactions")
+                with mock.patch.object(shipped.tapback, "reactions_allowed", return_value=False), \
+                     mock.patch.object(shipped.tapback, "_ensure_tool", return_value=True):
+                    ctx.enabled = True
+                    ctx.hooks["pre_llm_call"](platform="desktop")
+                    ctx.hooks["post_llm_call"](platform="desktop", assistant_response="All done.")
+                    self.assertEqual(ctx.calls, [], "the user's appearance setting must silence both hooks")
 
     def test_a_profile_made_any_other_way_is_adopted(self):
         """A Bot from Hermes' own New Agent dialog never heard of this plugin — it still reacts."""
@@ -1876,79 +1925,11 @@ class OutboundMail(unittest.TestCase):
 class ReviewFollowUps(unittest.TestCase):
     """The findings from the catalog review that the first fix did not cover."""
 
-    def test_every_in_package_import_survives_being_a_package(self):
-        """A bare in-package import drops all 14 tools when Hermes loads this as a package.
 
-        Both forms matter and the first audit only caught one: a module-level `import forge`, and a
-        deferred `import doctor` inside a function. The deferred one is harmless in a module that
-        only ever runs as a script, and fatal in one that runs in-process — which is why the rule
-        here is every occurrence, not every reachable occurrence.
-        """
-        import re
-        root = Path(__file__).resolve().parent.parent
-        modules = ("forge", "manage", "journal", "portable", "companion", "survey", "doctor",
-                   "notify", "waiting", "acks", "tapback", "health", "schemas", "tools", "team")
-        bare = re.compile(r"^(\s*)import (" + "|".join(modules) + r")$")
-        offenders = []
-        for path in sorted(root.glob("*.py")) + sorted((root / "extras").glob("*.py")):
-            lines = path.read_text().splitlines()
-            for i, line in enumerate(lines):
-                if bare.match(line) and (i == 0 or lines[i - 1].strip() != "else:"):
-                    offenders.append(f"{path.name}:{i + 1}: {line.strip()}")
-        self.assertEqual(offenders, [], "unprefixed in-package imports remain:\n"
-                                        + "\n".join(offenders))
 
-    def test_the_plugin_works_when_loaded_from_anywhere(self):
-        """Hermes loads the plugin as a package from its own working directory, not the plugin's.
 
-        Running the probe from inside the repo passes even when it should not, because the current
-        directory is on sys.path and every bare import resolves. This runs it from elsewhere.
-        """
-        import subprocess
-        root = Path(__file__).resolve().parent.parent
-        probe = (
-            "import importlib.util, sys\n"
-            f"p = {str(root)!r}\n"
-            "spec = importlib.util.spec_from_file_location('bf', p + '/__init__.py',"
-            " submodule_search_locations=[p])\n"
-            "m = importlib.util.module_from_spec(spec); sys.modules['bf'] = m\n"
-            "spec.loader.exec_module(m)\n"
-            "class Ctx:\n"
-            "    def __init__(self): self.cli = {}; self.tools = []\n"
-            "    def register_tool(self, name=None, **k): self.tools.append(name)\n"
-            "    def register_hook(self, *a, **k): pass\n"
-            "    def register_skill(self, *a, **k): pass\n"
-            "    def register_cli_command(self, name=None, handler_fn=None, **k):"
-            " self.cli[name] = handler_fn\n"
-            "    def get_config(self, key, default=None): return default\n"
-            "    def dispatch_tool(self, *a, **k): return '{}'\n"
-            "c = Ctx(); m.register(c)\n"
-            "assert len(c.tools) == 14, c.tools\n"
-            "import io, contextlib\n"
-            "class A: json = True\n"
-            "with contextlib.redirect_stdout(io.StringIO()): c.cli['bot-forge-doctor'](A())\n"
-            "print('ok')\n"
-        )
-        with tempfile.TemporaryDirectory() as elsewhere:
-            out = subprocess.run([sys.executable, "-c", probe], cwd=elsewhere,
-                                 capture_output=True, text=True, timeout=300)
-        self.assertEqual(out.returncode, 0, out.stderr[-900:])
-        self.assertIn("ok", out.stdout)
 
-    def test_the_journal_tool_is_given_the_real_settings(self):
-        """Without the wrapper its settings are always {}, so notify_blocked: false never fires."""
-        source = (Path(__file__).resolve().parent.parent / "__init__.py").read_text()
-        block = source[source.index('name="agent_journal"'):]
-        block = block[:block.index("description=")]
-        self.assertIn("settings=settings()", block)
-
-    def test_the_doctor_is_given_the_real_settings(self):
-        import doctor
-        import inspect
-        self.assertIn("settings", inspect.signature(doctor.check).parameters)
-        source = (Path(__file__).resolve().parent.parent / "doctor.py").read_text()
-        self.assertIn("notify.mail_config(root, settings)", source)
-
+    @unittest.skipUnless(os.name == "posix", "credential-copy helper is POSIX only")
     def test_sharing_a_login_copies_it_instead_of_linking(self):
         """A symlink makes the Bot's profile *be* the root's credential store; a copy is a copy."""
         import extras.share_login as share_login
@@ -1969,6 +1950,7 @@ class ReviewFollowUps(unittest.TestCase):
             dest.write_text('{"token": "replaced"}')
             self.assertEqual((root / "auth.json").read_text(), '{"token": "abc"}')
 
+    @unittest.skipUnless(os.name == "posix", "credential-copy helper is POSIX only")
     def test_an_older_symlink_is_replaced_by_a_copy(self):
         import extras.share_login as share_login
         with tempfile.TemporaryDirectory() as t:

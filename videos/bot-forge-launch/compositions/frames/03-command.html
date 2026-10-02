@@ -1,0 +1,215 @@
+<template>
+  <style>
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:block}
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-700-normal.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:block}
+
+    /* ── Frame root (styled via #root — never a class on the composition root) ── */
+    #root {
+      position: relative;
+      width: 1080px;
+      height: 1080px;
+      overflow: hidden;
+      container-type: size;
+    }
+
+    /* Track 0 — the full-bleed dark ground (cream = #070B13 in this inverted preset) */
+    .f03cmd-ground {
+      position: absolute;
+      inset: 0;
+      background: #070b13;
+    }
+
+    /* Track 1 — the captured catalog page, inherited in motion, settling + dimming */
+    .f03cmd-plate {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    .f03cmd-plate-img {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 2160px;
+      height: 1215px;
+      margin-left: -1080px;
+      margin-top: -607px;
+      display: block;
+    }
+
+    /* Track 2 — the near-black scrim the plate sits behind */
+    .f03cmd-scrim {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(
+          to bottom,
+          rgba(7, 11, 19, 0) 0%,
+          rgba(7, 11, 19, 0) 42%,
+          rgba(7, 11, 19, 0.46) 100%
+        ),
+        radial-gradient(
+          ellipse 76% 58% at 50% 50%,
+          rgba(7, 11, 19, 0.5) 0%,
+          rgba(7, 11, 19, 0.78) 56%,
+          rgba(7, 11, 19, 0.95) 100%
+        );
+    }
+
+    /* Track 3 — the command chip */
+    .f03cmd-stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .f03cmd-chip {
+      display: inline-flex;
+      align-items: center;
+      max-width: 1000px;
+      padding: 36px 48px;
+      background: #151718;
+      border: 1px solid rgba(34, 211, 238, 0.26);
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.55), 0 8px 28px rgba(0, 0, 0, 0.35);
+    }
+    .f03cmd-line {
+      display: flex;
+      align-items: baseline;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 42px;
+      font-weight: 400;
+      line-height: 1.2;
+      letter-spacing: 0.01em;
+      white-space: nowrap;
+      color: #f1f5f9;
+    }
+    .f03cmd-text {
+      display: inline-block;
+      clip-path: inset(0px 100% 0px 0px);
+    }
+    .f03cmd-caret {
+      display: inline-block;
+      width: 0.56em;
+      height: 0.98em;
+      margin-left: 0.14em;
+      margin-bottom: -0.1em;
+      background: #22d3ee;
+      opacity: 0;
+    }
+  </style>
+
+  <div
+    id="root"
+    data-composition-id="03-command"
+    data-start="0"
+    data-duration="4"
+    data-width="1080"
+    data-height="1080"
+  >
+    <div
+      class="clip f03cmd-ground"
+      data-start="0"
+      data-duration="4"
+      data-track-index="0"
+    ></div>
+
+    <div
+      id="03-command-plate"
+      class="clip f03cmd-plate"
+      data-start="0"
+      data-duration="4"
+      data-track-index="1"
+    >
+      <img
+        class="f03cmd-plate-img"
+        src="assets/catalog-page.png"
+        alt=""
+      />
+    </div>
+
+    <div
+      id="03-command-scrim"
+      class="clip f03cmd-scrim"
+      data-start="0"
+      data-duration="4"
+      data-track-index="2"
+    ></div>
+
+    <div
+      class="clip f03cmd-stage"
+      data-start="0"
+      data-duration="4"
+      data-track-index="3"
+    >
+      <div id="03-command-chip" class="f03cmd-chip">
+        <div class="f03cmd-line">
+          <span id="03-command-text" class="f03cmd-text">hermes plugins install bot-forge</span
+          ><span id="03-command-caret" class="f03cmd-caret"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      window.__timelines = window.__timelines || {};
+
+      var plate = document.getElementById("03-command-plate");
+      var scrim = document.getElementById("03-command-scrim");
+      var chip = document.getElementById("03-command-chip");
+      var text = document.getElementById("03-command-text");
+      var caret = document.getElementById("03-command-caret");
+
+      var tl = gsap.timeline({ paused: true });
+
+      /* Scene 1 — 0.0–0.5s · the inherited plate arrives at scale 1.0 / opacity 1,
+         still travelling upward at the handoff rate, then decelerates to rest and
+         dims to 18% as the near-black scrim fades up behind the chip. */
+      tl.fromTo(
+        plate,
+        { y: 56, scale: 1, opacity: 1 },
+        { y: 0, scale: 1, duration: 0.55, ease: "power2.out" },
+        0
+      );
+      tl.fromTo(plate, { opacity: 1 }, { opacity: 0.18, duration: 0.5, ease: "power2.out" }, 0);
+      tl.fromTo(scrim, { opacity: 0 }, { opacity: 1, duration: 0.5, ease: "power1.inOut" }, 0);
+
+      /* Pre-state for the wipe + caret so every backward seek is clean. */
+      tl.set(text, { clipPath: "inset(0px 100% 0px 0px)" }, 0);
+      tl.set(caret, { opacity: 0 }, 0);
+
+      /* Scene 2 — 0.3–1.0s · the mono chip scales up from 0.96, centred. */
+      tl.fromTo(
+        chip,
+        { opacity: 0, scale: 0.96 },
+        { opacity: 1, scale: 1, duration: 0.45, ease: "power2.out" },
+        0.3
+      );
+
+      /* Scene 3 — 0.5–1.2s · the command reveals in one smooth left-to-right
+         clip-path wipe (mask reveal, not a character stutter). */
+      tl.fromTo(
+        text,
+        { clipPath: "inset(0px 100% 0px 0px)" },
+        { clipPath: "inset(0px 0% 0px 0px)", duration: 0.7, ease: "power2.out" },
+        0.5
+      );
+
+      /* Scene 4 — 1.2–1.5s · the caret blinks exactly ONCE, then stays off. */
+      tl.fromTo(caret, { opacity: 0 }, { opacity: 1, duration: 0.07, ease: "none" }, 1.2);
+      tl.to(caret, { opacity: 0, duration: 0.07, ease: "none" }, 1.4);
+
+      /* Scene 5 — 1.5s → end · dead still. Legible, screenshot-able hold.
+         (Caret stays off; this also pads the timeline to the frame's full
+         clip duration so the hold spans the whole window.) */
+      tl.set(caret, { opacity: 0 }, 4);
+
+      window.__timelines["03-command"] = tl;
+      tl.seek(0);
+    })();
+  </script>
+</template>

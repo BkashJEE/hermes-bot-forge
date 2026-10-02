@@ -1,0 +1,192 @@
+<template>
+  <style>
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:block}
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-700-normal.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:block}
+
+    /* ---------------------------------------------------------------
+       04-close — fonts
+       No .woff2 files ship with this project (assets/fonts/ and
+       capture/assets/fonts/ are both empty, fonts-manifest.json is
+       empty), so these faces are declared from local() sources only —
+       no fabricated file paths, no network @import. Every rule below
+       still carries an explicit generic fallback stack so the render
+       degrades to a sane sans / mono rather than an unknown family.
+       --------------------------------------------------------------- */
+    /* Frame root — styled by #root (never by a class on the
+       data-composition-id element). */
+    #root {
+      position: relative;
+      width: 1080px;
+      height: 1080px;
+      container-type: size;
+      overflow: hidden;
+    }
+
+    /* The dark ground is its own full-duration clip layer, never a
+       background on #root. */
+    .f04-close-ground {
+      position: absolute;
+      inset: 0;
+      background: #070b13;
+    }
+
+    /* The lockup stage. Content is centred, then lifted ~40px so the
+       signature sits in the optical centre of the content area and
+       clears the bottom keep-out band entirely. */
+    .f04-close-stage {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding-bottom: 7.4cqw;
+    }
+
+    /* The mark. Laid out at its FINAL size / position; the travel from
+       frame 01's lower-left park is a pure GSAP transform (x / y /
+       scale), so no CSS transform ever sits on this element. */
+    .f04-close-mark {
+      display: block;
+      width: 20.4cqw; /* 220px @1080 */
+      height: 20.4cqw;
+      object-fit: contain;
+    }
+
+    .f04-close-wordmark {
+      margin-top: 5.2cqw; /* 56px */
+      font-family: "Inter", ui-sans-serif, system-ui, sans-serif;
+      font-weight: 400;
+      font-size: 9.9cqw; /* display-cover — 2 words, top of the ramp */
+      line-height: 0.98;
+      letter-spacing: -0.028em;
+      color: #f1f5f9;
+      white-space: nowrap;
+    }
+
+    /* The single voltage moment in this frame — one cyan element, never two. */
+    .f04-close-rule {
+      margin-top: 4.1cqw; /* 44px */
+      width: 18.5cqw; /* 200px */
+      height: 2px;
+      background: #22d3ee;
+      transform-origin: 50% 50%;
+    }
+
+    .f04-close-address {
+      margin-top: 3.7cqw; /* 40px */
+      font-family: "JetBrains Mono", ui-monospace, "DejaVu Sans Mono", monospace;
+      font-weight: 500;
+      font-size: 2.8cqw; /* 30px @1080 — above the legibility floor */
+      line-height: 1.2;
+      letter-spacing: 0.02em;
+      color: rgba(241, 245, 249, 0.72);
+      white-space: nowrap;
+    }
+  </style>
+
+  <div
+    id="root"
+    data-composition-id="04-close"
+    data-duration="3"
+    data-width="1080"
+    data-height="1080"
+  >
+    <div
+      class="f04-close-ground clip"
+      data-start="0"
+      data-duration="3"
+      data-track-index="0"
+    ></div>
+
+    <div class="f04-close-stage clip" data-start="0" data-duration="3" data-track-index="1">
+      <img class="f04-close-mark" src="assets/icon.png" alt="" />
+      <div class="f04-close-wordmark">Bot Forge</div>
+      <div class="f04-close-rule"></div>
+      <div class="f04-close-address">github.com/BkashJEE/hermes-bot-forge</div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      window.__timelines = window.__timelines || {};
+
+      var scope = document.querySelector('[data-composition-id="04-close"]') || document;
+      var q = function (sel) {
+        return scope.querySelector(sel);
+      };
+
+      var mark = q(".f04-close-mark");
+      var wordmark = q(".f04-close-wordmark");
+      var rule = q(".f04-close-rule");
+      var address = q(".f04-close-address");
+
+      /* ---- Handoff from frame 01 -------------------------------------
+         Frame 01 parks this same mark small in the lower-left corner:
+         96px box at left 64 / top 764, i.e. centre (112, 812).
+         Its resting place here is a 220px box centred at (540, 358).
+         The travel is expressed as offsets from the resting state so the
+         object reads as the SAME mark returning, not a new one.
+      ------------------------------------------------------------------ */
+      var START_X = -428; /* 112 - 540 */
+      var START_Y = 454; /*  812 - 358 */
+      var START_SCALE = 96 / 220; /* 0.43636 */
+
+      var tl = gsap.timeline({ paused: true });
+
+      /* Scene 1 (0.0–0.8s) — the mark travels corner → centre and grows
+         96px → 220px. Hero is on screen at t=0; calm, mechanical, no
+         overshoot. This is the frame's one scale-for-emphasis. */
+      tl.fromTo(
+        mark,
+        { x: START_X, y: START_Y, scale: START_SCALE, opacity: 1 },
+        { x: 0, y: 0, scale: 1, opacity: 1, duration: 0.8, ease: "power2.inOut" },
+        0
+      );
+
+      /* Scene 2 (0.8–1.4s) — "Bot Forge" rises and fades up beneath it. */
+      tl.fromTo(
+        wordmark,
+        { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" },
+        0.8
+      );
+
+      /* Near-imperceptible life in the held mark — ends at 2.5s so the
+         last half second is dead still. immediateRender:false keeps this
+         second tween on `mark` from stomping the travel tween's from-state
+         at build time (seek-safe in both directions). */
+      tl.fromTo(
+        mark,
+        { scale: 1 },
+        { scale: 1.012, duration: 1.5, ease: "none", immediateRender: false },
+        1.0
+      );
+
+      /* Scene 3 (1.3–1.7s) — the 2px cyan rule draws outward from centre
+         to 200px wide (centre-outward expansion, both edges at once). */
+      tl.fromTo(
+        rule,
+        { scaleX: 0, opacity: 1 },
+        { scaleX: 1, duration: 0.4, ease: "power2.out" },
+        1.3
+      );
+
+      /* Scene 4 (1.6–2.2s) — the address fades up in mono under the rule. */
+      tl.fromTo(
+        address,
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" },
+        1.6
+      );
+
+      /* Scene 5 (2.2–3.0s) — the lockup holds. Nothing moves after 2.5s. */
+
+      window.__timelines["04-close"] = tl;
+    })();
+  </script>
+</template>

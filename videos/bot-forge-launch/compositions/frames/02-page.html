@@ -1,0 +1,254 @@
+<template>
+  <style>
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:block}
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-700-normal.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:block}
+
+    /* ── 02-page — the real catalog page travelling upward ──────────────────
+       Plate: assets/catalog-full-page.png (1920×12344 full-page capture).
+       Scale factor k = 1/1.05 = 0.952381 maps the page's readable column
+       (plate x 393 → 1527, width 1134) exactly onto the 1080 square:
+         img width  = 1920 / 1.05 = 1828.571px
+         img left   = -393 / 1.05 = -374.286px
+         img height = 12344 / 1.05 = 11756.190px
+       The plate is never rebuilt — this is the capture itself.            */
+
+    #root {
+      position: relative;
+      width: 1080px;
+      height: 1080px;
+      overflow: hidden;
+      container-type: size;
+    }
+
+    /* full-duration dark ground — the paper this frame is printed on
+       (frame.md inverted tokens: cream = #070B13). Never on #root.      */
+    [id="02-page-ground"] {
+      position: absolute;
+      inset: 0;
+      background-color: #070b13;
+    }
+
+    /* the travelling page stage */
+    /* The captured page is a light document; the video is dark. Rather than
+       recolour someone else's page (which would misrepresent it), it is inset
+       as a card on the dark ground — the screenshot reads as a screenshot, and
+       the white no longer blows out the frame. Scaling the stage keeps every
+       internal measurement, including the ring's tracking, intact. */
+    [id="02-page-stage"] {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+      transform: scale(0.88) translateY(-18px);
+      transform-origin: 50% 50%;
+      border-radius: 20px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.55), 0 24px 64px rgba(0, 0, 0, 0.45);
+      filter: brightness(0.95);
+    }
+
+    /* hairline edge, drawn over the card so the crop reads as deliberate */
+    [id="02-page-stage"]::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      border: 1px solid rgba(241, 245, 249, 0.16);
+      border-radius: 20px;
+      pointer-events: none;
+    }
+
+    [id="02-page-world"] {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1080px;
+      height: 14586.67px;
+      will-change: transform;
+    }
+
+    [id="02-page-plate"] {
+      position: absolute;
+      top: 0;
+      left: -374.286px;
+      width: 1828.571px;
+      height: 14586.67px;
+      display: block;
+      image-rendering: auto;
+    }
+
+    /* the one voltage moment: a cyan hairline ring that draws itself around
+       the `Community · v0.5.0 · ★ 29` row and rides with the plate.
+       Row measured in plate space: x 628.7–848.7, y 547–573.            */
+    [id="02-page-ring"] {
+      position: absolute;
+      left: 205.238px;
+      top: 501.714px;
+      width: 248px;
+      height: 63.238px;
+      overflow: visible;
+    }
+
+    [id="02-page-ring-rect"] {
+      fill: none;
+      stroke: #22d3ee;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-dasharray: 100;
+      stroke-dashoffset: 100;
+    }
+
+    /* edge fade — the page dissolves into the ground at top and bottom so the
+       traversal never hard-cuts a row (blueprint: content fade at frame edges) */
+    [id="02-page-edge-top"] {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 1080px;
+      height: 56px;
+      background-image: linear-gradient(to bottom, rgba(7, 11, 19, 0.82), rgba(7, 11, 19, 0));
+      pointer-events: none;
+    }
+
+    [id="02-page-edge-bottom"] {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 1080px;
+      height: 132px;
+      background-image: linear-gradient(to top, rgba(7, 11, 19, 0.92), rgba(7, 11, 19, 0));
+      pointer-events: none;
+    }
+
+    /* mono address plate — lower band, well above the 0.83 keep-out (≤896px).
+       No font-face ships with this project, so the generic monospace family
+       is named rather than an unavailable file-backed face.               */
+    [id="02-page-addr"] {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 812px;
+      margin-left: auto;
+      margin-right: auto;
+      width: fit-content;
+      max-width: 1000px;
+      padding: 16px 30px;
+      border: 1px solid rgba(241, 245, 249, 0.2);
+      border-radius: 9999px;
+      background-color: #070b13;
+      box-shadow:
+        0 1px 3px rgba(0, 0, 0, 0.55),
+        0 8px 28px rgba(0, 0, 0, 0.35);
+      opacity: 0;
+    }
+
+    [id="02-page-addr-text"] {
+      display: block;
+      font-family:"JetBrains Mono", monospace;
+      font-size: 22px;
+      font-weight: 500;
+      line-height: 1;
+      letter-spacing: 0.02em;
+      color: #f1f5f9;
+      white-space: nowrap;
+    }
+  </style>
+
+  <div
+    id="root"
+    data-composition-id="02-page"
+    data-start="0"
+    data-duration="6.5"
+    data-width="1080"
+    data-height="1080"
+  >
+    <div
+      id="02-page-ground"
+      class="clip"
+      data-start="0"
+      data-duration="6.5"
+      data-track-index="0"
+    ></div>
+
+    <div id="02-page-stage" class="clip" data-start="0" data-duration="6.5" data-track-index="1">
+      <div id="02-page-world" data-layout-allow-overflow>
+        <img
+          id="02-page-plate"
+          src="assets/catalog-full-page.png"
+          alt="The bot-forge plugin listing on the Hermes Agent plugin catalog"
+        />
+        <svg id="02-page-ring" viewBox="0 0 248 63.238" xmlns="http://www.w3.org/2000/svg">
+          <rect
+            id="02-page-ring-rect"
+            x="4"
+            y="4"
+            width="240"
+            height="55.238"
+            rx="9"
+            pathLength="100"
+          />
+        </svg>
+      </div>
+      <div id="02-page-edge-top"></div>
+      <div id="02-page-edge-bottom"></div>
+    </div>
+
+    <div id="02-page-addr" class="clip" data-start="0" data-duration="6.5" data-track-index="2">
+      <span id="02-page-addr-text">hermes-agent.nousresearch.com/docs/plugins/bot-forge</span>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      /* Scene 1 (0.0–0.5s) — the plate fades up from black, already parked at
+         the top of the page. No scale move: the plate stays at scale 1.0 for
+         the whole frame (handoff_out). */
+      tl.fromTo(
+        '[id="02-page-stage"]',
+        { opacity: 0 },
+        { opacity: 1, duration: 0.5, ease: "none" },
+        0
+      );
+
+      /* Scene 2 (0.0–6.0s) — the constant-rate upward travel. Linear, never
+         eased, never stopped: −105px/s for the full 6s → −630px at the cut,
+         so frame 03 inherits the plate still moving at the same rate. */
+      tl.fromTo(
+        '[id="02-page-world"]',
+        { y: 0 },
+        { y: -630, duration: 6, ease: "none" },
+        0
+      );
+
+      /* Scene 3 (0.4–1.0s) — the mono address rises into the lower band and
+         holds at opacity 1 to the end. */
+      tl.fromTo(
+        '[id="02-page-addr"]',
+        { opacity: 0, y: 12 },
+        { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" },
+        0.4
+      );
+
+      /* Scene 4 (1.6–2.0s) — the cyan hairline ring draws itself around the
+         `Community · v0.5.0 · ★ 29` row as that row crosses the upper third
+         (ring centre y ≈ 344px at t=1.8s). The ring lives inside the world
+         layer, so it tracks the row while the page keeps moving. */
+      tl.fromTo(
+        '[id="02-page-ring-rect"]',
+        { strokeDashoffset: 100, opacity: 1 },
+        { strokeDashoffset: 0, duration: 0.4, ease: "power2.inOut" },
+        1.6
+      );
+
+      /* Scene 5 (2.0–3.2s) — the ring holds at full opacity while the eye
+         lands. Scene 6 (3.2–3.6s) — it releases; nothing replaces it. */
+      tl.to('[id="02-page-ring-rect"]', { opacity: 0, duration: 0.4, ease: "power1.in" }, 3.2);
+
+      window.__timelines["02-page"] = tl;
+      tl.seek(0);
+    })();
+  </script>
+</template>

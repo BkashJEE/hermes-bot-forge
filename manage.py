@@ -140,6 +140,17 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
         if marks.get("ok") and (marks.get("copied") or marks.get("enabled")) and "reactions" not in changed:
             changed.append("reactions")
 
+    # plugins from the root profile (the fix for a check_agents "enabled but not installed" flag)
+    plugins = None
+    if s.get("inherit_plugins") not in (None, False, [], ""):
+        import companion
+        carried = companion.inherit_plugins(root, pdir, s["inherit_plugins"])
+        if carried["failed"]:
+            raise RuntimeError("could not inherit plugins: " + "; ".join(f["error"] for f in carried["failed"]))
+        plugins = {"inherited": [i["name"] for i in carried["installed"]], "skipped": carried["skipped"]}
+        if plugins["inherited"]:
+            changed.append("plugins")
+
     # memory
     if s.get("memory"):
         mem = pdir / "memories" / "MEMORY.md"
@@ -194,9 +205,9 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
     if not changed:
         return {"ok": False, "name": name, "error": "nothing to update — pass soul_md/soul_append, display_name, "
                                                     "description, memory, add_toolsets, skill_categories, model, "
-                                                    "avatar_kind, ack_reactions, ack_tapback or routines"}
+                                                    "avatar_kind, ack_reactions, ack_tapback, inherit_plugins or routines"}
     return {"ok": True, "name": name, "display_name": _bot_meta(pdir).get("title") or name, "changed": changed,
-            "routines_added": routines_added, "routines_removed": routines_removed,
+            "routines_added": routines_added, "routines_removed": routines_removed, "plugins": plugins,
             "backups": {k: v for k, v in backups.items() if v},
             "note": "changes apply to the Bot's next turn; its open Bot Chat keeps its history"}
 

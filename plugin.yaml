@@ -1,5 +1,5 @@
 name: bot-forge
-version: 0.15.4
+version: 0.16.0
 description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
 author: Bikash Joshi
 license: MIT
@@ -97,6 +97,18 @@ config_schema:
       the same. When true, runs on plugin load, installs the hook into each profile and switches
       Hermes' own Message Reactions setting on there, and does nothing when everything is already
       in place. Off by default: Bot Forge never edits profiles it did not create unless asked.
+  inherit_plugins:
+    type: list
+    default: []
+    description: >-
+      Plugins from the root profile to copy into every new Bot and enable there, by name; ["all"] for
+      every plugin enabled on the root profile. Off by default: `hermes profile create --clone-from`
+      copies the root's plugins.enabled list but not the plugin directories, so without this a root
+      plugin is enabled-but-inert in a Bot (check_agents flags those). Bot Forge itself is never
+      copied, and no .env or credential file travels with a plugin. create_agent's own
+      inherit_plugins argument overrides this per Bot. Under ["all"], a plugin that declares
+      requires_env is skipped and must be named: those are the ones carrying reach into an account,
+      and a Bot should not acquire that silently.
   notify_email:
     type: str
     default: ""

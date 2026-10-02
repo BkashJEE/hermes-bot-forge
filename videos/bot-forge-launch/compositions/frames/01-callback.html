@@ -1,0 +1,195 @@
+<template>
+  <style>
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:block}
+@font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-700-normal.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+@font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:block}
+
+    /* Frame 01 — The callback.
+       Palette is the INVERTED code-editorial preset from frame.md:
+         cream = #070B13 (the near-black paper), ink = #F1F5F9 (the type),
+         coral/voltage = cyan #22D3EE (scarce: the answer line only). */
+    #root {
+      position: absolute;
+      inset: 0;
+      width: 1080px;
+      height: 1080px;
+      container-type: size;
+      overflow: hidden;
+      color: #f1f5f9;
+      font-family: Inter, sans-serif;
+      font-weight: 400;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* full-bleed ground — its own clip layer, never a background on #root */
+    #f01-callback-ground {
+      position: absolute;
+      inset: 0;
+      background-color: #070b13;
+      background-image: radial-gradient(118% 88% at 17% 21%, #0c1420 0%, #070b13 63%);
+    }
+
+    #f01-callback-stage {
+      position: absolute;
+      inset: 0;
+    }
+
+    /* — the type block, left-aligned inside the safe pad — */
+    #f01-callback-kicker {
+      position: absolute;
+      left: 6cqw;
+      top: 25cqw;
+      font-family: "JetBrains Mono", monospace;
+      font-weight: 500;
+      font-size: 2cqw;
+      line-height: 1;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: rgba(34, 211, 238, 0.78);  /* 0.55 failed WCAG AA on the near-black ground */
+      opacity: 0;
+    }
+
+    #f01-callback-headline {
+      position: absolute;
+      left: 6cqw;
+      top: 30cqw;
+      width: 88cqw;
+      font-family: Inter, sans-serif;
+      font-weight: 400;
+      font-size: 6.2cqw;
+      line-height: 1.06;
+      letter-spacing: -0.018em;
+      color: #f1f5f9;
+      opacity: 0;
+    }
+
+    /* section-rule — the only separator: 1px ink@20%, 320px wide */
+    #f01-callback-rule {
+      position: absolute;
+      left: 6cqw;
+      top: 40.5cqw;
+      width: 29.6cqw;
+      height: 1px;
+      background: rgba(241, 245, 249, 0.2);
+      transform-origin: left center;
+    }
+
+    /* the frame's one voltage moment */
+    #f01-callback-answer {
+      position: absolute;
+      left: 6cqw;
+      top: 44.2cqw;
+      width: 82cqw;
+      font-family: Inter, sans-serif;
+      font-weight: 500;
+      font-size: 2.5cqw;
+      line-height: 1.35;
+      letter-spacing: -0.006em;
+      color: #22d3ee;
+      opacity: 0;
+    }
+
+    /* the product mark — present, small, bottom-left, never the subject */
+    #f01-callback-mark {
+      position: absolute;
+      left: 6cqw;
+      top: 69.6cqw;
+      width: 8.9cqw;
+      height: 8.9cqw;
+      display: block;
+      opacity: 0;
+    }
+  </style>
+
+  <div
+    id="root"
+    data-composition-id="01-callback"
+    data-width="1080"
+    data-height="1080" data-duration="4"
+  >
+    <div
+      id="f01-callback-ground"
+      class="clip"
+      data-start="0"
+      data-duration="4"
+      data-track-index="0"
+    ></div>
+
+    <div
+      id="f01-callback-stage"
+      class="clip"
+      data-start="0"
+      data-duration="4"
+      data-track-index="1"
+    >
+      <div id="f01-callback-kicker">Sep 17</div>
+      <div id="f01-callback-headline">I built a bot that builds bots.</div>
+      <div id="f01-callback-rule"></div>
+      <div id="f01-callback-answer">It&rsquo;s in the catalog now.</div>
+      <img id="f01-callback-mark" src="assets/icon.png" alt="" />
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      var tl = gsap.timeline({ paused: true, defaults: { ease: "power2.out" } });
+
+      /* hold the full 3.5s window (no exit — the cut does the work) */
+      tl.to({}, { duration: 3.5 }, 0);
+
+      /* Scene 1 (0.0–0.6s) — the dated kicker fades up at the top of the type block */
+      tl.fromTo(
+        "#f01-callback-kicker",
+        { opacity: 0, y: 10 },
+        { opacity: 1, y: 0, duration: 0.52 },
+        0.04
+      );
+
+      /* Scene 2 (0.3–1.4s) — the claim rises 24px and fades in.
+         Opacity resolves faster than the rise so the hero reads by t = 0.5s. */
+      tl.fromTo(
+        "#f01-callback-headline",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.58 },
+        0.3
+      );
+      tl.fromTo(
+        "#f01-callback-headline",
+        { y: 24 },
+        { y: 0, duration: 1.1, ease: "power3.out" },
+        0.3
+      );
+
+      /* the mark settles in from 0.8s and then holds still to the last frame */
+      tl.fromTo(
+        "#f01-callback-mark",
+        { opacity: 0, scale: 0.94 },
+        { opacity: 0.9, scale: 1, duration: 0.7 },
+        0.8
+      );
+
+      /* Scene 3 (1.4–1.6s) — the hairline draws left to right under the claim */
+      tl.fromTo(
+        "#f01-callback-rule",
+        { scaleX: 0 },
+        { scaleX: 1, duration: 0.22 },
+        1.4
+      );
+
+      /* Scene 4 (1.6–2.6s) — the answer lands in cyan beneath the rule */
+      tl.fromTo(
+        "#f01-callback-answer",
+        { opacity: 0, y: 14 },
+        { opacity: 1, y: 0, duration: 0.95 },
+        1.62
+      );
+
+      /* Scene 5 (2.6–3.5s) — allocated stillness: everything holds, nothing exits. */
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines["01-callback"] = tl;
+    })();
+  </script>
+</template>

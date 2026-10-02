@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      @font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+      @font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:block}
+      @font-face{font-family:"Inter";src:url("assets/fonts/inter-latin-700-normal.woff2") format("woff2");font-weight:700;font-style:normal;font-display:block}
+      @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-400-normal.woff2") format("woff2");font-weight:400;font-style:normal;font-display:block}
+      @font-face{font-family:"JetBrains Mono";src:url("assets/fonts/jetbrains-mono-latin-500-normal.woff2") format("woff2");font-weight:500;font-style:normal;font-display:block}
+
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1080px; overflow: hidden; background: #000; }
+
+      #root {
+        position: relative; width: 1080px; height: 1080px; overflow: hidden;
+        font-family: "Inter", sans-serif;
+      }
+      .layer { position: absolute; inset: 0; }
+
+      /* the ground is its own clip layer, never a background on #root */
+      #ground { background: radial-gradient(120% 90% at 50% 18%, #121a2b 0%, #070B13 62%); }
+
+      #kicker {
+        position: absolute; top: 132px; left: 0; width: 100%; text-align: center;
+        font-family: "JetBrains Mono", monospace; font-size: 25px; font-weight: 500;
+        letter-spacing: 0.17em; text-transform: uppercase; color: #38BDF8;
+      }
+
+      /* the message, as the person sent it */
+      #bubble-wrap { position: absolute; top: 236px; right: 96px; }
+      #bubble {
+        max-width: 620px; padding: 34px 40px; border-radius: 26px 26px 8px 26px;
+        background: linear-gradient(135deg, #3B4B8F 0%, #2C3C74 100%);
+        color: #EEF2FF; font-size: 37px; line-height: 1.32; font-weight: 400;
+        box-shadow: 0 2px 4px rgba(0,0,0,.5), 0 22px 60px rgba(0,0,0,.45);
+      }
+      /* the tapback, where Hermes puts it: on the message that was sent */
+      #tap {
+        position: absolute; left: -26px; bottom: -30px;
+        display: flex; align-items: center; justify-content: center;
+        width: 92px; height: 92px; border-radius: 50%;
+        background: #101827; border: 2px solid #2B3853; font-size: 46px; line-height: 1;
+        /* colour glyphs ignore this, but the contrast checker reads the declared colour */
+        color: #F1F5F9;
+        box-shadow: 0 10px 30px rgba(0,0,0,.55);
+      }
+
+      #status {
+        position: absolute; top: 470px; left: 0; width: 100%; text-align: center;
+        font-family: "JetBrains Mono", monospace; font-size: 29px; color: #94A6C2;
+      }
+      #status b { color: #F1F5F9; font-weight: 500; }
+
+      /* the legend: every state a reply can be in */
+      #legend { position: absolute; top: 592px; left: 96px; right: 96px; }
+      .row {
+        display: flex; align-items: center; gap: 22px; padding: 15px 26px; margin-bottom: 13px;
+        border-radius: 16px; background: #0D1524; border: 1px solid #202C45;
+      }
+      .row .e { font-size: 35px; line-height: 1; width: 46px; text-align: center; color: #F1F5F9; }
+      .row .t { font-size: 27px; color: #B8C7DE; }
+
+      /* close */
+      #close { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+      #mark { width: 176px; height: 176px; border-radius: 40px; display: block; }
+      #wordmark { margin-top: 34px; font-size: 76px; font-weight: 700; letter-spacing: -0.028em; color: #F1F5F9; }
+      #rule { margin-top: 26px; width: 200px; height: 3px; background: #22D3EE; border-radius: 2px; }
+      #cmd {
+        margin-top: 30px; padding: 20px 34px; border-radius: 14px;
+        background: #0B1220; border: 1px solid #2A3550;
+        font-family: "JetBrains Mono", monospace; font-size: 27px; color: #7DD3FC;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="15"
+      data-width="1080"
+      data-height="1080"
+    >
+      <div id="ground" class="layer clip" data-start="0" data-duration="15" data-track-index="0"></div>
+
+      <div id="scene-message" class="layer clip" data-start="0" data-duration="11.2" data-track-index="1">
+        <div id="kicker">the moment your message lands</div>
+        <div id="bubble-wrap">
+          <div id="bubble">draft the launch thread for tomorrow</div>
+          <div id="tap">👀</div>
+        </div>
+        <div id="status"><b>Marlow</b> picked it up</div>
+      </div>
+
+      <div id="legend" class="clip" data-start="6.2" data-duration="5" data-track-index="2">
+        <div class="row"><span class="e">👀</span><span class="t">picked it up, working on it</span></div>
+        <div class="row"><span class="e">✅</span><span class="t">finished</span></div>
+        <div class="row"><span class="e">✋</span><span class="t">needs your approval before it goes further</span></div>
+        <div class="row"><span class="e">⚠️</span><span class="t">blocked, and it says why</span></div>
+      </div>
+
+      <div id="close" class="layer clip" data-start="11.2" data-duration="3.8" data-track-index="1">
+        <img id="mark" src="assets/icon.png" alt="Bot Forge" />
+        <div id="wordmark">Bot Forge</div>
+        <div id="rule"></div>
+        <div id="cmd">hermes plugins install bot-forge</div>
+      </div>
+    </div>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+
+      // 0.1–1.0 — the kicker, then the message arriving the way a person sends it
+      tl.fromTo("#kicker", { opacity: 0, y: -14 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.1);
+      tl.fromTo("#bubble", { opacity: 0, y: 34, scale: 0.97 },
+                { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: "power3.out" }, 0.45);
+
+      // 1.5 — the reaction lands ON that message. A tapback pops; it never fades in.
+      tl.fromTo("#tap", { opacity: 0, scale: 0.3 },
+                { opacity: 1, scale: 1, duration: 0.42, ease: "back.out(2.4)" }, 1.5);
+      tl.fromTo("#status", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.4, ease: "power2.out" }, 1.75);
+
+      // 2.4–5.6 — it works. One slow breath, so the frame is alive without being busy.
+      tl.to("#tap", { scale: 1.05, duration: 1.1, ease: "sine.inOut", yoyo: true, repeat: 2 }, 2.4);
+
+      // 5.7 — the turn ends and the same reaction becomes the outcome, in place.
+      tl.to("#tap", { scale: 0.75, opacity: 0.35, duration: 0.22, ease: "power2.in" }, 5.7);
+      tl.call(() => { document.getElementById("tap").textContent = "✅"; }, null, 5.92);
+      tl.to("#tap", { scale: 1, opacity: 1, duration: 0.42, ease: "back.out(2.6)" }, 5.92);
+      tl.to("#status", { opacity: 0, duration: 0.25 }, 5.7);
+      tl.call(() => { document.getElementById("status").innerHTML = "<b>Marlow</b> finished"; }, null, 5.95);
+      tl.to("#status", { opacity: 1, duration: 0.35 }, 5.95);
+
+      // 6.35 — the rest of the vocabulary, one row at a time
+      gsap.utils.toArray("#legend .row").forEach((row, i) => {
+        tl.fromTo(row, { opacity: 0, x: -18 },
+                  { opacity: 1, x: 0, duration: 0.38, ease: "power2.out" }, 6.35 + i * 0.26);
+      });
+
+      // 10.4 — clear before the close
+      tl.to("#scene-message", { opacity: 0, duration: 0.5, ease: "power2.in" }, 10.4);
+      tl.to("#legend", { opacity: 0, duration: 0.5, ease: "power2.in" }, 10.4);
+
+      // 11.35 — the signature
+      tl.fromTo("#mark", { opacity: 0, scale: 0.82 },
+                { opacity: 1, scale: 1, duration: 0.6, ease: "back.out(1.7)" }, 11.35);
+      tl.fromTo("#wordmark", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 11.75);
+      tl.fromTo("#rule", { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 12.05);
+      tl.fromTo("#cmd", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 12.3);
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

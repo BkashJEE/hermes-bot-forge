@@ -1,0 +1,15 @@
+{
+  "name": "bot-forge-launch",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.8.75 preview",
+    "check": "npx --yes hyperframes@0.8.75 check",
+    "render": "npx --yes hyperframes@0.8.75 render",
+    "publish": "npx --yes hyperframes@0.8.75 publish"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0"
+  }
+}

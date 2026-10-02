@@ -3,5 +3,16 @@ __pycache__/
 .pytest_cache/
 *.tmp
 
-# Video projects (HyperFrames) — build artifacts, not source
-videos/
+# Video projects (HyperFrames): the compositions are source, everything else is build
+# output or re-capturable. A clone can regenerate the video; see videos/README.md.
+videos/**/node_modules/
+videos/**/renders/
+videos/**/snapshots/
+videos/**/capture/
+videos/**/catalog-capture/
+videos/**/assets/
+videos/**/.hyperframes/
+videos/**/package-lock.json
+videos/**/meta.json
+videos/**/AGENTS.md
+videos/**/CLAUDE.md

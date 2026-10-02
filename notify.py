@@ -209,7 +209,7 @@ def notify_blocked(root: Path, pdir: Path, spec: dict, settings: dict | None = N
                    transport=None, now: float | None = None) -> dict:
     """Called when a Bot records a blocker. Quiet unless the entry really is one."""
     settings = settings or {}
-    if not settings.get("notify_blocked", True):
+    if settings.get("notify_blocked") is False:
         return {"sent": False, "reason": "disabled"}
     if _clean(spec.get("status"), 20).lower() not in ("blocked", "failed"):
         return {"sent": False, "reason": "not a blocker"}

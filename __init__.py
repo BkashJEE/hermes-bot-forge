@@ -53,7 +53,7 @@ def register(ctx):
             from . import doctor
         else:
             import doctor
-        return doctor.cli(args)
+        return doctor.cli(args, settings=settings())
 
     try:
         ctx.register_cli_command(name="bot-forge-doctor", help="Check that Bot Forge is set up correctly",

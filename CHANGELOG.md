@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **The plugin failed to load at all on an install without PyYAML.** `forge.py`, `manage.py`, `companion.py` and `tools.py` all `import yaml`, but no manifest ever declared it — so Hermes never installed it, and the plugin only worked on a machine where some unrelated package happened to drag PyYAML in. On a clean install the loader logged `Failed to load plugin 'bot-forge': No module named 'yaml'` and dropped all 14 tools and both hooks. `plugin.yaml` now declares `python_dependencies: [PyYAML>=6.0,<7]`, which Hermes installs into the environment the plugin runs in and keeps across later dependency syncs. Reported with a full reproduction on Windows.
+- **CI could not have caught it.** The workflow ran a hardcoded `pip install pyyaml==6.0.2` instead of installing from the manifest, so the declaration was never exercised — and the plugin's own manifest-parsing step imports yaml, so the test job itself supplied the missing dependency. Test dependencies now come from `requirements-dev.txt`, and `tests/test_declared_dependencies.py` asserts every third-party import in the shipped plugin is declared in `plugin.yaml` with an upper bound.
+
 ## [0.16.0] - 2026-10-02
 
 ### Added

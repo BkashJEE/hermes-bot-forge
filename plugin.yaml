@@ -7,6 +7,12 @@ homepage: https://github.com/BkashJEE/hermes-bot-forge
 tags: [bots, bot-mode, profiles, agents, multi-agent, automation]
 kind: standalone
 requires_hermes: ">=0.21"
+# Installed into the environment the plugin runs in. forge.py, manage.py, companion.py
+# and tools.py all import yaml; without this declaration the plugin only loads on a
+# machine that happens to have PyYAML already, and fails with ModuleNotFoundError
+# everywhere else — taking all 14 tools and both hooks with it.
+python_dependencies:
+  - PyYAML>=6.0,<7
 provides_tools:
   - create_agent
   - create_team

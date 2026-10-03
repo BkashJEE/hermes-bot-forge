@@ -1,0 +1,4 @@
+# Test-only dependencies. The plugin's own runtime dependencies live in
+# plugin.yaml (python_dependencies) — that is what Hermes installs, and what
+# tests/test_declared_dependencies.py keeps in sync with the imports.
+PyYAML>=6.0,<7

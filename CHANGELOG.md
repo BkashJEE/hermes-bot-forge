@@ -3,6 +3,12 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.17.0] - 2026-10-04
+
+### Added
+- **A Bot can have a screen of its own.** `bot_screen: true` on `create_agent` (or `update_agent` for one that already exists) gives the Bot its own Xfce desktop on the gateway host, granting `computer_use` and `browser`: it browses and clicks there, the user watches in Hermes Desktop, takes over for a login, 2FA prompt or CAPTCHA, and hands control back so the Bot continues with the session the user just signed in to. The screen lives on the gateway, so the work survives closing the laptop. Off by default — a screen costs about 1.1-1.5 GB while open — and meant for jobs that need a real browser session a human may have to rescue.
+- **It refuses rather than half-delivering.** On macOS and Windows there is no separate screen, so the Bot would act on the *user's own* display; that is declined with the reason instead of being granted by implication. A Linux host missing TigerVNC/Xfce or the cua-driver is told which, with the command that fixes it, and no Bot is created — the same contract the sandbox option has always had.
+
 ## [0.16.0] - 2026-10-02
 
 ### Added

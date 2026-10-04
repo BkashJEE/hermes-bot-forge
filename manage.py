@@ -130,6 +130,13 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
             backups.setdefault("SOUL.md", result["backup"] or "")
             changed.append("acknowledgements")
 
+    if s.get("bot_screen"):
+        problem = forge.screen_error(root, True)
+        if problem:
+            return {"ok": False, "name": name, "error": problem}
+        add = set(s.get("add_toolsets") or []) | {"computer_use", "browser"}
+        s = {**s, "add_toolsets": sorted(add)}
+
     # the reaction hook, which has to live inside the Bot to run on the Bot's own turns
     if s.get("ack_reactions") or s.get("ack_tapback"):
         if __package__:

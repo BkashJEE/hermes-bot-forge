@@ -282,6 +282,45 @@ def sandbox_error(sandbox: str) -> str:
     return ""
 
 
+# ── bot screen ───────────────────────────────────────────────────────────────
+def screen_error(root: Path, want: bool) -> str:
+    """Refuse a Bot Screen this host cannot actually give, before a half-usable Bot exists.
+
+    Hermes gives each profile its own Xfce desktop on a **Linux gateway host**, streamed into the
+    Desktop app: the Bot browses and clicks on its own screen, the user watches, takes over for a
+    login or a CAPTCHA, and hands control back. It needs TigerVNC and Xfce on that host plus the
+    cua-driver, and none of it is installed silently.
+
+    On macOS and Windows there is no separate screen to give: Hermes does not offer the pane there,
+    and granting `computer_use` would point the Bot at the user's **own** display. That is a
+    different and much larger thing to hand a Bot by implication, so this refuses and says so
+    rather than quietly doing it.
+    """
+    if not want:
+        return ""
+    if os.name == "nt" or sys.platform == "darwin":
+        return ("Bot Screen needs a Linux gateway host — on macOS and Windows there is no separate "
+                "screen, so the Bot would act on your own display instead of its own. Create it "
+                "without bot_screen, or ask for the computer_use toolset explicitly if driving this "
+                "machine's desktop is really what you want.")
+    driver = run(root, "computer-use", "status", check=False, timeout=60)
+    if driver.returncode != 0 or "cua-driver: installed" not in f"{driver.stdout}{driver.stderr}":
+        return ("Computer Use is not ready on this host (cua-driver missing), so a screen would have "
+                "nothing driving it. Run `hermes computer-use install`, then create the Bot again.")
+    screen = run(root, "computer-use", "screen", "status", check=False, timeout=60)
+    text = f"{screen.stdout}\n{screen.stderr}"
+    if screen.returncode != 0 and not text.strip():
+        return ("This Hermes build has no Bot Screen support (`hermes computer-use screen` is "
+                "missing) — update Hermes, or create the Bot without bot_screen.")
+    if re.search(r"not installed|install on host|apt-get install|dnf install|pacman -S", text, re.I):
+        hint = clean(text)[-300:]
+        return ("The host is missing the Bot Screen packages (TigerVNC + Xfce core), so the Bot "
+                "would have no screen to act on. Install them on the gateway host with "
+                "`hermes computer-use screen install`, then create the Bot again. The host reported: "
+                + hint)
+    return ""
+
+
 # ── routines ─────────────────────────────────────────────────────────────────
 MIN_ROUTINE_MINUTES = 30
 DEFAULT_APPROVALS = ["send, post or publish anything", "spend money or buy anything", "delete files or data"]
@@ -521,6 +560,11 @@ def forge(s: dict) -> dict:
     problem = sandbox_error(sandbox)
     if problem:
         return {"ok": False, "error": problem, "rolled_back": False}
+    bot_screen = bool(s.get("bot_screen") if s.get("bot_screen") is not None
+                      else settings.get("bot_screen"))
+    problem = screen_error(root, bot_screen)
+    if problem:
+        return {"ok": False, "error": problem, "rolled_back": False}
     approvals = s.get("approvals")
     approvals = list(DEFAULT_APPROVALS) if approvals is None else [a for a in approvals if isinstance(a, str)]
     reports_to = (s.get("reports_to") or "").strip().lstrip("@")
@@ -631,6 +675,10 @@ def forge(s: dict) -> dict:
         cfg_path = pdir / "config.yaml"
         cfg = load_yaml(cfg_path)
         tools = set(BASE_TOOLSETS) | {t for t in (s.get("toolsets") or []) if t in ALL_TOOLSETS}
+        if bot_screen:
+            # The screen is the surface; computer_use is what acts on it, and a headed browser is
+            # what the user actually wants to watch and take over.
+            tools |= {"computer_use", "browser"}
         cfg.setdefault("platform_toolsets", {})["cli"] = sorted(tools)
         disabled = set()
         if s.get("skill_categories"):
@@ -697,6 +745,9 @@ def forge(s: dict) -> dict:
                 "connect_next": connect_next, "sandbox": sandbox,
                 "approvals": approvals, "reports_to": reports_to or None,
                 "warning": warning, "toolsets": sorted(tools),
+                "bot_screen": ("its own screen on this host — watch it in Hermes Desktop, take over "
+                               f"for a login, hand back: hermes -p {profile_id} computer-use screen start"
+                               if bot_screen else None),
                 "skills_disabled": len(disabled), "routines": routines, "gateway": gateway, "intro": reply[-600:],
                 "journal": journal_path, "reactions": marks, "plugins": plugins, "workspace": workspace,
                 "note": "done — it already introduced itself. Do not message, test or change this Bot; just report."}

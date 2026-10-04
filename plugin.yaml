@@ -1,5 +1,5 @@
 name: bot-forge
-version: 0.16.0
+version: 0.17.0
 description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
 author: Bikash Joshi
 license: MIT
@@ -88,6 +88,17 @@ config_schema:
     description: >-
       Extra directories the survey may read, replacing the default (the working directory Hermes was
       launched in). Point it at the projects your Bots should know about.
+  bot_screen:
+    type: bool
+    default: false
+    description: >-
+      Give every new Bot its own desktop on the gateway host — it browses and clicks on a screen you
+      can watch in Hermes Desktop, take over for a login or CAPTCHA, and hand back. Grants
+      computer_use and browser. Linux gateway hosts only, and it needs TigerVNC + Xfce
+      (`hermes computer-use screen install`) and the cua-driver; creation is refused with the reason
+      when the host cannot provide one, rather than making a Bot that cannot see. Off by default:
+      a screen costs about 1.1-1.5 GB while it is open. create_agent's own bot_screen argument
+      overrides this per Bot.
   adopt_bots:
     type: bool
     default: false

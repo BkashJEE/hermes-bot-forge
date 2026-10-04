@@ -322,6 +322,16 @@ For the whole queue on a schedule rather than one blocker at a time:
 python3 ~/.hermes/plugins/bot-forge/notify.py digest
 ```
 
+### A screen of its own
+
+> make me a procurement bot that works in our supplier portal, give it a screen
+
+On a Linux gateway host each Bot can have its **own desktop** — not yours. It browses and clicks there; you watch it live in Hermes Desktop, **take over** when it hits a login, 2FA prompt or CAPTCHA, then **hand control back** and it carries on with the session you just signed in to. The screen lives on the gateway, so the work continues after you shut your laptop.
+
+`bot_screen: true` grants `computer_use` and `browser`. It is off by default — a screen costs roughly 1.1–1.5 GB while it is open — and it is for jobs that need a real browser session a human may have to rescue, not for reading public pages.
+
+**It refuses rather than half-delivering.** On macOS or Windows there is no separate screen to give, so the Bot would act on *your* display; Bot Forge says so and declines instead of quietly handing a Bot your desktop. If the host is missing TigerVNC/Xfce or the cua-driver, the refusal names what is missing and the command that fixes it, and no Bot is created.
+
 ### Cost and safety built in
 
 - **Draft-first by default.** Every Bot is born with approval checkpoints — sending/publishing, spending money, deleting data — unless you explicitly ask for none.

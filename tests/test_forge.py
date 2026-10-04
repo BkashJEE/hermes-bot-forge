@@ -2211,7 +2211,16 @@ class BlanketInheritanceStopsAtCredentials(unittest.TestCase):
 
 
 class BotScreenPreflight(unittest.TestCase):
-    """A screen this host cannot give is refused before a half-usable Bot exists."""
+    """A screen this host cannot give is refused before a half-usable Bot exists.
+
+    NOT VERIFIED ON REAL HARDWARE — the macOS and Windows cases below patch `sys.platform` and
+    `os.name`, so they prove *this* code refuses, not that Hermes behaves on those hosts the way
+    its Bot Screen documentation says. Everything here was developed and exercised on Linux.
+    Before anyone claims support for a Mac or Windows gateway, run a real one: confirm the pane is
+    genuinely absent, confirm `computer-use screen status` says what we expect, and confirm nothing
+    offers the user's own display as a substitute. Until then this refusal is the safe default,
+    deliberately chosen over granting computer_use and hoping.
+    """
 
     def _probe(self, driver_out="cua-driver: installed at /x (0.21.0)", screen_out="installed, not running",
                driver_rc=0, screen_rc=0):

@@ -2230,9 +2230,10 @@ class BotScreenPreflight(unittest.TestCase):
     def test_a_ready_linux_host_passes(self):
         self.addCleanup(setattr, forge, "run", forge.run)
         forge.run = self._probe()
+        root = Path("/x")
         with mock.patch.object(forge.sys, "platform", "linux"), \
              mock.patch.object(forge.os, "name", "posix"):
-            self.assertEqual(forge.screen_error(Path("/x"), True), "")
+            self.assertEqual(forge.screen_error(root, True), "")
 
     def test_macos_is_refused_rather_than_pointed_at_your_own_display(self):
         """The dangerous silent behaviour: granting computer_use where the only screen is the user's."""
@@ -2242,24 +2243,29 @@ class BotScreenPreflight(unittest.TestCase):
         self.assertIn("your own display", problem)
 
     def test_windows_is_refused_too(self):
+        # Build the Path before patching os.name: pathlib picks its flavour at construction, so a
+        # Path() created while os.name == "nt" raises NotImplementedError on Linux under 3.11.
+        root = Path("/x")
         with mock.patch.object(forge.os, "name", "nt"):
-            self.assertIn("Linux gateway host", forge.screen_error(Path("/x"), True))
+            self.assertIn("Linux gateway host", forge.screen_error(root, True))
 
     def test_a_host_without_the_driver_says_so(self):
         self.addCleanup(setattr, forge, "run", forge.run)
         forge.run = self._probe(driver_out="cua-driver: not installed", driver_rc=1)
+        root = Path("/x")
         with mock.patch.object(forge.sys, "platform", "linux"), \
              mock.patch.object(forge.os, "name", "posix"):
-            problem = forge.screen_error(Path("/x"), True)
+            problem = forge.screen_error(root, True)
         self.assertIn("cua-driver", problem)
         self.assertIn("hermes computer-use install", problem)
 
     def test_a_host_missing_the_packages_relays_what_it_said(self):
         self.addCleanup(setattr, forge, "run", forge.run)
         forge.run = self._probe(screen_out="Bot Desktop: not installed. apt-get install -y tigervnc-standalone-server xfce4-panel")
+        root = Path("/x")
         with mock.patch.object(forge.sys, "platform", "linux"), \
              mock.patch.object(forge.os, "name", "posix"):
-            problem = forge.screen_error(Path("/x"), True)
+            problem = forge.screen_error(root, True)
         self.assertIn("TigerVNC", problem)
         self.assertIn("hermes computer-use screen install", problem)
         self.assertIn("tigervnc-standalone-server", problem, "relay what the host actually reported")
@@ -2267,9 +2273,10 @@ class BotScreenPreflight(unittest.TestCase):
     def test_an_older_hermes_without_the_command_is_explained(self):
         self.addCleanup(setattr, forge, "run", forge.run)
         forge.run = self._probe(screen_out="", screen_rc=2)
+        root = Path("/x")
         with mock.patch.object(forge.sys, "platform", "linux"), \
              mock.patch.object(forge.os, "name", "posix"):
-            self.assertIn("no Bot Screen support", forge.screen_error(Path("/x"), True))
+            self.assertIn("no Bot Screen support", forge.screen_error(root, True))
 
 
 class GatewayReporting(unittest.TestCase):

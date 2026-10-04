@@ -33,6 +33,12 @@ CREATE_AGENT = {
             "allow_overlap": {"type": "boolean", "description": (
                 "only after the tool refused because an existing Bot already does this job, and the user "
                 "confirmed they want a second one anyway. Never pass it on a first attempt.")},
+            "bot_screen": {"type": "boolean", "description": (
+                "give this Bot its own desktop on the gateway host, so it browses and clicks on a screen "
+                "the user can watch in Hermes Desktop, take over for a login or CAPTCHA, and hand back. "
+                "Grants computer_use and browser. Linux gateway hosts only; the call is refused with the "
+                "reason when the host cannot provide one. Ask for it when the job needs a real browser "
+                "session a human may have to rescue.")},
             "sandbox": {"type": "string", "enum": ["local", "docker", "singularity", "apptainer"], "description": (
                 "where this Bot's shell runs. 'local' (default) shares this machine; 'docker' gives the Bot its own "
                 "container, so it cannot touch the user's files and cannot block other Bots. Use a sandbox for any "
@@ -136,6 +142,9 @@ UPDATE_AGENT = {
             "ack_reactions": {"type": "boolean", "description": (
                 "true turns on reaction acknowledgements for a Bot created before this feature; it is added to "
                 "the persona without replacing it")},
+            "bot_screen": {"type": "boolean", "description": (
+                "give an existing Bot its own desktop on the gateway host (adds computer_use and browser); "
+                "refused with the reason when the host cannot provide one")},
             "ack_tapback": {"type": "boolean", "description": (
                 "true installs the reaction hook inside this Bot so it can tapback the user's own message in the "
                 "desktop app; needed once for a Bot created before that shipped")},

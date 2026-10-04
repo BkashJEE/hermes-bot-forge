@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.16.0
+version: 0.17.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos, windows]
@@ -97,6 +97,13 @@ The result's `workspace` block is what you report: `fits` (the places it belongs
 
 ## Plugins in a Bot
 A new Bot's config lists the same plugins as the user's main profile, but the plugin directories are not cloned, so those plugins never load in it. That is on purpose: a Bot gets only what it was asked for. When the user wants a plugin in the Bot — "every Bot should have my style plugin", "give Nova the bookmarks plugin" — pass `inherit_plugins: ["<name>"]` to `create_agent` (or `["all"]` for everything enabled on the main profile), or `update_agent(name, inherit_plugins: [...])` for a Bot that already exists. Bot Forge itself is never copied into a Bot and no credential file travels with a plugin; a plugin that needs a key still needs the user to set it in that Bot. `check_agents` flags a Bot whose config names a plugin that is not installed in it ("enabled but not installed"); the fix is the same `update_agent` call, or leaving it alone if the user never wanted that plugin there.
+
+## Its own screen
+`bot_screen: true` gives the Bot a desktop on the gateway host: it browses and clicks there, the user watches in Hermes Desktop, takes over for a login, 2FA or CAPTCHA, and hands back — the Bot continues with the session the user just signed in to. It grants `computer_use` and `browser`.
+
+Ask for it when the job needs a **real browser session a human may have to rescue**: anything behind a login, a portal with no API, a flow that hits a CAPTCHA. Do not add it to a Bot that only reads public pages — `web` and `browser` already cover that, and a screen costs real memory while it is open.
+
+Linux gateway hosts only. On macOS or Windows the call is refused, because there the Bot would act on the **user's own display** rather than its own — if the user genuinely wants that, they ask for the `computer_use` toolset explicitly. When the host is missing TigerVNC/Xfce or the cua-driver, the refusal says which and gives the command; relay it rather than retrying.
 
 ## Sandboxes
 Any Bot you give `terminal` or `code_execution` should get `sandbox: "docker"` so its shell runs in a container instead of on the user's machine — say so in your reply. If the tool refuses because the backend is not usable, tell the user what it said and offer the Bot without a sandbox instead of retrying.

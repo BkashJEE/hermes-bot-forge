@@ -93,9 +93,9 @@ def clean(text):
 
 def load_yaml(path: Path) -> dict:
     try:
-        data = yaml.safe_load(path.read_text())
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
         return data if isinstance(data, dict) else {}
-    except (OSError, yaml.YAMLError):
+    except (OSError, UnicodeDecodeError, yaml.YAMLError):
         return {}
 
 

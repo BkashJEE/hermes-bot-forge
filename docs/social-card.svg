@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <!-- Background plate for the social card. The hero character is composited over the left side
+       afterwards (see docs/make-social-card.sh) rather than embedded, so the artwork file stays
+       separate from the layout. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#101A33"/>
+      <stop offset="55%" stop-color="#070B13"/>
+      <stop offset="100%" stop-color="#0A1020"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="24%" cy="52%" r="38%">
+      <stop offset="0%" stop-color="#2F2FF2" stop-opacity="0.38"/>
+      <stop offset="100%" stop-color="#2F2FF2" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0H0V40" fill="none" stroke="#223055" stroke-width="1" opacity="0.5"/>
+    </pattern>
+  </defs>
+
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect width="1280" height="640" fill="url(#grid)"/>
+  <rect width="1280" height="640" fill="url(#halo)"/>
+
+  <g font-family="Liberation Sans, Inter, DejaVu Sans" fill="#F8FAFC">
+    <text x="520" y="214" font-size="84" font-weight="bold" letter-spacing="-2">Bot Forge</text>
+    <text x="522" y="266" font-size="28" fill="#A9B6D0">Say what you need. Your agent builds the whole Bot.</text>
+  </g>
+
+  <rect x="522" y="306" width="560" height="68" rx="16" fill="#0C1426" stroke="#2F3F6B" stroke-width="2"/>
+  <text x="550" y="350" font-family="JetBrains Mono, DejaVu Sans Mono" font-size="27" fill="#8FA7FF">hermes plugins install bot-forge</text>
+
+  <g font-family="Liberation Sans, Inter, DejaVu Sans" font-size="23">
+    <rect x="522" y="406" width="278" height="52" rx="26" fill="#121C38" stroke="#2F3F6B" stroke-width="2"/>
+    <circle cx="550" cy="432" r="7" fill="#4ADE80"/>
+    <text x="568" y="440" fill="#CBD5E1">In the Hermes catalog</text>
+
+    <rect x="816" y="406" width="150" height="52" rx="26" fill="#121C38" stroke="#2F3F6B" stroke-width="2"/>
+    <circle cx="844" cy="432" r="7" fill="#6F8BFF"/>
+    <text x="862" y="440" fill="#CBD5E1">14 tools</text>
+
+    <rect x="982" y="406" width="100" height="52" rx="26" fill="#121C38" stroke="#2F3F6B" stroke-width="2"/>
+    <circle cx="1010" cy="432" r="7" fill="#A78BFA"/>
+    <text x="1028" y="440" fill="#CBD5E1">MIT</text>
+  </g>
+
+  <text x="522" y="524" font-family="Liberation Sans, Inter, DejaVu Sans" font-size="25" fill="#64748B">
+    github.com/BkashJEE/hermes-bot-forge
+  </text>
+</svg>

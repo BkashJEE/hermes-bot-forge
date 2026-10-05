@@ -196,6 +196,8 @@ SHARE_AGENT = {
         "properties": {
             "name": {"type": "string", "description": "the Bot to share"},
             "mode": {"type": "string", "enum": ["template", "backup"], "description": "template (default) or backup"},
+            "publish": {"type": "boolean", "description": (
+                "also post the template as an unlisted gist and return a link anyone can import from. Uses the user's own GitHub CLI; refused with the reason when it is missing or signed out. Never use it with mode backup.")},
             "path": {"type": "string", "description": "optional file name/path under <hermes>/profile-exports (never overwrites)"},
         },
         "required": ["name"],
@@ -205,14 +207,17 @@ SHARE_AGENT = {
 IMPORT_AGENT = {
     "name": "import_agent",
     "description": (
-        "Import a Bot from a .botforge.json template (built fresh, secret-scanned, like create_agent) or restore a "
-        ".tar.gz backup made with share_agent mode='backup'. Before importing a template from someone else, read "
-        "its soul_md and routines and tell the user what the Bot will do."
+        "Import a Bot from a .botforge.json template, an https link someone shared (a gist from share_agent "
+        "publish=true, or any https URL serving the template), or restore a .tar.gz backup made with "
+        "share_agent mode='backup'. Built fresh and secret-scanned like create_agent. Before importing "
+        "someone else's Bot, read its soul_md and routines and tell the user what the Bot will do."
     ),
     "parameters": {
         "type": "object",
         "properties": {
-            "path": {"type": "string", "description": "path to a .botforge.json template or a .tar.gz backup"},
+            "path": {"type": "string", "description": (
+                "a path to a .botforge.json template or .tar.gz backup, or an https link to a shared "
+                "template (gist links are read directly)")},
             "display_name": {"type": "string", "description": "optional new Proper Case name for the imported Bot"},
         },
         "required": ["path"],

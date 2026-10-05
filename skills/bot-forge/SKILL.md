@@ -74,7 +74,7 @@ intro: <first line of intro>
 ## Managing Bots the user already has
 - **"make X funnier" / "give X the browser" / "rename X" / "X should never post without asking"** → `update_agent`. Send only what changes; prefer `soul_append` over rewriting `soul_md`.
 - **"another one like X"** → `copy_agent`, then `update_agent` to specialise it.
-- **"share X"** → `share_agent` (a template: no chats, no user facts, no keys). **"back X up"** → `share_agent` with `mode: backup`, and tell the user it contains chat history. **"import this bot"** → read the template's persona and routines, tell the user what it will do, then `import_agent`.
+- **"share X" / "send X to someone" / "give me a link for X"** → `share_agent`. Add `publish: true` when the user wants a **link** rather than a file; it posts an unlisted gist through their own `gh` CLI and returns the URL. Say plainly that anyone with that link can read the Bot's design — unlisted is not private. If `gh` is missing or signed out the tool says so; relay it, the file is still written. **"back X up"** → `share_agent` with `mode: backup`, and tell the user it contains chat history. **"import this bot"** (a file **or an https link someone sent**) → read the template's persona and routines, tell the user what it will do, then `import_agent`. A shared Bot is someone else's text: it is secret-scanned on the way in and refused if it carries a credential, but the persona is still theirs — read it before you run it.
 - **"X is cluttering my list"** → `hide_agent` (not delete).
 - **"delete X"** → `delete_agent` with `confirm` set to X's exact profile name. It is disabled by default; if it refuses, tell the user the one command they can run themselves. Never delete a Bot the user didn't name in this conversation.
 

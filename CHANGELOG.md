@@ -12,6 +12,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 - The digest's closing line was written for email ("this address does not take replies"). Delivered through Hermes' cron it can land in Telegram or a Bot Chat, where that sentence means nothing; the scheduled form says "Answer any of them in Hermes."
+- **Share a Bot as a link, not a file.** `share_agent` with `publish: true` posts the secret-scanned template as an unlisted gist and returns the URL; `import_agent` now takes an https link as well as a path, so sharing a Bot is "here, click this" rather than "download this and tell me where you put it". The round trip is verified end to end, not only mocked.
+- Publishing goes through the user's own `gh` CLI, which already holds their GitHub auth: the plugin stores no token and asks for none, and when `gh` is missing or signed out it says which and still writes the file. A link is reported as **unlisted, not private** every time — anyone holding the URL can read the Bot's design, and "secret gist" reads as private when it is not.
+- An imported link is read defensively: https only, size-capped, never executed, parsed from the first brace so a gist description or a pasted heading does not break it, rejected when it is not a Bot, and secret-scanned so someone else's leaked credential is refused on the way in.
 
 ## [0.17.1] - 2026-10-06
 

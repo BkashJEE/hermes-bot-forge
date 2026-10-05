@@ -308,7 +308,21 @@ def op_export(s: dict, root: Path, settings: dict) -> dict:
         return {"ok": False, "name": pdir.name, "error": err}
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(text + "\n")
+    published = None
+    if s.get("publish"):
+        if __package__:
+            from . import publish as publish_mod
+        else:
+            import publish as publish_mod
+        published = publish_mod.publish(
+            text + "\n", f"{pdir.name}.botforge.json",
+            f"Hermes Bot: {_bot_meta(pdir).get('title') or pdir.name} — import with Bot Forge")
+        if not published.get("ok"):
+            return {"ok": False, "name": pdir.name, "path": str(out), "error": published["error"],
+                    "note": "the template was written to disk; only publishing the link failed"}
+
     return {"ok": True, "name": pdir.name, "mode": "template", "path": str(out), "scan": scan,
+            **({"url": published["url"], "visibility": published["visibility"]} if published else {}),
             "size_kb": round(out.stat().st_size / 1000, 1),
             "contains": ["persona", "its own memory", "tools", "skill choices",
                          f"{len(tpl['taught_skills'])} taught skill(s)", f"{len(tpl['routines'])} routine(s)"],
@@ -319,7 +333,27 @@ def op_export(s: dict, root: Path, settings: dict) -> dict:
 
 def op_import(s: dict, root: Path, settings: dict) -> dict:
     """Import a Bot: a .botforge.json template (built fresh, like create_agent) or a .tar.gz backup (restored)."""
-    path = Path(s.get("path") or "").expanduser()
+    if __package__:
+        from . import publish as publish_mod
+    else:
+        import publish as publish_mod
+
+    where = str(s.get("path") or "").strip()
+    if publish_mod.is_url(where):
+        shared = publish_mod.read_shared(where)
+        if not shared.get("ok"):
+            return {"ok": False, "error": shared["error"]}
+        if shared["scan"]["verdict"] == "BLOCK" and not settings.get("allow_secrets"):
+            return {"ok": False, "scan": shared["scan"], "source": shared["source"],
+                    "error": "that shared Bot contains what looks like a credential — refusing to "
+                             "import it. Ask whoever shared it to remove it and republish."}
+        spec = {**shared["spec"], "display_name": s.get("display_name") or shared["spec"].get("display_name"),
+                "hermes_root": str(root), "settings": settings,
+                "launch_profile": s.get("launch_profile") or "default"}
+        result = forge.forge(spec)
+        return {**result, "source": shared["source"], "scan": shared["scan"]} if result.get("ok") else result
+
+    path = Path(where).expanduser()
     if not path.is_file():
         return {"ok": False, "error": f"no file at {path}"}
     if path.name.endswith(".json"):

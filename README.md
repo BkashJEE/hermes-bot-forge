@@ -340,6 +340,24 @@ To send it by email instead:
 python3 ~/.hermes/plugins/bot-forge/notify.py digest
 ```
 
+### Send someone a Bot
+
+> share Pane and give me a link
+
+```
+🔗 https://gist.github.com/you/cb9d2e7d6a0a26c7a8d9dad83b912de4
+   unlisted — anyone with this link can read the Bot's design
+   (not your chats, memory of you, or keys)
+```
+
+They import it with the link, and get their own copy:
+
+> import this bot: https://gist.github.com/you/cb9d2e7d…
+
+The template carries the Bot's **design** — persona, tools, skill choices, taught skills, routines — and never your chat history, your work journal, facts about you, or any key. It is secret-scanned on the way out **and on the way in**, so a Bot carrying someone's leaked credential is refused at both ends.
+
+Publishing goes through your own `gh` CLI, which already holds your GitHub login. Bot Forge stores no token and asks for none; with `gh` missing or signed out it says so and still writes the file.
+
 ### A screen of its own
 
 > make me a procurement bot that works in our supplier portal, give it a screen

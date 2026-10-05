@@ -1,0 +1,34 @@
+# Lint rules for the shipped plugin and its tests.
+#
+# Chosen to catch things that break a user's install, not to impose a house style on a codebase
+# that already has one. The plugin is loaded into someone else's Hermes process, so an unused
+# import is not cosmetic — it is a module that gets imported on every load and, if it ever stops
+# resolving, takes all 14 tools and both hooks down with it. That is how v0.15.0 shipped.
+#
+# Deliberately not enabled:
+#   ARG  — 51 hits, nearly all of them handler signatures Hermes calls with arguments we ignore
+#          (`args`, `**kw`). Renaming them to `_args` to satisfy a linter would make the
+#          registration contract harder to read, not easier.
+#   SIM, RET, I — style and import order. Real churn, no bug caught.
+
+line-length = 140
+target-version = "py311"  # plugin.yaml requires Hermes >= 0.21; CI runs 3.11 and 3.12
+
+# Artwork and video build scripts — one-shot generators full of long inline SVG and HTML, not
+# part of the plugin Hermes loads.
+exclude = ["docs", "videos"]
+
+[lint]
+select = [
+  "F",    # pyflakes: undefined names, unused imports, unused locals
+  "E",    # pycodestyle errors
+  "W",    # pycodestyle warnings
+  "B",    # bugbear: mutable defaults, `raise` without `from`, bare zip, duplicate set items
+  "C4",   # comprehension misuse
+  "UP",   # outdated idioms for the Python we require
+]
+
+[lint.per-file-ignores]
+# The test modules put the plugin directory on sys.path before importing it, so their imports
+# cannot all sit at the top of the file. That is the point of the probe design, not an oversight.
+"tests/*" = ["E402"]

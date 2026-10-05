@@ -28,7 +28,6 @@ import json
 import os
 import random
 import re
-import shutil
 import string
 import subprocess
 import sys
@@ -88,7 +87,8 @@ def run(root, *args, timeout=180, check=True):
 
 
 def clean(text):
-    return "\n".join(l for l in (text or "").splitlines() if not any(n in l for n in NOISE)).strip()
+    return "\n".join(line for line in (text or "").splitlines()
+                     if not any(n in line for n in NOISE)).strip()
 
 
 def load_yaml(path: Path) -> dict:
@@ -217,14 +217,20 @@ def filter_user_memory(text: str, other_names: set) -> str:
 
 
 def render_soul(s, profile_id):
-    bullets = lambda xs: "\n".join(f"- {x}" for x in xs)
+    def bullets(xs):
+        return "\n".join(f"- {x}" for x in xs)
+
     habits = s.get("habits") or ["break the job into small steps and finish each one",
                                  "verify before claiming; say plainly when unsure"]
+    # Built here rather than inline in the template below: the template is what a Bot reads
+    # about itself, so this sentence must not be wrapped in the rendered SOUL.md.
+    intro = (f"You are **{s['display_name']}**, the {s['role']} of this Hermes deployment "
+             f"(profile `{profile_id}`). Always introduce yourself as {s['display_name']}.")
     never = (s.get("never") or []) + ["never fabricate numbers, quotes, or results",
                                       "never send, post, buy, or delete anything without the user's approval"]
     return f"""# {s['display_name']} — {s['role']}
 
-You are **{s['display_name']}**, the {s['role']} of this Hermes deployment (profile `{profile_id}`). Always introduce yourself as {s['display_name']}.
+{intro}
 
 ## Your one job
 {s['one_job']}.
@@ -487,7 +493,7 @@ def suggest_connectors(root: Path, text: str, limit: int = 3) -> list:
         if not m:
             continue
         name, _status, desc = m.group(1), m.group(2), m.group(3).strip()
-        haystack = {w for w in re.findall(r"[a-z]{3,}", f"{name} {desc}".lower())} - STOPWORDS
+        haystack = set(re.findall(r"[a-z]{3,}", f"{name} {desc}".lower())) - STOPWORDS
         score = len(words & haystack) + (3 if name.split("-")[0] in text else 0)
         if score:
             scored.append((score, name, desc))

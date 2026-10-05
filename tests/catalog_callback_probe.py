@@ -63,8 +63,10 @@ def run(command, **kwargs):
     stream = io.StringIO()
     with mock.patch.object(sys, 'argv', command[1:]), mock.patch.object(sys, 'stdin', io.StringIO(kwargs['input'])):
         with contextlib.redirect_stdout(stream):
-            try: doctor.main()
-            except SystemExit: pass
+            try:
+                doctor.main()
+            except SystemExit:
+                pass
     return subprocess.CompletedProcess(command, 0, stream.getvalue(), '')
 
 with mock.patch.object(forge, 'default_root', return_value=root), \
@@ -92,7 +94,8 @@ with mock.patch.object(forge, 'default_root', return_value=root), \
             assert result['ok'] and result['written'], result
             assert result['notified']['sent'] is expected, result
             assert len(outbox) == before + int(expected)
-            if expected: assert outbox[-1][1]['To'] == recipient
+            if expected:
+                assert outbox[-1][1]['To'] == recipient
             read = json.loads(ctx.tools['agent_journal']({'action': 'read', 'name': 'quill'}))
             assert read['ok'] and read['count'] > 0, read
             # Both registered diagnostics must honor trusted operator settings.
@@ -105,7 +108,8 @@ with mock.patch.object(forge, 'default_root', return_value=root), \
             assert next(c for c in cli_report['checks'] if c['check'] == 'mail') == mail
             if settings.get('notify_email') is False or settings.get('notify_blocked') is False:
                 assert mail['status'] == 'warn' and 'disabled' in mail['detail'], mail
-            else: assert (recipient or 'home@example.test') in mail['detail'], mail
+            else:
+                assert (recipient or 'home@example.test') in mail['detail'], mail
         # Deferred package imports on the notify digest path.
         assert notify.notify_waiting(root, {'notify_email': False})['sent'] is False
 

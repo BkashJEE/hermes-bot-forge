@@ -12,13 +12,14 @@ import json
 import os
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
     from . import forge, portable
 else:
-    import forge, portable
+    import forge
+    import portable
 
 JOURNAL_MARKER = "<!-- bot-forge-journal:v1 -->"
 JOURNAL_POLICY = f"""{JOURNAL_MARKER}
@@ -141,13 +142,13 @@ def _entry_markdown(spec: dict, now: datetime) -> tuple[str, dict]:
         raise ValueError(f"summary is longer than {MAX_SUMMARY} characters")
     evidence = _items(spec.get("evidence"))
     next_steps = _items(spec.get("next_steps"))
-    tags = sorted(set(_clean_line(v, 40).lower() for v in (spec.get("tags") or []) if _clean_line(v, 40)))[:12]
+    tags = sorted({_clean_line(v, 40).lower() for v in (spec.get("tags") or []) if _clean_line(v, 40)})[:12]
     scan_blob = "\n".join([title, summary, *evidence, *next_steps, *tags])
     scan = portable.scan_text(scan_blob)
     if scan["verdict"] != "CLEAN":
         raise ValueError("journal entry looks like it contains sensitive or credential-like text; nothing was written")
 
-    stamp = now.astimezone(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    stamp = now.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     lines = [f"## {stamp} · {status} · {title}", "", summary]
     if evidence:
         lines += ["", "**Evidence**", *[f"- {v}" for v in evidence]]
@@ -162,9 +163,9 @@ def _entry_markdown(spec: dict, now: datetime) -> tuple[str, dict]:
 def add_entry(pdir: Path, spec: dict, now: datetime | None = None) -> dict:
     if not journaling_enabled(pdir):
         raise ValueError("journaling is not enabled for this Bot; call agent_journal with action='enable' first")
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     folder = ensure_journal(pdir)
-    utc_date = now.astimezone(timezone.utc).date().isoformat()
+    utc_date = now.astimezone(UTC).date().isoformat()
     path = folder / f"{utc_date}.md"
     if path.exists() and path.is_symlink():
         raise ValueError("journal file cannot be a symlink")
@@ -198,7 +199,7 @@ def read_entries(pdir: Path, spec: dict) -> dict:
     try:
         limit = max(1, min(int(spec.get("limit") or 10), MAX_READ))
     except (TypeError, ValueError):
-        raise ValueError(f"limit must be an integer from 1 to {MAX_READ}")
+        raise ValueError(f"limit must be an integer from 1 to {MAX_READ}") from None
     query = str(spec.get("query") or "").strip().lower()
     paths = [folder / f"{date}.md"] if date else sorted(folder.glob("????-??-??.md"), reverse=True)
     entries = []

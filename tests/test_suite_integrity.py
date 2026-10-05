@@ -21,6 +21,10 @@ def _test_modules():
     return sorted(p for p in TESTS.glob("test_*.py") if p.name != Path(__file__).name)
 
 
+def fn_is_test(fn):
+    return fn.name.startswith("test")
+
+
 def _is_assertion(node):
     if isinstance(node, ast.Assert):
         return True
@@ -41,10 +45,6 @@ class EveryTestCanFail(unittest.TestCase):
                     if not any(_is_assertion(n) for n in ast.walk(fn)):
                         empty.append(f"{path.name}:{fn.lineno} {cls.name}.{fn.name}")
         self.assertEqual(empty, [], "these tests assert nothing: " + repr(empty))
-
-
-def fn_is_test(fn):
-    return fn.name.startswith("test")
 
 
 class NoSilentSkips(unittest.TestCase):
@@ -100,6 +100,32 @@ def _exception_names(node):
 
 def _assigns_none(stmt):
     return isinstance(stmt.value, ast.Constant) and stmt.value.value is None
+
+
+
+class PlatformClaimsMatchWhatIsTested(unittest.TestCase):
+    """Only claim a platform the suite actually runs on.
+
+    The skill advertised `platforms: [linux, macos, windows]` while no Windows machine has ever
+    run these tests, every Windows code path is exercised by patching `sys.platform`, and the two
+    bug reports that did arrive from Windows were both the plugin failing outright. Claiming a
+    platform is a promise; this keeps the promise and the evidence in the same place.
+    """
+
+    TESTED = ["linux", "macos"]
+
+    def test_the_skill_claims_only_tested_platforms(self):
+        import re
+        skill = (ROOT / "skills" / "bot-forge" / "SKILL.md").read_text(encoding="utf-8")
+        match = re.search(r"^platforms:\s*\[([^\]]*)\]", skill, re.MULTILINE)
+        self.assertIsNotNone(match, "skills/bot-forge/SKILL.md declares no platforms")
+        claimed = [p.strip() for p in match.group(1).split(",") if p.strip()]
+        self.assertEqual(claimed, self.TESTED,
+                         "add the platform to TESTED only once the suite runs there")
+
+    def test_the_readme_does_not_call_windows_supported(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertIn("Windows is not supported", readme)
 
 
 if __name__ == "__main__":

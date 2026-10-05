@@ -55,26 +55,28 @@ def register(ctx):
             import doctor
         return doctor.cli(args, settings=settings())
 
-    try:
+    # Older Hermes has no plugin CLI commands at all; there the diagnostic tool and
+    # `python doctor.py` still work. Asked rather than wrapped in `except Exception`, which
+    # also swallowed real breakage in our own registration — twice.
+    if hasattr(ctx, "register_cli_command"):
         ctx.register_cli_command(name="bot-forge-doctor", help="Check that Bot Forge is set up correctly",
                                  setup_fn=_doctor_setup, handler_fn=_doctor_handler,
                                  description="Report which profiles have Bot Forge enabled, whether their gateways "
                                              "run the current code, model sign-in, sandbox backends and templates.")
-    except Exception:  # older Hermes without plugin CLI commands: the tool and `python doctor.py` still work
-        pass
 
     # Put the acknowledgement on the user's own message in Desktop, without relying on the model —
     # unless the companion is here to do it, in which case two placements would cancel each other.
-    from . import companion, tapback
+    # Imported outside the guard below on purpose: a failure to import these is the plugin being
+    # broken, not adoption being impossible, and `except Exception` around the import is what let
+    # v0.15.0 ship a ModuleNotFoundError that silently cost every tool and hook.
+    from . import companion, forge as _forge, tapback
 
     # Any profile, however it was made — Hermes' own New Agent dialog, `hermes profile create`, a
     # clone — gets the reaction. The user does not care which door a Bot came through; they expect
     # all of them to behave the same. No-op when everything is already in place.
     try:
-        from . import forge as _forge
-
         companion.adopt_all(_forge.default_root(), settings())
-    except Exception:  # never let adoption stop the plugin loading
+    except Exception:  # a profile we cannot write must never stop the plugin loading
         pass
 
     if not companion.companion_running(Path(__file__).resolve().parent):

@@ -49,7 +49,12 @@ Every step is checked, and the whole Bot is rolled back if one fails.
 
 - Hermes Agent **0.21+** with the `hermes` CLI on your `PATH`
 - Hermes Desktop for Bot Mode (the CLI works too — Bots are profiles)
-- **Linux and macOS are tested.** Windows is not: Bots are still created and work from the CLI, but gateway services and sandboxes are skipped there
+- **Linux and macOS are tested. Windows is not supported.** Nobody runs the suite on Windows and
+  no release has been tried there. The reports that do come from Windows have been real breakage —
+  a manifest the doctor could not read ([#41](https://github.com/BkashJEE/hermes-bot-forge/pull/41)),
+  a plugin that would not load on a clean install ([#38](https://github.com/BkashJEE/hermes-bot-forge/pull/38)).
+  Gateway services, sandboxes and Bot Screen are skipped there by design. Creating a Bot from the
+  CLI may well work — it is simply not a claim this project can make yet. Fixes are welcome
 
 ### 2. Install
 

@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Bot Forge in the Hermes house style: monochrome, no gradient, a heavy keyline, and solid
+       black masses cut by parallel highlight slashes — their visual language, our character. -->
+  <rect width="512" height="512" fill="#0B0F17"/>
+  <rect x="26" y="26" width="460" height="460" rx="108" fill="none" stroke="#FFFFFF" stroke-width="15"/>
+
+  <!-- antenna -->
+  <path d="M256 86v54" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round"/>
+  <circle cx="256" cy="80" r="22" fill="#FFFFFF"/>
+
+  <!-- ears, drawn first so the head overlaps them: one silhouette, not floating parts -->
+  <g fill="#0B0F17" stroke="#FFFFFF" stroke-width="14" stroke-linejoin="round">
+    <rect x="84" y="244" width="46" height="96" rx="23"/>
+    <rect x="382" y="244" width="46" height="96" rx="23"/>
+  </g>
+
+  <!-- the head: a big confident black mass, the way their hair reads -->
+  <rect x="116" y="146" width="280" height="248" rx="70" fill="#0B0F17" stroke="#FFFFFF" stroke-width="15"/>
+
+  <!-- highlights: parallel slashes INSIDE the black crown, catching one light source -->
+  <g fill="#FFFFFF">
+    <path d="M176 186l30-13-16 44-30 13z"/>
+    <path d="M224 172l22-9-16 44-22 9z"/>
+    <path d="M300 170l24 10-16 44-24-10z"/>
+    <path d="M340 186l26 11-16 44-26-11z"/>
+  </g>
+
+  <!-- the visor: smaller, so black dominates -->
+  <rect x="166" y="242" width="180" height="118" rx="44" fill="#FFFFFF"/>
+
+  <g fill="#0B0F17">
+    <ellipse cx="217" cy="292" rx="23" ry="26"/>
+    <ellipse cx="295" cy="292" rx="23" ry="26"/>
+    <path d="M216 329c12 14 68 14 80 0" fill="none" stroke="#0B0F17" stroke-width="11" stroke-linecap="round"/>
+  </g>
+  <g fill="#FFFFFF">
+    <circle cx="226" cy="282" r="7.5"/>
+    <circle cx="304" cy="282" r="7.5"/>
+  </g>
+</svg>

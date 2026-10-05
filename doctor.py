@@ -11,7 +11,6 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script

@@ -152,7 +152,7 @@ def check_bot(pdir: Path, gateways: dict, now: float, bundled: set | None = None
     if soul and "## Ask first" not in soul and "approval" not in soul.lower():
         flags.append("no approval checkpoints in SOUL.md — add them with update_agent")
     if name in gateways and not gateways[name]:
-        flags.append("gateway is not running — `hermes -p %s gateway start`" % name)
+        flags.append(f"gateway is not running — `hermes -p {name} gateway start`")
     import companion
     inert = companion.inert_plugins(pdir, pdir.parent.parent, bundled)
     if inert:

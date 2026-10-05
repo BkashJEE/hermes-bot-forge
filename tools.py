@@ -27,7 +27,8 @@ def hermes_root() -> Path:
 
 
 def _clean(text):
-    return "\n".join(l for l in (text or "").splitlines() if not any(n in l for n in NOISE)).strip()
+    return "\n".join(line for line in (text or "").splitlines()
+                     if not any(n in line for n in NOISE)).strip()
 
 
 def launch_profile(session_id=None, root=None) -> str:

@@ -22,3 +22,38 @@ jobs:
         run: python -m unittest discover -s tests -v
       - name: Check the plugin manifest parses
         run: python -c "import yaml,sys; m=yaml.safe_load(open('plugin.yaml')); sys.exit(0 if m['name']=='bot-forge' and m['provides_tools'] else 1)"
+
+  # The bug class that has cost two releases is the plugin not loading at all, and it always
+  # looked like a passing suite: `python -m unittest` runs from inside the checkout, where ''
+  # on sys.path resolves a bare `import forge` that Hermes cannot resolve. So load it the way
+  # Hermes does — as a package, with the working directory somewhere else entirely — and check
+  # that what registers is what plugin.yaml promised.
+  loads-like-hermes-loads-it:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: checkout
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install only what the plugin declares
+        run: pip install pyyaml==6.0.2
+      - name: Every declared tool and hook must actually register
+        working-directory: /tmp
+        run: python -B "$GITHUB_WORKSPACE/checkout/tests/registration_probe.py" "$GITHUB_WORKSPACE/checkout" "$(mktemp -d)"
+      - name: The registered CLI command, diagnostic tool and journal callbacks must run
+        working-directory: /tmp
+        run: python -B "$GITHUB_WORKSPACE/checkout/tests/catalog_callback_probe.py" "$GITHUB_WORKSPACE/checkout" "$(mktemp -d)"
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install ruff
+        run: pip install ruff==0.16.10
+      - name: Lint
+        run: ruff check --output-format github .

@@ -60,7 +60,7 @@ STOPWORDS = {"the", "and", "for", "with", "that", "this", "your", "from", "into"
              "their", "them", "they", "all", "any", "not", "but", "has", "have", "can", "will", "our",
              "use", "using", "via", "per", "own", "end", "new", "one", "two", "each", "when", "what",
              "who", "how", "why", "here", "there", "then", "than", "also", "just", "only", "user",
-             "users", "primary", "every", "before", "after", "about", "into", "over", "under"}
+             "users", "primary", "every", "before", "after", "about", "over", "under"}
 
 # In a Hermes workspace these match everything, so they identify nothing.
 LOCAL_NOISE = {"hermes", "agent", "agents", "plugin", "plugins", "skill", "skills", "bots", "claude"}
@@ -236,7 +236,7 @@ def configured_roots(settings: dict) -> list:
 def _head(path: Path) -> str:
     try:
         with path.open(errors="ignore") as fh:
-            return "".join(line for _i, line in zip(range(HEAD_LINES), fh))[:HEAD_BYTES]
+            return "".join(line for _i, line in zip(range(HEAD_LINES), fh, strict=False))[:HEAD_BYTES]
     except OSError:
         return ""
 

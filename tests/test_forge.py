@@ -26,6 +26,7 @@ import journal  # noqa: E402
 import manage  # noqa: E402
 import team  # noqa: E402
 import tools  # noqa: E402
+from datetime import UTC
 
 
 def make_root(tmp: Path, profiles=(), titles=None, root_display=None):
@@ -322,7 +323,10 @@ class Manage(unittest.TestCase):
             spec = {"op": "delete", "hermes_root": str(root), "name": "quill", "confirm": "quill",
                     "settings": {"allow_delete": True}}
             calls = []
-            with mock.patch.object(manage, "op_export", side_effect=lambda s, r, st: (calls.append(s), {"ok": True, "path": "/x.tar.gz"})[1]), \
+            def record_export(s, r, st):
+                calls.append(s)
+                return {"ok": True, "path": "/x.tar.gz"}
+            with mock.patch.object(manage, "op_export", side_effect=record_export), \
                     mock.patch.object(manage.forge, "run", side_effect=lambda root, *a, **k: calls.append(a)):
                 out = manage.manage(spec)
             self.assertTrue(out["ok"])
@@ -523,7 +527,7 @@ class Journal(unittest.TestCase):
             self.assertTrue((pdir / "journal" / "README.md").exists())
 
     def test_add_and_read_factual_entry(self):
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         with tempfile.TemporaryDirectory() as t:
             root = make_root(Path(t))
@@ -532,7 +536,7 @@ class Journal(unittest.TestCase):
             out = journal.add_entry(pdir, {"title": "Prepared launch draft", "summary": "Drafted three posts.",
                                                    "status": "completed", "evidence": ["drafts/x-launch.md"],
                                                    "next_steps": ["Owner reviews the hooks"], "tags": ["X", "launch"]},
-                                    now=datetime(2026, 9, 20, 20, 30, tzinfo=timezone.utc))
+                                    now=datetime(2026, 9, 20, 20, 30, tzinfo=UTC))
             self.assertTrue(out["written"])
             read = journal.read_entries(pdir, {"query": "three posts", "limit": 5})
             self.assertEqual(read["count"], 1)
@@ -1224,7 +1228,6 @@ class TapbackHooks(unittest.TestCase):
         self.assertTrue(ok._react(tapback.WORKING))
 
     def test_an_unregistered_tool_is_not_dispatched_at_all(self):
-        import tapback
         ctx = self.FakeCtx()
         marks = self._marks(ctx, registered=False)
         marks.on_turn_start(platform="desktop")
@@ -1709,13 +1712,13 @@ class WaitingQueueTests(unittest.TestCase):
 
     def test_blocked_bots_surface_with_bot_name_age_and_detail(self):
         import waiting
-        from datetime import datetime, timezone
+        from datetime import datetime
         with tempfile.TemporaryDirectory() as t:
             root = make_root(Path(t))
             self._bot(root, "marlow", "Marlow", [
                 ("2026-09-20", "2026-09-20T09:00:00Z", "blocked", "Need the Stripe key",
                  "Invoice sync cannot run without it.")])
-            now = datetime(2026, 9, 24, 9, 0, tzinfo=timezone.utc)
+            now = datetime(2026, 9, 24, 9, 0, tzinfo=UTC)
             out = waiting.waiting_on_user(root, now)
             self.assertEqual(out["count"], 1)
             item = out["items"][0]
@@ -2074,7 +2077,7 @@ class OutboundMail(unittest.TestCase):
     def test_the_digest_carries_the_whole_queue(self):
         import notify
         with tempfile.TemporaryDirectory() as tmp:
-            root = self._root(tmp)
+            self._root(tmp)
             subject, body = notify.compose_digest({"count": 2, "items": [
                 {"display_name": "Marlow", "title": "Need the Stripe key", "age_days": 4.0,
                  "detail": "invoice sync"},

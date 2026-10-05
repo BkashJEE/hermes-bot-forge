@@ -7,7 +7,7 @@ has to answer — newest first, so an agent can say "three things need you" with
 Read-only. An item is open until the same Bot writes a later entry that resolves it.
 """
 import re
-from datetime import datetime, timezone
+from datetime import datetime, UTC
 from pathlib import Path
 
 if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
@@ -51,7 +51,7 @@ def _age_days(stamp: str, now: datetime) -> float:
 
 def open_items(pdir: Path, now: datetime | None = None) -> list:
     """Blocked or failed entries a later entry hasn't resolved."""
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     entries = _entries(pdir)
     items = []
     for index, (stamp, status, title, body) in enumerate(entries):
@@ -70,7 +70,7 @@ def open_items(pdir: Path, now: datetime | None = None) -> list:
 def waiting_on_user(root: Path, now: datetime | None = None) -> dict:
     """Every open item across every Bot, newest first."""
     root = Path(root)
-    now = now or datetime.now(timezone.utc)
+    now = now or datetime.now(UTC)
     profiles = root / "profiles"
     bots = [d for d in sorted(profiles.iterdir()) if forge.is_live_profile(d)] if profiles.is_dir() else []
     items = []

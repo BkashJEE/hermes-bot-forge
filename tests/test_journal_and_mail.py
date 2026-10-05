@@ -415,3 +415,79 @@ class OutboundMail(unittest.TestCase):
                              "other@example.com")
 
 
+class ScheduledDigest(unittest.TestCase):
+    """The waiting queue delivers itself, with no model turn and no mail setup."""
+
+    def test_an_empty_queue_prints_nothing(self):
+        """Silence is the feature: a daily "nothing is waiting" teaches you to ignore it."""
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(notify.digest_text(make_root(Path(tmp))), "")
+
+    def test_the_text_drops_the_email_wording(self):
+        """Through Hermes' cron this may land in Telegram, where "this address" means nothing."""
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(Path(tmp))
+            d = root / "profiles" / "nova"
+            (d / "journal").mkdir(parents=True)
+            (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}))
+            (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Nova"}}}))
+            (d / "journal" / "2026-09-20.md").write_text(
+                "\n## 2026-09-20T09:00:00Z \u00b7 blocked \u00b7 Draft could not publish\nneeds approval\n")
+            text = notify.digest_text(root)
+            self.assertIn("Nova: Draft could not publish", text)
+            self.assertIn("Answer any of them in Hermes.", text)
+            self.assertNotIn("this address", text)
+
+    def test_the_script_goes_where_that_profile_will_look(self):
+        """Hermes resolves --script against the running profile's scripts/, not the root's."""
+        import notify
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(Path(tmp))
+            self.assertEqual(notify.scripts_dir(root, "ceo"), root / "profiles" / "ceo" / "scripts")
+            self.assertEqual(notify.scripts_dir(root, ""), root / "scripts")
+            path = notify.install_launcher(root, Path("/plug"), "ceo")
+            self.assertEqual(path.parent, root / "profiles" / "ceo" / "scripts")
+            self.assertIn("/plug/notify.py", path.read_text())
+            self.assertIn("--stdout", path.read_text())
+
+    def test_the_active_profile_is_read_from_the_diamond(self):
+        import notify
+        import subprocess
+        listing = ("  Omarchy (default) gpt-5.6-sol    running\n"
+                   " \u25c6Sanvith \u2014 Chief of Staff (ceo) gpt-6-astra  running\n"
+                   "  Nova \u2014 CMO (nova) ornith-1.5-9b   running\n")
+        out = subprocess.CompletedProcess([], 0, listing, "")
+        self.assertEqual(notify.active_profile(Path("/x"), runner=lambda: out), "ceo")
+        plain = subprocess.CompletedProcess([], 0, " \u25c6Omarchy (default) gpt-5.6-sol running\n", "")
+        self.assertEqual(notify.active_profile(Path("/x"), runner=lambda: plain), "",
+                         "the default profile takes no -p flag")
+
+    def test_scheduling_uses_no_model_turn(self):
+        import notify
+        import subprocess
+        seen = {}
+
+        def fake_run(args):
+            seen["args"] = args
+            return subprocess.CompletedProcess(args, 0, "created", "")
+        with tempfile.TemporaryDirectory() as tmp:
+            out = notify.schedule(make_root(Path(tmp)), "0 8 * * *", profile="ceo",
+                                  plugin_dir=Path("/plug"), runner=fake_run)
+        self.assertTrue(out["ok"], out)
+        self.assertIn("--no-agent", seen["args"], "the digest is deterministic; never call the model")
+        self.assertIn("--script", seen["args"])
+        self.assertIn(notify.SCRIPT_NAME, seen["args"])
+        self.assertEqual(out["profile"], "ceo")
+        self.assertIn("no email setup needed", out["delivery"])
+
+    def test_a_refusal_keeps_the_reason(self):
+        import notify
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            out = notify.schedule(make_root(Path(tmp)), "0 8 * * *", profile="ceo",
+                                  plugin_dir=Path("/plug"),
+                                  runner=lambda a: subprocess.CompletedProcess(a, 1, "", "no such profile"))
+        self.assertFalse(out["ok"])
+        self.assertIn("no such profile", out["error"])

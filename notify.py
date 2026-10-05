@@ -252,10 +252,126 @@ def operate(spec: dict) -> dict:
         return {"ok": False, "error": str(exc)}
 
 
+# ── scheduling ───────────────────────────────────────────────────────────────
+SCRIPT_NAME = "bot-forge-digest.py"
+JOB_NAME = "bot-forge-digest"
+
+LAUNCHER = "\n".join([
+    "#!/usr/bin/env python3",
+    '"""Written by Bot Forge — prints what is waiting on you, and nothing when nothing is.',
+    "",
+    "Hermes runs this on a schedule with --no-agent, so it costs no model turn and its stdout is",
+    "delivered as-is. Silence is the point: a digest that greets you every morning with",
+    '\"nothing is waiting\" teaches you to ignore it.',
+    '"""',
+    "import subprocess",
+    "import sys",
+    "",
+    "raise SystemExit(subprocess.run(",
+    "    [sys.executable, {plugin!r}, \"digest\", \"--stdout\"]).returncode)",
+    "",
+])
+
+
+def digest_text(root: Path) -> str:
+    """The waiting queue as plain text, or empty when nothing is waiting."""
+    if __package__:
+        from . import waiting
+    else:
+        import waiting
+
+    _subject, body = compose_digest(waiting.waiting_on_user(Path(root)))
+    # compose_digest closes with a line written for email. Delivered through Hermes' own cron this
+    # may land in Telegram or a Bot Chat, where "this address" means nothing.
+    return body.replace("Answer any of them in Hermes; this address does not take replies.",
+                        "Answer any of them in Hermes.")
+
+
+def active_profile(root: Path, runner=None) -> str:
+    """Which profile Hermes would run a bare command as — `profile list` marks it with a diamond.
+
+    The job and its script have to agree on this. Hermes resolves `--script` against the *running*
+    profile's `scripts/` directory, so writing to the root while the active profile is a Bot gives
+    "Script file not found" with two correct-looking paths in the error.
+    """
+    if __package__:
+        from . import forge
+    else:
+        import forge
+
+    run = runner or (lambda: forge.run(Path(root), "profile", "list", check=False, timeout=60))
+    try:
+        text = getattr(run(), "stdout", "") or ""
+    except Exception:
+        return ""
+    for line in text.splitlines():
+        if "◆" in line:
+            m = re.search(r"\(([a-z0-9][a-z0-9._-]*)\)", line)
+            if m:
+                return "" if m.group(1) == "default" else m.group(1)
+    return ""
+
+
+def scripts_dir(root: Path, profile: str) -> Path:
+    """Where Hermes looks for a cron --script, for this profile."""
+    root = Path(root)
+    return (root / "profiles" / profile / "scripts") if profile else (root / "scripts")
+
+
+def install_launcher(root: Path, plugin_dir: Path | None = None, profile: str = "") -> Path:
+    """Write the tiny script Hermes' cron can run, where that profile will look for it."""
+    plugin = Path(plugin_dir or Path(__file__).resolve().parent) / "notify.py"
+    folder = scripts_dir(root, profile)
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / SCRIPT_NAME
+    path.write_text(LAUNCHER.format(plugin=str(plugin)))
+    try:
+        os.chmod(path, 0o700)
+    except OSError:
+        pass
+    return path
+
+
+def schedule(root: Path, when: str = "0 8 * * *", profile: str = "", plugin_dir: Path | None = None,
+             runner=None) -> dict:
+    """Have Hermes deliver the waiting queue on a schedule, with no model turn and no mail setup."""
+    if __package__:
+        from . import forge
+    else:
+        import forge
+
+    when = " ".join(str(when or "").split()) or "0 8 * * *"
+    profile = profile or active_profile(root)
+    path = install_launcher(root, plugin_dir, profile)
+    args = ["cron", "create", when, "--name", JOB_NAME, "--no-agent", "--script", path.name]
+    run = runner or (lambda a: forge.run(Path(root), *(["-p", profile] if profile else []), *a,
+                                         check=False, timeout=120))
+    out = run(args)
+    if getattr(out, "returncode", 1) != 0:
+        return {"ok": False, "error": f"could not schedule: {forge.clean(out.stderr or out.stdout)[-300:]}",
+                "script": str(path)}
+    return {"ok": True, "schedule": when, "job": JOB_NAME, "script": str(path),
+            "profile": profile or "default",
+            "delivery": "Hermes delivers the job's output wherever that profile's cron delivers — "
+                        "no email setup needed. Nothing waiting means no message at all.",
+            "stop_it_with": f"hermes cron delete {JOB_NAME}"}
+
+
 def main() -> None:
     import sys
 
     arg = sys.argv[1] if len(sys.argv) > 1 else "-"
+    flags = sys.argv[2:]
+    if arg == "digest" and "--stdout" in flags:
+        # What the scheduled job runs: the queue as plain text, nothing when nothing waits, so an
+        # empty day is silent rather than a cheerful "all clear" nobody reads.
+        print(digest_text(Path(os.environ.get("HERMES_HOME") or forge.default_root())), end="")
+        raise SystemExit(0)
+    if arg == "schedule":
+        when = next((f for f in flags if not f.startswith("-")), "0 8 * * *")
+        result = schedule(forge.default_root(), when)
+        print(json.dumps(result, indent=2))
+        raise SystemExit(0 if result.get("ok") else 1)
     if arg in ("digest", "status"):      # the documented form: no shell pipe to get one action
         spec = {"action": arg}
     elif arg == "-":

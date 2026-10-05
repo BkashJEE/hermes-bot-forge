@@ -3,6 +3,16 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.18.0] - 2026-10-05
+
+### Added
+- **The waiting queue can deliver itself.** `notify.py schedule "0 8 * * *"` writes a small launcher into the running profile's `scripts/` and creates a Hermes cron job for it with `--no-agent` — so it costs no model turn, and Hermes delivers the output wherever that profile already delivers. **No email configuration is needed**, which matters because the mail path needs SMTP credentials and the queue was otherwise only visible when someone remembered to ask.
+- An empty queue prints nothing at all. A digest that greets you every morning with "nothing is waiting" is one you stop reading, so silence is the default rather than a cheerful all-clear.
+- `check_install` reports whether anything delivers the queue, with the command when nothing does.
+
+### Fixed
+- The digest's closing line was written for email ("this address does not take replies"). Delivered through Hermes' cron it can land in Telegram or a Bot Chat, where that sentence means nothing; the scheduled form says "Answer any of them in Hermes."
+
 ## [0.17.1] - 2026-10-06
 
 ### Fixed

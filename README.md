@@ -326,7 +326,15 @@ It uses the email Hermes already has (`EMAIL_SMTP_HOST` / `EMAIL_ADDRESS` / `EMA
 
 **Outbound only, on purpose.** The recipient is resolved from your config and nothing else — never from a tool call, a persona, or anything a model wrote. A Bot can write to your address and no other, so it cannot be talked into mailing a stranger and two Bots cannot reply to each other forever. Nothing here reads a mailbox. Messages are rate limited per Bot so a stuck routine can't become a mail storm, secret-scanned before they leave, and skipped in silence when mail isn't set up — a mail server being down never breaks a turn.
 
-For the whole queue on a schedule rather than one blocker at a time:
+**For the whole queue on a schedule — no email needed.** Hermes delivers the job's output wherever that profile already delivers (Bot Chat, Telegram, wherever), and it runs with `--no-agent`, so it costs no model turn:
+
+```bash
+python3 ~/.hermes/plugins/bot-forge/notify.py schedule "0 8 * * *"
+```
+
+An empty queue prints nothing, so a quiet week is a quiet inbox — a digest that greets you every morning with "nothing is waiting" is one you stop reading. `check_install` tells you whether anything is scheduled.
+
+To send it by email instead:
 
 ```bash
 python3 ~/.hermes/plugins/bot-forge/notify.py digest

@@ -218,6 +218,17 @@ def check(root: Path | None = None, settings: dict | None = None) -> dict:
                               "Set EMAIL_SMTP_HOST, EMAIL_ADDRESS and EMAIL_PASSWORD in Hermes to "
                               "have Bots tell you")})
 
+    profiles = root / "profiles"
+    scheduled = (root / "scripts" / notify.SCRIPT_NAME).exists() or any(
+        (d / "scripts" / notify.SCRIPT_NAME).exists()
+        for d in (profiles.iterdir() if profiles.is_dir() else []) if d.is_dir())
+    checks.append({"check": "digest", "status": OK if scheduled else WARN,
+                   "detail": ("the waiting queue is delivered on a schedule" if scheduled else
+                              "nothing delivers the waiting queue — you only see what needs you when "
+                              "you ask. Schedule it with `python3 "
+                              + str(Path(__file__).resolve().parent / "notify.py")
+                              + " schedule \"0 8 * * *\"` (no email setup needed)")})
+
     if __package__:
         from . import portable
     else:

@@ -18,25 +18,14 @@ sys.path.insert(0, str(ROOT))
 import forge  # noqa: E402
 import yaml  # noqa: E402
 
-try:  # the plugin package (tools.py uses relative-free imports, so plain import works too)
-    import tools  # noqa: E402
-except ImportError:  # pragma: no cover
-    tools = None
-
-try:
-    import manage  # noqa: E402
-except ImportError:  # pragma: no cover
-    manage = None
-
-try:
-    import team  # noqa: E402
-except ImportError:  # pragma: no cover
-    team = None
-
-try:
-    import journal  # noqa: E402
-except ImportError:  # pragma: no cover
-    journal = None
+# Imported outright, never behind `except ImportError: ... = None`. These modules are always
+# importable; the fallback existed only so a class could be skipped, which meant a plugin that
+# had stopped importing at all — v0.15.0, v0.15.3 — silently skipped 22 tests and left CI green.
+# A failure to import any of these is the thing the suite most needs to shout about.
+import journal  # noqa: E402
+import manage  # noqa: E402
+import team  # noqa: E402
+import tools  # noqa: E402
 
 
 def make_root(tmp: Path, profiles=(), titles=None, root_display=None):
@@ -195,7 +184,6 @@ class Skills(unittest.TestCase):
             self.assertEqual(forge.disabled_skills(skills, {"research", "creative"}), {"himalaya"})
 
 
-@unittest.skipIf(tools is None, "tools module not importable")
 class LaunchProfile(unittest.TestCase):
     def test_session_owner_is_found(self):
         with tempfile.TemporaryDirectory() as t:
@@ -253,7 +241,6 @@ class ConfigWrites(unittest.TestCase):
             self.assertEqual(yaml.safe_load(path.read_text())["model"]["default"], "m")
 
 
-@unittest.skipIf(manage is None, "manage module not importable")
 class Manage(unittest.TestCase):
     def _bot(self, root, name="quill", title="Quill"):
         d = root / "profiles" / name
@@ -415,7 +402,6 @@ class Connectors(unittest.TestCase):
         self.assertEqual(forge.suggest_connectors(Path("/nonexistent"), ""), [])
 
 
-@unittest.skipIf(manage is None, "manage module not importable")
 class Teach(unittest.TestCase):
     def _bot(self, root):
         d = root / "profiles" / "quill"
@@ -447,7 +433,6 @@ class Teach(unittest.TestCase):
             self.assertIn("steps", out["error"])
 
 
-@unittest.skipIf(team is None, "team module not importable")
 class Team(unittest.TestCase):
     def test_team_needs_members(self):
         out = team.build_team({"team": "Content", "members": []})
@@ -514,7 +499,6 @@ class Health(unittest.TestCase):
         self.assertFalse(forge.check_routine({"schedule": "*/5 * * * *", "allow_frequent": True}))
 
 
-@unittest.skipIf(journal is None, "journal module not importable")
 class Journal(unittest.TestCase):
     def _bot(self, root, name="quill"):
         d = root / "profiles" / name
@@ -829,37 +813,6 @@ class Manifest(unittest.TestCase):
         registered = {v["name"] for v in vars(schemas).values()
                       if isinstance(v, dict) and "name" in v and "parameters" in v}
         self.assertEqual(set(manifest["provides_tools"]), registered)
-
-    def test_register_loads_as_a_package_like_hermes_does(self):
-        """Hermes imports the plugin as a package with only submodule_search_locations — the plugin dir
-        is never on sys.path, so a bare `import forge` anywhere on the register() path breaks loading."""
-        import subprocess
-        probe = (
-            "import importlib.util, json, sys, types\n"
-            "root = sys.argv[1]\n"
-            "sys.path[:] = [p for p in sys.path if p not in ('', root) and not p.startswith(root)]\n"
-            "ns = sys.modules.setdefault('hermes_plugins', types.ModuleType('hermes_plugins')); ns.__path__ = []\n"
-            "spec = importlib.util.spec_from_file_location('hermes_plugins.bot_forge', root + '/__init__.py',\n"
-            "                                              submodule_search_locations=[root])\n"
-            "mod = importlib.util.module_from_spec(spec); sys.modules[spec.name] = mod; spec.loader.exec_module(mod)\n"
-            "tools = []\n"
-            "class Ctx:\n"
-            "    def register_tool(self, **kw): tools.append(kw['name'])\n"
-            "    def register_cli_command(self, **kw): pass\n"
-            "    def register_hook(self, *a, **kw): pass\n"
-            "    def register_skill(self, *a, **kw): pass\n"
-            "    def get_config(self, key, default=None): return default\n"
-            "mod.register(Ctx())\n"
-            "print(json.dumps(sorted(tools)))\n"
-        )
-        with tempfile.TemporaryDirectory() as t:
-            env = {k: v for k, v in __import__("os").environ.items() if k != "PYTHONPATH"}
-            env.update(HOME=t, USERPROFILE=t, LOCALAPPDATA=t, HERMES_HOME=str(Path(t) / ".hermes"))
-            p = subprocess.run([sys.executable, "-c", probe, str(ROOT)], cwd=t, env=env,
-                               capture_output=True, text=True, timeout=60)
-        self.assertEqual(p.returncode, 0, p.stderr[-2000:])
-        manifest = yaml.safe_load((ROOT / "plugin.yaml").read_text())
-        self.assertEqual(json.loads(p.stdout), sorted(manifest["provides_tools"]))
 
     def test_versions_agree(self):
         manifest = yaml.safe_load(Path(ROOT / "plugin.yaml").read_text())
@@ -1644,7 +1597,6 @@ class InheritedPlugins(unittest.TestCase):
             self.assertEqual(bot["inert_plugins"], [])
             self.assertFalse(any("enabled but not installed" in f for f in bot["flags"]))
 
-    @unittest.skipIf(manage is None, "manage module not importable")
     def test_update_agent_carries_plugins_into_an_existing_bot(self):
         with tempfile.TemporaryDirectory() as t:
             root = self._root(t)

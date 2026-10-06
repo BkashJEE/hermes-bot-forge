@@ -21,7 +21,6 @@ import shutil
 import subprocess
 import urllib.error
 import urllib.request
-from pathlib import Path
 
 MAX_FETCH_BYTES = 512_000
 FETCH_TIMEOUT = 20

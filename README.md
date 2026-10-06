@@ -51,8 +51,10 @@ Every step is checked, and the whole Bot is rolled back if one fails.
 - Hermes Desktop for Bot Mode (the CLI works too — Bots are profiles)
 - **Linux and macOS are tested.** Windows is not: Bots are still created and work from the CLI, but gateway services and sandboxes are skipped there
 
-PyYAML is installed for you: `plugin.yaml` declares it under `python_dependencies`, and Hermes
-asks before preparing it. Nothing to add to your own environment.
+PyYAML is installed for you: `plugin.yaml` declares it under `python_dependencies`, and
+`hermes plugins install` puts it in the environment the plugin runs in, re-applying it after
+later updates. Nothing to add to your own environment; `--no-deps` skips it if you manage
+Python packages yourself.
 
 ### 2. Install
 

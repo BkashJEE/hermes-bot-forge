@@ -197,7 +197,9 @@ SHARE_AGENT = {
             "name": {"type": "string", "description": "the Bot to share"},
             "mode": {"type": "string", "enum": ["template", "backup"], "description": "template (default) or backup"},
             "publish": {"type": "boolean", "description": (
-                "also post the template as an unlisted gist and return a link anyone can import from. Uses the user's own GitHub CLI; refused with the reason when it is missing or signed out. Never use it with mode backup.")},
+                "also post the template as an unlisted gist and return a link anyone can import "
+                "from. Uses the user's own GitHub CLI; refused with the reason when it is missing "
+                "or signed out. Never use it with mode backup.")},
             "path": {"type": "string", "description": "optional file name/path under <hermes>/profile-exports (never overwrites)"},
         },
         "required": ["name"],

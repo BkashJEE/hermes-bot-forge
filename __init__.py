@@ -34,6 +34,10 @@ def register(ctx):
     ctx.register_tool(name="ask_agent", toolset="bot_forge", schema=schemas.ASK_AGENT,
                       handler=tools.ask_agent, emoji="📨",
                       description="Ask another Hermes Bot something and return its reply")
+    ctx.register_tool(name="handoff_agent", toolset="bot_forge", schema=schemas.HANDOFF_AGENT,
+                      handler=lambda args, **kw: tools.handoff_agent(args, settings=settings(), **kw),
+                      emoji="🤝",
+                      description="Hand a task, with context, to another Bot that then owns it")
 
     for name, schema, handler, emoji, blurb in (
         ("create_team", schemas.CREATE_TEAM, tools.create_team, "🧬", "Build a team of Bots with a lead"),

@@ -1,5 +1,5 @@
 name: bot-forge
-version: 0.18.0
+version: 0.19.0
 description: Say "make me a <role>" and your Hermes agent builds a complete, working Bot — name, face, SOUL.md, memory, tools, skills, routines, Bot Chat and gateway — tested and rolled back on failure.
 author: Bikash Joshi
 license: MIT
@@ -10,7 +10,7 @@ requires_hermes: ">=0.21"
 # Installed into the environment the plugin runs in. forge.py, manage.py, companion.py
 # and tools.py all import yaml; without this declaration the plugin only loads on a
 # machine that happens to have PyYAML already, and fails with ModuleNotFoundError
-# everywhere else — taking all 14 tools and both hooks with it.
+# everywhere else — taking all 15 tools and both hooks with it.
 python_dependencies:
   - PyYAML>=6.0,<7
 provides_tools:
@@ -25,6 +25,7 @@ provides_tools:
   - check_install
   - agent_journal
   - ask_agent
+  - handoff_agent
   - share_agent
   - import_agent
   - hide_agent

@@ -30,7 +30,11 @@ class IndependentCredentials(unittest.TestCase):
         spec.loader.exec_module(self.helper)
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
-        self.root = Path(self.tmp.name)
+        # Resolved, because copy_login() resolves its root (extras/share_login.py:27).
+        # On macOS tempfile hands back /var/folders/..., which resolves to
+        # /private/var/folders/..., so an unresolved path here never matches the one the
+        # helper actually operates on and the assertions silently compare nothing (#37).
+        self.root = Path(self.tmp.name).resolve()
         self.bot = self.root / 'profiles' / 'quill'
         self.bot.mkdir(parents=True)
         (self.bot / 'config.yaml').write_text('{}')
@@ -81,6 +85,26 @@ class IndependentCredentials(unittest.TestCase):
                 self.helper.copy_login(self.root, 'quill')
         self.assertEqual(dest.read_text(), 'old synthetic credentials')
         self.assertEqual(list(self.bot.glob('.auth-copy-*')), [])
+
+    def test_a_root_reached_through_a_symlink_is_handled(self):
+        """macOS reaches its temp dir through a symlink; Linux CI never did, so #37 hid there.
+
+        Recreating that shape here means this platform difference is exercised on every CI run
+        rather than only on a contributor's laptop.
+        """
+        real = Path(self.tmp.name) / 'real-home'
+        (real / 'profiles' / 'quill').mkdir(parents=True)
+        (real / 'profiles' / 'quill' / 'config.yaml').write_text('{}')
+        (real / 'auth.json').write_text('{"synthetic":"test-only"}')
+        link = Path(self.tmp.name) / 'linked-home'
+        link.symlink_to(real, target_is_directory=True)
+
+        self.helper.copy_login(link, 'quill')
+
+        dest = real / 'profiles' / 'quill' / 'auth.json'
+        self.assertTrue(dest.exists(), 'the copy must land in the real directory')
+        self.assertEqual(dest.stat().st_mode & 0o777, 0o600)
+        self.assertFalse(dest.is_symlink())
 
     def test_credentials_are_private_before_copying_any_bytes(self):
         from unittest import mock

@@ -229,6 +229,11 @@ def ask_agent(args: dict, **kwargs) -> str:
         # process essentials
         "PATH", "HOME", "LANG", "LC_ALL", "TZ", "TERM", "TMPDIR",
         "SYSTEMROOT", "WINDIR", "PATHEXT", "VIRTUAL_ENV",
+        # who this machine's account is. The account *name* carries no authority — it is not a
+        # credential and not a handle to one — but tools that already hold a login look it up to
+        # find that login. Without USER the Claude CLI reported no login at all in this sanitized
+        # environment, so ask_agent could not consult a Bot on a working Claude subscription.
+        "USER", "LOGNAME", "USERNAME",
         # how this machine reaches the network and trusts certificates. Dropping these does not
         # fail loudly — the Bot simply cannot reach the model behind a corporate proxy, or rejects
         # a TLS-inspecting one. Read by utils.py, agent/proxy_bypass.py, agent/process_bootstrap.py

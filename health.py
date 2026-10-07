@@ -8,6 +8,7 @@ Spec: {"hermes_root": "...", "name": "optional single Bot"}
 Read-only. Reports per Bot: model, gateway, routines with estimated runs/day, last activity, and flags —
 too-frequent routines, paused or never-run routines, unused Bots, a SOUL.md that doesn't state the Bot's
 name or approval checkpoints, plugins enabled in config but not installed in the profile (enabled but inert).
+Across Bots: what is waiting on the user, and which handoffs between Bots are still in flight.
 Suggestions only; it never changes anything.
 """
 import contextlib
@@ -202,24 +203,29 @@ def check(s: dict) -> dict:
         if not bots:
             return {"ok": False, "error": f"no Bot named '{s['name']}'"}
     if __package__:
-        from . import companion, waiting
+        from . import companion, handoff, waiting
     else:
         import companion
+        import handoff
         import waiting
     gateways = _gateways(root)
     bundled = companion.bundled_plugin_names()
     report = [check_bot(d, gateways, now, bundled) for d in bots]
     pending = waiting.waiting_on_user(root)
+    in_flight = handoff.open_handoffs(root)
     attention = [b for b in report if b["flags"]]
     silent = [b["display_name"] for b in report if not b.get("acknowledges")]
+    summary = (f"{pending['count']} waiting on you — {pending['summary']}" if pending["count"] else
+               "all Bots look healthy" if not attention else
+               "; ".join(f"{b['display_name']}: {b['flags'][0]}" for b in attention[:5]))
+    if in_flight["count"]:
+        summary += f"; {in_flight['count']} handoff{'s' if in_flight['count'] != 1 else ''} in flight — {in_flight['summary']}"
     return {"ok": True, "bots": len(report), "needing_attention": len(attention),
             "not_acknowledging": silent,
             "waiting_on_you": pending["items"], "waiting_count": pending["count"],
+            "handoffs": in_flight["items"], "handoffs_count": in_flight["count"],
             "total_routine_runs_per_day": round(sum(b["runs_per_day"] for b in report), 1),
-            "report": report,
-            "summary": (f"{pending['count']} waiting on you — {pending['summary']}" if pending["count"] else
-                        "all Bots look healthy" if not attention else
-                        "; ".join(f"{b['display_name']}: {b['flags'][0]}" for b in attention[:5]))}
+            "report": report, "summary": summary}
 
 
 def main():

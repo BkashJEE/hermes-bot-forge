@@ -264,7 +264,8 @@ Fifteen tools, all driven by plain requests in chat:
 | `check_agents` | *"anything waiting on me?"* | Leads with `waiting_on_you` — every Bot blocked on something only you can do, with its age. Then the read-only health check: routines that run too often (and their cost in runs/day), paused or never-run routines, unused Bots, stopped gateways, a persona missing its name or approvals. |
 | `check_policies` | *"are my bots up to date with the house rules?"* | Read-only. Compares every Bot's inlined [shared operating policy](#shared-operating-policy) against `~/.hermes/shared/BOT-POLICY.md` and reports which are `stale` or have none. |
 | `agent_journal` | *"what did Inkwell work on this week?"* | Enables, appends to, and reads a Bot's dated work journal. Entries capture outcomes and evidence, never credentials or private reasoning. |
-| `ask_agent` | *"ask Inkwell for 3 post ideas"* | Sends a task to another Bot and returns its reply. |
+| `ask_agent` | *"ask Inkwell for 3 post ideas"* | Asks another Bot a question and returns its reply. |
+| `handoff_agent` | *"pass this to Nova"*, *"let Scout take the research"* | Hands a task **and its context** to another Bot, which then owns it. Runs in that Bot's own Bot Chat; comes back as ✅ done / ✋ needs you / ⚠️ blocked plus the reply. Both Bots journal it. |
 | `share_agent` | *"share Inkwell with a friend"* | Writes a readable `.botforge.json` template — persona, its own memory, tools, skills, routines. **Never chat history, facts about you, or keys**, and secret-scanned (CLEAN / WARN / BLOCK). `mode: backup` makes a full private backup instead. |
 | `import_agent` | *"import this bot"* | Builds a Bot from a `.botforge.json` template (scanned again), or restores a backup. |
 | `hide_agent` | *"hide Inkwell from the list"* | Hides or unhides it in the roster. It keeps running. |
@@ -285,6 +286,23 @@ Five starters, modelled on the most-used Grok Bot patterns:
 > make me a chief of staff from the template
 
 Any field you give overrides the template's, so *"a morning brief bot called Sol that also covers crypto"* works.
+
+### Bots that hand work to each other
+
+> Marshal, get Thursday's launch thread written
+
+Marshal doesn't write it. It calls `handoff_agent` with the task and everything it already knows — audience, the hook, where the notes are — and Inkwell takes it from there, **in Inkwell's own Bot Chat**, where you can watch. The result comes back as a state, not a paragraph to interpret:
+
+| | Inkwell's reply began with | so Marshal reports |
+|---|---|---|
+| `completed` | ✅ | done, and where the work is |
+| `needs_you` | ✋ | what you have to approve — and it's already in *what's waiting on you* |
+| `blocked` | ⚠️ | what it needs — also in the waiting queue |
+| `scheduled` | ⏳ | when it will run |
+
+The state is read from the acknowledgement every Bot Forge Bot already starts its replies with, so no second convention is needed. Both Bots journal the handoff (*"Handed off to Inkwell"*, *"Handoff from Marshal"*), the record lives with the Bot that owns the work, and `check_agents` lists every handoff still in flight — so *"where did that task go?"* has an answer, even a week later.
+
+Only words cross between Bots. No file is copied, no credential or environment travels, and the task and context are secret-scanned before anything is sent: a key pasted into the context is refused with the reason, and nothing runs.
 
 ### A team in one sentence
 
@@ -497,6 +515,8 @@ The existing general `check_agents`/`check_install` diagnostics are outside this
 | Share / import a Bot | templates | markdown teams | ClawHub | ✅ `share_agent` |
 | Approval checkpoints written in at birth | set later | permission cards | policy | ✅ `approvals` |
 | Whole team from one sentence | — | markdown file | — | ✅ `create_team` |
+| Bots hand work to each other, with context, ownership recorded | group chat | — | delegation tool | ✅ `handoff_agent`, outcome as a state |
+| Where a handed-off task went, a week later | — | — | — | ✅ `check_agents` → `handoffs` |
 | Teach a skill by chatting | ✅ | playbooks | ClawHub | ✅ `teach_agent` |
 | Connector suggestions for the job | ✅ | ✅ | — | ✅ from Hermes' MCP catalog |
 | Routine cost health check | community bots | — | — | ✅ `check_agents` |

@@ -17,6 +17,15 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 - README said "Thirteen tools"; the manifest already listed fourteen before this change, and lists fifteen with `check_policies`.
+## [0.19.0] - 2026-10-07
+
+### Added
+- **Bots hand work to each other.** `handoff_agent(to, task, context)` moves a task from the Bot the user is talking to onto another Bot, which then owns it. The receiving Bot is told who handed it over, what it owns, what is already known and what "done" looks like, and the work runs in **its own Bot Chat**, so the user can watch it in Desktop rather than find it buried in a lead Bot's transcript. `ask_agent` stays what it was — a question and an answer — this is ownership moving.
+- **The outcome is a state, not prose.** Every Bot Forge Bot already begins its replies with one acknowledgement emoji; the handoff reads it. ✅ is `completed`, ✋ is `needs_you`, ⚠️ is `blocked`, ⏳ is `scheduled`, and a reply with none of them is reported as such instead of guessed at. A ✋ or ⚠️ writes a `blocked` entry in the receiving Bot's journal, so it is already in *what's waiting on you* and already mailed, with nothing extra to wire.
+- **The record survives the chat.** Each handoff is written to the receiving Bot's `handoffs/<id>.json` before the turn runs, updated with the outcome after, and both Bots journal it (*Handed off to Inkwell* / *Handoff from Marshal*). `check_agents` lists every handoff that has not ended in ✅ under `handoffs`, newest first, with its age — the first answer to "where did that task go?".
+
+### Security
+- **Only words cross between Bots.** The receiving Bot's turn runs with the same environment allowlist `ask_agent` has used since #22 (network and config, never `SSH_AUTH_SOCK` or the caller's `.env`), now shared as `forge.safe_env` rather than duplicated. The task and context are secret-scanned before anything is sent; a credential in either is refused with the reason and nothing runs. The sender is the profile whose turn called the tool, never a tool argument, so a Bot cannot hand work over in another Bot's name.
 
 ## [0.18.0] - 2026-10-05
 

@@ -11,8 +11,9 @@ import sys
 from pathlib import Path
 
 if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
-    from . import policy as policy_mod
+    from . import forge, policy as policy_mod
 else:
+    import forge
     import policy as policy_mod
 
 PLUGIN_DIR = Path(__file__).resolve().parent
@@ -292,6 +293,23 @@ def delete_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
     return _manage("delete", args, settings)
 
 
+def handoff_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
+    """Pass a task, with context, to another Bot; it runs in that Bot's own Bot Chat."""
+    root = hermes_root()
+    spec = {**args, "from": launch_profile(kwargs.get("session_id"), root),
+            "hermes_root": str(root), "settings": settings or {}}
+    try:
+        p = subprocess.run([sys.executable, str(PLUGIN_DIR / "handoff.py"), "-"], input=json.dumps(spec),
+                           capture_output=True, text=True, timeout=960)
+    except subprocess.TimeoutExpired:
+        return json.dumps({"ok": False, "error": "handoff_agent timed out after 16 min"})
+    out = p.stdout.strip()
+    try:
+        return json.dumps(json.loads(out[out.index("{"):]))
+    except ValueError:
+        return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
+
+
 def _profile_info(name, home):
     import yaml
     cfg, meta = {}, {}
@@ -334,36 +352,9 @@ def ask_agent(args: dict, **kwargs) -> str:
         return json.dumps({"ok": False, "error": "need a valid profile name and a message"})
     if name != "default" and not (root / "profiles" / name / "config.yaml").exists():
         return json.dumps({"ok": False, "error": f"no Bot named '{name}' (see list_agents)"})
-    # The caller may have loaded its entire .env (or a routed profile's secrets).
-    # Never forward that process environment to another Bot. The CLI loads the
-    # target profile's own .env and auth.json after -p resolves its home.
-    safe_keys = (
-        # process essentials
-        "PATH", "HOME", "LANG", "LC_ALL", "TZ", "TERM", "TMPDIR",
-        "SYSTEMROOT", "WINDIR", "PATHEXT", "VIRTUAL_ENV",
-        # who this machine's account is. The account *name* carries no authority — it is not a
-        # credential and not a handle to one — but tools that already hold a login look it up to
-        # find that login. Without USER the Claude CLI reported no login at all in this sanitized
-        # environment, so ask_agent could not consult a Bot on a working Claude subscription.
-        "USER", "LOGNAME", "USERNAME",
-        # how this machine reaches the network and trusts certificates. Dropping these does not
-        # fail loudly — the Bot simply cannot reach the model behind a corporate proxy, or rejects
-        # a TLS-inspecting one. Read by utils.py, agent/proxy_bypass.py, agent/process_bootstrap.py
-        # and the model-provider plugins.
-        "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE",
-        "NODE_EXTRA_CA_CERTS",
-        "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY",
-        "http_proxy", "https_proxy", "no_proxy", "all_proxy",
-        # where this machine keeps config and data. Hermes resolves 1Password and Bitwarden secret
-        # sources through these (agent/secret_sources/, agent/vault_backends/), so without them a
-        # Bot whose keys live in a vault cannot find them.
-        "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME",
-    )
-    # Deliberately absent: SSH_AUTH_SOCK, GPG_AGENT_INFO and anything else that hands the child a
-    # live handle to the caller's own credentials. This list is for reaching the network and
-    # finding config, never for carrying authority.
-    env = {k: os.environ[k] for k in safe_keys if k in os.environ}
-    env["HERMES_HOME"] = str(root)  # -p resolves under this root, independent of caller HOME
+    # Never forward the caller's process environment to another Bot — it may hold the main profile's
+    # whole .env. forge.safe_env is the one allowlist for running another Bot's turn.
+    env = forge.safe_env(root)
     try:
         p = subprocess.run(["hermes", "-p", name, "chat", "-Q", "--max-turns", "30", "-q", message],
                            capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=900, env=env)

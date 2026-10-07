@@ -83,9 +83,47 @@ def cli_env(root: Path):
     return env
 
 
-def run(root, *args, timeout=180, check=True):
+# What a `hermes` child process may inherit when it is another Bot's turn being run — reaching the
+# network and finding config, never carrying authority. The caller may have loaded its whole .env, and
+# that must not reach a Bot with credentials of its own (#22). The target profile loads its own .env
+# and auth.json once -p resolves its home.
+SAFE_ENV_KEYS = (
+    # process essentials
+    "PATH", "HOME", "LANG", "LC_ALL", "TZ", "TERM", "TMPDIR",
+    "SYSTEMROOT", "WINDIR", "PATHEXT", "VIRTUAL_ENV",
+    # who this machine's account is. The account *name* carries no authority — it is not a
+    # credential and not a handle to one — but tools that already hold a login look it up to
+    # find that login. Without USER the Claude CLI reported no login at all in this sanitized
+    # environment (#43), so neither ask_agent nor handoff_agent could reach a Bot on a working
+    # Claude subscription.
+    "USER", "LOGNAME", "USERNAME",
+    # how this machine reaches the network and trusts certificates. Dropping these does not
+    # fail loudly — the Bot simply cannot reach the model behind a corporate proxy, or rejects
+    # a TLS-inspecting one. Read by utils.py, agent/proxy_bypass.py, agent/process_bootstrap.py
+    # and the model-provider plugins.
+    "SSL_CERT_FILE", "SSL_CERT_DIR", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE",
+    "NODE_EXTRA_CA_CERTS",
+    "HTTP_PROXY", "HTTPS_PROXY", "NO_PROXY", "ALL_PROXY",
+    "http_proxy", "https_proxy", "no_proxy", "all_proxy",
+    # where this machine keeps config and data. Hermes resolves 1Password and Bitwarden secret
+    # sources through these (agent/secret_sources/, agent/vault_backends/), so without them a
+    # Bot whose keys live in a vault cannot find them.
+    "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME",
+)
+# Deliberately absent: SSH_AUTH_SOCK, GPG_AGENT_INFO and anything else that hands the child a
+# live handle to the caller's own credentials.
+
+
+def safe_env(root: Path) -> dict:
+    """Environment for running *another* Bot's turn: the allowlist above plus the Hermes root."""
+    env = {k: os.environ[k] for k in SAFE_ENV_KEYS if k in os.environ}
+    env["HERMES_HOME"] = str(root)  # -p resolves under this root, independent of caller HOME
+    return env
+
+
+def run(root, *args, timeout=180, check=True, env=None):
     p = subprocess.run(["hermes", *args], capture_output=True, text=True, stdin=subprocess.DEVNULL,
-                       timeout=timeout, env=cli_env(root))
+                       timeout=timeout, env=env if env is not None else cli_env(root))
     if check and p.returncode != 0:
         raise RuntimeError(f"hermes {' '.join(args)} failed ({p.returncode}): {clean(p.stderr or p.stdout)[-800:]}")
     return p
@@ -553,7 +591,8 @@ def newest_session(root, profile_id: str) -> str:
         return ""
 
 
-def bot_chat(root, profile_id, message, source: str = ""):
+def bot_chat(root, profile_id, message, source: str = "", max_turns: int = 3, timeout: int = CHAT_TIMEOUT,
+             env: dict | None = None):
     """Send a message in the Bot's canonical Bot Chat (created on first use).
 
     The source stamped here is permanent, and Hermes decides a session's client surface from it
@@ -564,17 +603,18 @@ def bot_chat(root, profile_id, message, source: str = ""):
     existing = has_bot_chat(root, profile_id)
     if existing or source == "cli":
         p = run(root, "-p", profile_id, "chat", "-c", BOT_CHAT_TITLE, "--create-if-missing", "-Q",
-                "--max-turns", "3", "-q", message, timeout=CHAT_TIMEOUT, check=False)
+                "--max-turns", str(max_turns), "-q", message, timeout=timeout, check=False, env=env)
     else:
         # `chat -c <title> --create-if-missing` hardcodes source="cli" (hermes_cli/main.py), and a session's
         # stored source is what decides its client surface — a cli-stamped chat never gets the desktop
         # toolset, so the Bot cannot react to a message in Desktop. Start it with the right source, then
         # give it the canonical title.
-        p = run(root, "-p", profile_id, "chat", "--source", source, "-Q", "--max-turns", "3", "-q", message,
-                timeout=CHAT_TIMEOUT, check=False)
+        p = run(root, "-p", profile_id, "chat", "--source", source, "-Q", "--max-turns", str(max_turns), "-q",
+                message, timeout=timeout, check=False, env=env)
         session_id = newest_session(root, profile_id)  # -Q hides the session_id line, so read it back
         if session_id:
-            run(root, "-p", profile_id, "sessions", "rename", session_id, BOT_CHAT_TITLE, check=False, timeout=60)
+            run(root, "-p", profile_id, "sessions", "rename", session_id, BOT_CHAT_TITLE, check=False, timeout=60,
+                env=env)
     out = clean(p.stdout)
     return p.returncode == 0 and bool(out), out or clean(p.stderr)[-800:]
 

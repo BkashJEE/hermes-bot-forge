@@ -135,6 +135,34 @@ ASK_AGENT = {
 }
 
 
+HANDOFF_AGENT = {
+    "name": "handoff_agent",
+    "description": (
+        "Hand a piece of work to another Bot so it owns it from here — 'pass this to Nova', 'let Scout take "
+        "the research', or when a task is another Bot's job (check list_agents). Unlike ask_agent, which asks "
+        "a question and returns an answer, a handoff moves ownership: the other Bot is told it owns the task "
+        "end to end, the work runs in its own Bot Chat where the user can watch it, and the result comes back "
+        "as a state read from its reply — completed (✅), needs_you (✋), blocked (⚠️) or scheduled (⏳) — "
+        "plus the reply itself. Both Bots journal it, and check_agents lists handoffs still in flight. Put "
+        "everything the other Bot needs in `context`: your findings, links, constraints, what 'done' looks "
+        "like — it does not see this chat. Never put a key or password in it; say where it lives instead. "
+        "Synchronous: it waits for the other Bot, up to 15 minutes. Do not redo the work yourself afterwards."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "to": {"type": "string", "description": "the Bot that takes the work — profile name or roster title from list_agents"},
+            "task": {"type": "string", "description": (
+                "what the other Bot now owns, in one or two sentences, including what 'done' looks like")},
+            "context": {"type": "string", "description": (
+                "what you already know that it needs: findings so far, links, files by path, constraints, the "
+                "user's preferences. Plain text, up to ~8,000 characters; summarise and point to the rest.")},
+        },
+        "required": ["to", "task"],
+    },
+}
+
+
 UPDATE_AGENT = {
     "name": "update_agent",
     "description": (
@@ -401,7 +429,9 @@ CHECK_AGENTS = {
         "checkpoints, plugins enabled in its config that are not installed in it (enabled but inert — fix with "
         "update_agent's inherit_plugins). It also returns `waiting_on_you`: everything a Bot got blocked on and "
         "wrote in its journal that nobody has answered yet — report those FIRST, oldest ones by name, because the user "
-        "cannot see them without asking. Use when the user asks 'how are my bots doing' or 'what needs me', "
+        "cannot see them without asking — and `handoffs`: work one Bot passed to another that has not ended in ✅ "
+        "(needs the user, blocked, scheduled), so the user can see where a task went. Use when the user asks "
+        "'how are my bots doing' or 'what needs me', "
         "during a weekly review, or before adding more routines. Suggest fixes; don't apply them without asking."
     ),
     "parameters": {

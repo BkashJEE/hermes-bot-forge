@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.18.0
+version: 0.19.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos]
@@ -153,6 +153,14 @@ When a Bot journals a `blocked` or `failed` entry, the plugin emails the user by
 - Skip routine conversation. Never journal credentials, authentication material, facts unrelated to the job, private reasoning, or hidden chain-of-thought.
 - "what did X do?" / "show X's journal" → `agent_journal` with `action: read` and the Bot name.
 - A Bot created before journaling existed → `agent_journal` with `action: enable` once. This appends the journal policy without replacing its persona.
+
+## Handing work to another Bot
+"pass this to Nova", "let Scout take the research", "Inkwell should write this up" — or a task that is plainly another Bot's job (check `list_agents`) → `handoff_agent`. It is not `ask_agent`: a handoff **moves ownership**. The other Bot is told it owns the task end to end, the work runs in *its* Bot Chat where the user can watch, and the result comes back as a state read from its reply — `completed` ✅, `needs_you` ✋, `blocked` ⚠️, `scheduled` ⏳ — plus the reply.
+
+- Put everything it needs in `context`: your findings, links, file paths, constraints, what "done" looks like. It cannot see this chat. Never a key or password — say where it lives.
+- Report the outcome, don't redo the work. `needs_you` means the user has to approve something: say what. `blocked` is already in the waiting queue.
+- Both Bots journal the handoff, and `check_agents` lists the ones still in flight under `handoffs`, so "where did that task go?" has an answer.
+- It waits for the other Bot (up to 15 minutes). Use `ask_agent` for a quick question with no ownership change.
 
 ## Teams
 Apply the same preflight to each proposed responsibility, including the lead. A request for a

@@ -52,6 +52,25 @@ class AskAgentEnvironment(unittest.TestCase):
             self.assertNotIn("SSH_AUTH_SOCK", env)
             self.assertNotIn("OPENAI_API_KEY", env)
 
+    def test_the_account_name_travels_so_an_existing_login_is_found(self):
+        """Reported from macOS (#43): without USER the Claude CLI saw no login at all.
+
+        The account name is not a credential and opens nothing on its own, but a tool that
+        already holds a login looks it up to find that login. Dropping it failed silently —
+        ask_agent simply could not consult a Bot on a working Claude subscription.
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = make_root(Path(tmp), profiles=("kairo",))
+            identity = {"USER": "bkash86", "LOGNAME": "bkash86", "USERNAME": "bkash86"}
+            with mock.patch.object(tools, "hermes_root", return_value=root), \
+                 mock.patch.dict(os.environ, identity), \
+                 mock.patch.object(tools.subprocess, "run",
+                                   return_value=subprocess.CompletedProcess([], 0, "done", "")) as run:
+                tools.ask_agent({"name": "kairo", "message": "Review only"})
+            env = run.call_args.kwargs["env"]
+            for key, value in identity.items():
+                self.assertEqual(env.get(key), value, key)
+
 
 class Manage(unittest.TestCase):
     def _bot(self, root, name="quill", title="Quill"):

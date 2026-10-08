@@ -151,6 +151,22 @@ def check_bot(pdir: Path, gateways: dict, now: float, bundled: set | None = None
         flags.append("SOUL.md doesn't state the Bot's own name — it may introduce itself as another Bot")
     if soul and "## Ask first" not in soul and "approval" not in soul.lower():
         flags.append("no approval checkpoints in SOUL.md — add them with update_agent")
+    # A Bot given its own login holds a readable copy of it. That is the point — a Bot should not
+    # borrow the root profile's credentials — but it is worth saying out loud, because nothing
+    # else in this report tells you which Bots can read a token and which cannot.
+    credential = pdir / "auth.json"
+    if credential.is_file():
+        try:
+            mode = credential.stat().st_mode & 0o777
+        except OSError:
+            mode = None
+        detail = f" (mode {mode:o})" if mode is not None else ""
+        if mode is not None and mode & 0o077:
+            flags.append(f"holds its own auth.json readable by other users on this machine{detail} — "
+                         f"`chmod 600 {credential}`")
+        else:
+            flags.append(f"holds its own auth.json{detail} — the Bot's process can read that token; "
+                         f"that is how an independent login works, but it is reach worth knowing about")
     if name in gateways and not gateways[name]:
         flags.append(f"gateway is not running — `hermes -p {name} gateway start`")
     import companion

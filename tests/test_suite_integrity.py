@@ -13,6 +13,8 @@ import ast
 import unittest
 from pathlib import Path
 
+import yaml
+
 TESTS = Path(__file__).resolve().parent
 ROOT = TESTS.parents[0]
 
@@ -104,27 +106,76 @@ def _assigns_none(stmt):
 
 
 class PlatformClaimsMatchWhatIsTested(unittest.TestCase):
-    """Only claim a platform the suite actually runs on.
+    """A platform may be claimed only if CI actually runs the suite on it.
 
-    The skill advertised `platforms: [linux, macos, windows]` while no Windows machine has ever
-    run these tests, every Windows code path is exercised by patching `sys.platform`, and the two
-    bug reports that did arrive from Windows were both the plugin failing outright. Claiming a
-    platform is a promise; this keeps the promise and the evidence in the same place.
+    The first version of this test compared the skill's `platforms:` against a hardcoded
+    `TESTED = ["linux", "macos"]` in this file. Both sides were things the maintainer typed, so
+    it could only catch a typo — and it went green while every CI job ran `ubuntu-latest` and a
+    test failed deterministically on macOS, which a contributor had to report (#37).
+
+    So the evidence is the workflow. The OS list on the job that runs the suite *is* the set of
+    platforms this project may claim; nothing in this file gets a vote.
     """
 
-    TESTED = ["linux", "macos"]
+    WORKFLOW = ROOT / ".github" / "workflows" / "tests.yml"
 
-    def test_the_skill_claims_only_tested_platforms(self):
+    # GitHub runner label prefix -> the platform name a skill manifest uses.
+    RUNNERS = {"ubuntu": "linux", "macos": "macos", "windows": "windows"}
+
+    def platforms_ci_runs_the_suite_on(self):
+        """Read the workflow and return the platforms the test suite is actually executed on."""
+        import re
+        workflow = yaml.safe_load(self.WORKFLOW.read_text(encoding="utf-8"))
+        found = set()
+        for name, job in (workflow.get("jobs") or {}).items():
+            steps = job.get("steps") or []
+            # Only a job that runs the whole suite counts. Linting on one OS is not coverage,
+            # and neither is a job that loads the plugin without exercising its behaviour.
+            if not any("unittest discover" in str(step.get("run", "")) for step in steps):
+                continue
+            labels = []
+            runs_on = job.get("runs-on", "")
+            if isinstance(runs_on, str) and "matrix." in runs_on:
+                key = re.search(r"matrix\.([A-Za-z_][A-Za-z0-9_]*)", runs_on).group(1)
+                labels = ((job.get("strategy") or {}).get("matrix") or {}).get(key) or []
+            elif isinstance(runs_on, list):
+                labels = runs_on
+            elif runs_on:
+                labels = [runs_on]
+            self.assertTrue(labels, f"job {name!r} runs the suite but declares no runner")
+            for label in labels:
+                for prefix, platform in self.RUNNERS.items():
+                    if str(label).startswith(prefix):
+                        found.add(platform)
+                        break
+                else:
+                    self.fail(f"unrecognised runner {label!r} in job {name!r}; "
+                              f"add it to RUNNERS so the claim stays derived from CI")
+        return found
+
+    def test_ci_runs_the_suite_somewhere(self):
+        """Guard the guard: if this returns nothing, every assertion below is vacuous."""
+        self.assertTrue(self.platforms_ci_runs_the_suite_on(),
+                        "no CI job runs `unittest discover`, so nothing below proves anything")
+
+    def test_the_skill_claims_no_platform_ci_does_not_run(self):
         import re
         skill = (ROOT / "skills" / "bot-forge" / "SKILL.md").read_text(encoding="utf-8")
         match = re.search(r"^platforms:\s*\[([^\]]*)\]", skill, re.MULTILINE)
         self.assertIsNotNone(match, "skills/bot-forge/SKILL.md declares no platforms")
-        claimed = [p.strip() for p in match.group(1).split(",") if p.strip()]
-        self.assertEqual(claimed, self.TESTED,
-                         "add the platform to TESTED only once the suite runs there")
+        claimed = {p.strip() for p in match.group(1).split(",") if p.strip()}
+        unproven = claimed - self.platforms_ci_runs_the_suite_on()
+        self.assertEqual(
+            unproven, set(),
+            "the skill claims these platforms but no CI job runs the suite on them — either add "
+            "the runner to the unittest job's matrix or stop claiming the platform: "
+            + repr(sorted(unproven)))
 
     def test_the_readme_does_not_call_windows_supported(self):
+        """Windows stays disclaimed in prose until a Windows runner is in that matrix."""
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        if "windows" in self.platforms_ci_runs_the_suite_on():
+            self.skipTest("CI runs on Windows now; the README disclaimer should be revisited")
         self.assertIn("Windows is not supported", readme)
 
 

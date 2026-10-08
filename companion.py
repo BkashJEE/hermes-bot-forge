@@ -17,6 +17,8 @@ else:
 
 MARKS_NAME = "bot-forge-marks"
 SOURCE = Path(__file__).resolve().parent / "marks"
+SENTINEL_NAME = "bot-forge-sentinel"
+SENTINEL_SOURCE = Path(__file__).resolve().parent / "sentinel"
 FORGE_DIR = Path(__file__).resolve().parent
 # Never carried into a Bot with an inherited plugin: VCS and build litter, and anything that could
 # hold a credential. A plugin's secrets live in its own .env; a Bot has to be given them by the user.
@@ -88,6 +90,50 @@ def install_marks(pdir: Path) -> dict:
     switched = _enable(pdir)
     return {"ok": True, "name": MARKS_NAME, "version": want, "copied": copied,
             "enabled": switched or is_enabled(pdir), "previous_version": have or None}
+
+
+# ── enforced approvals ───────────────────────────────────────────────────────
+# A Bot's `approvals` are written into its SOUL.md as prose, which nothing checks. Sentinel
+# turns the same list into pre_tool_call directives Hermes enforces, so what a Bot promises and
+# what it may actually do stop being two different things.
+
+# The approval wording create_agent writes -> the category Sentinel knows it by.
+_APPROVAL_CATEGORIES = (("send", "send"), ("post", "send"), ("publish", "send"),
+                        ("spend", "spend"), ("buy", "spend"), ("money", "spend"),
+                        ("delete", "delete"), ("remove", "delete"))
+
+
+def policy_for(approvals) -> dict:
+    """The Sentinel policy a Bot's own declared approvals imply.
+
+    A Bot that promised nothing gets no built-in categories: enforcing rules it never claimed
+    would be us inventing its policy rather than holding it to its word. The explicit lists stay
+    empty and editable, so an operator can always add rules by hand afterwards.
+    """
+    wording = " ".join(a.lower() for a in (approvals or []) if isinstance(a, str))
+    covered = {category for word, category in _APPROVAL_CATEGORIES if word in wording}
+    return {"guard_defaults": bool(covered), "mode": "allow",
+            "refuse": [], "ask": [], "allow": []}
+
+
+def install_sentinel(pdir: Path, approvals=None) -> dict:
+    """Ship the policy layer into a Bot and write the policy its own approvals imply."""
+    pdir = Path(pdir)
+    if not SENTINEL_SOURCE.is_dir():
+        return {"ok": False, "error": "the policy layer is missing from this install"}
+    result = install_plugin(pdir, SENTINEL_NAME, SENTINEL_SOURCE, folder=SENTINEL_NAME)
+    if not result.get("ok"):
+        return result
+    policy = policy_for(approvals)
+    cfg_path = pdir / "config.yaml"
+    cfg = forge.load_yaml(cfg_path)
+    existing = cfg.get(SENTINEL_NAME)
+    if isinstance(existing, dict):
+        # Never undo a rule an operator added by hand; only fill in what is missing.
+        policy = {**policy, **existing}
+    cfg[SENTINEL_NAME] = policy
+    forge.dump_yaml(cfg_path, cfg)
+    return {**result, "policy": policy, "enforcing": bool(policy.get("guard_defaults"))}
 
 
 # ── inherited plugins (issue #25) ────────────────────────────────────────────
@@ -191,13 +237,13 @@ def select_inherited(root: Path, wanted) -> tuple:
     return chosen, skipped
 
 
-def install_plugin(pdir: Path, name: str, source: Path) -> dict:
+def install_plugin(pdir: Path, name: str, source: Path, folder: str | None = None) -> dict:
     """Copy one plugin directory into the Bot and switch it on. Same path as install_marks: a fresh copy
     replaces an older one, credentials and build litter stay behind."""
     pdir, source = Path(pdir), Path(source)
     if not (source / "plugin.yaml").exists():
         return {"ok": False, "name": name, "error": f"{source} has no plugin.yaml"}
-    target = pdir / "plugins" / source.name
+    target = pdir / "plugins" / (folder or source.name)
     try:
         if target.exists() or target.is_symlink():
             shutil.rmtree(target) if target.is_dir() and not target.is_symlink() else target.unlink()

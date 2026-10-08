@@ -390,8 +390,10 @@ class InheritedPlugins(unittest.TestCase):
                 out = forge.forge(self._spec(root))
             self.assertTrue(out["ok"], out)
             self.assertIsNone(out["plugins"])
+            # Both companions ship with every Bot — the reaction hook and the policy layer.
+            # Neither is an "inherited" plugin, which is what this test is about.
             self.assertEqual(sorted(p.name for p in (root / "profiles" / "marlow" / "plugins").iterdir()),
-                             ["bot-forge-marks"])
+                             ["bot-forge-marks", "bot-forge-sentinel"])
 
     def test_create_agent_inherits_by_setting_or_by_argument(self):
         from unittest import mock

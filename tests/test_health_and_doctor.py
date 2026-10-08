@@ -273,3 +273,52 @@ class BotScreenPreflight(unittest.TestCase):
             self.assertIn("no Bot Screen support", forge.screen_error(root, True))
 
 
+
+
+class CredentialReach(unittest.TestCase):
+    """A Bot with its own login holds a readable copy of it. Nothing used to say so.
+
+    Keeping credentials out of a Bot's reach is a separate, larger job. Reporting which Bots
+    hold one is the honest first step: you cannot fix what nothing reports.
+    """
+
+    def _bot(self, tmp, mode=None):
+        root = make_root(Path(tmp), profiles=("quill",))
+        pdir = root / "profiles" / "quill"
+        if mode is not None:
+            cred = pdir / "auth.json"
+            cred.write_text('{"synthetic":"test-only"}')
+            cred.chmod(mode)
+        return root, pdir
+
+    def _flags(self, root):
+        import health
+        report = health.check({"hermes_root": str(root)})["report"]
+        return next(b["flags"] for b in report if b["name"] == "quill")
+
+    def test_a_bot_without_its_own_login_is_not_flagged(self):
+        import health
+        with tempfile.TemporaryDirectory() as tmp:
+            root, _ = self._bot(tmp, mode=None)
+            with mock.patch.object(health, "_gateways", return_value={}):
+                self.assertFalse([f for f in self._flags(root) if "auth.json" in f])
+
+    def test_a_private_login_is_reported_as_reach_not_as_a_fault(self):
+        import health
+        with tempfile.TemporaryDirectory() as tmp:
+            root, _ = self._bot(tmp, mode=0o600)
+            with mock.patch.object(health, "_gateways", return_value={}):
+                flagged = [f for f in self._flags(root) if "auth.json" in f]
+            self.assertEqual(len(flagged), 1)
+            self.assertIn("worth knowing about", flagged[0])
+            self.assertNotIn("chmod", flagged[0])
+
+    def test_a_login_other_users_can_read_says_how_to_fix_it(self):
+        import health
+        with tempfile.TemporaryDirectory() as tmp:
+            root, _ = self._bot(tmp, mode=0o644)
+            with mock.patch.object(health, "_gateways", return_value={}):
+                flagged = [f for f in self._flags(root) if "auth.json" in f]
+            self.assertEqual(len(flagged), 1)
+            self.assertIn("readable by other users", flagged[0])
+            self.assertIn("chmod 600", flagged[0])

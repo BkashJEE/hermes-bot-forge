@@ -9,6 +9,7 @@ not add a permanent copy to every clone.
 |---|---|
 | `bot-forge-launch/` | the 16s catalog tour: the Sep 17 claim, the live listing, the install line |
 | `bot-reaction/` | the 15s reaction explainer: 👀 on pickup, then the outcome |
+| `bot-spawn/` | the 9s README loop: one sentence becomes a complete Bot |
 
 ## Regenerating
 
@@ -24,3 +25,33 @@ The capture is a live page, so a re-render reflects whatever the catalog says th
 point. When the listing moves (a new version, a new badge), re-capture rather than editing the frame:
 `02-page.html` maps the plate's own pixel coordinates onto the square, and the ring is positioned
 against the badges row in that space.
+
+## bot-spawn
+
+The loop at the top of the repo README. Its one asset is the Nous character, which lives in `docs/`
+and is copied in — `assets/` is ignored here, so restore it before rendering:
+
+```bash
+cd videos/bot-spawn
+mkdir -p assets && cp ../../docs/hero-character.png assets/character.png
+npm install
+npx hyperframes check
+npx hyperframes render
+```
+
+The orb in her palm is the origin of the tile animation, and its position is hard-coded in the
+composition (`#orb-glow` at 499,548, and the same pair in the tile stagger). Those coordinates
+follow from the character being 1000px tall with its right edge 40px off-canvas — change either and
+the tiles will fly out of the wrong place rather than out of her hand.
+
+`docs/demo.gif` is made from the render:
+
+```bash
+ffmpeg -i renders/<render>.mp4 -vf "fps=13,scale=480:-1:flags=lanczos,palettegen=max_colors=128:stats_mode=diff" -y /tmp/pal.png
+ffmpeg -i renders/<render>.mp4 -i /tmp/pal.png \
+  -lavfi "fps=13,scale=480:-1:flags=lanczos[x];[x][1:v]paletteuse=dither=bayer:bayer_scale=4:diff_mode=rectangle" \
+  -y ../../docs/demo.gif
+```
+
+480px at 13fps lands around 1.6 MB, which keeps the README's first screen quick to load. The GIF is
+committed because the README needs it; the MP4 it came from is not.

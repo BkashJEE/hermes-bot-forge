@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en" data-resolution="square">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, height=1080" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 1080px; height: 1080px; overflow: hidden; background: #05070E;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      }
+      #root { position: relative; width: 1080px; height: 1080px; overflow: hidden; }
+      .layer { position: absolute; inset: 0; }
+
+      /* the ground is its own layer, never a background on #root */
+      #ground { background: radial-gradient(120% 95% at 62% 52%, #141D36 0%, #05070E 68%); }
+      #grid {
+        background-image: linear-gradient(#1B2644 1px, transparent 1px),
+                          linear-gradient(90deg, #1B2644 1px, transparent 1px);
+        background-size: 60px 60px; opacity: .22;
+      }
+
+      /* she holds the orb; everything the Bot is made of comes out of it */
+      #character {
+        position: absolute; right: -40px; bottom: 0; height: 1000px; width: auto;
+        filter: drop-shadow(0 0 60px rgba(47, 47, 242, .35));
+      }
+      #orb-glow {
+        position: absolute; left: 499px; top: 548px; width: 300px; height: 300px;
+        margin: -150px 0 0 -150px; border-radius: 50%;
+        background: radial-gradient(circle, rgba(99,126,255,.55) 0%, rgba(47,47,242,0) 70%);
+      }
+
+      #ask {
+        position: absolute; left: 56px; top: 92px; width: 470px;
+        font-size: 40px; line-height: 1.26; font-weight: 500; color: #EEF2FF;
+      }
+      #ask .quote { color: #6F8BFF; }
+      #caret {
+        display: inline-block; width: 3px; height: 40px; margin-left: 4px;
+        background: #6F8BFF; vertical-align: -6px;
+      }
+
+      /* the parts of a Bot, as dimensional tiles */
+      #parts {
+        position: absolute; left: 56px; top: 268px; width: 436px;
+        display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px 26px;
+      }
+      .part { text-align: center; }
+      .tile {
+        position: relative; width: 128px; height: 128px; margin: 0 auto; border-radius: 30px;
+        background: linear-gradient(150deg, #4457FF 0%, #2B36C8 48%, #161C7A 100%);
+        box-shadow:
+          inset 0 3px 0 rgba(255,255,255,.42),
+          inset 0 -5px 14px rgba(0,0,0,.5),
+          inset 6px 0 14px rgba(255,255,255,.10),
+          0 22px 34px rgba(3,6,20,.72),
+          0 4px 10px rgba(3,6,20,.6);
+        transform: perspective(700px) rotateX(13deg) rotateY(-11deg);
+        display: flex; align-items: center; justify-content: center;
+      }
+      /* the specular band that sells the curvature */
+      .tile::after {
+        content: ""; position: absolute; inset: 5px 5px auto 5px; height: 46px;
+        border-radius: 25px 25px 60% 60% / 25px 25px 34px 34px;
+        background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,0));
+        pointer-events: none;
+      }
+      .tile svg { width: 60px; height: 60px; fill: none; stroke: #EAF0FF; stroke-width: 5.5;
+                  stroke-linecap: round; stroke-linejoin: round; }
+      .part .name {
+        margin-top: 15px; font-size: 21px; font-weight: 500; color: #9FB2D8; letter-spacing: .01em;
+      }
+
+      /* the Bot that came out */
+      #card {
+        position: absolute; left: 56px; top: 300px; width: 436px; padding: 34px 36px;
+        border-radius: 30px; background: linear-gradient(160deg, #101A33, #0A1022);
+        border: 2px solid #2B3B6B;
+        box-shadow: 0 30px 60px rgba(3,6,20,.75);
+      }
+      #card .who { display: flex; align-items: center; gap: 20px; }
+      #card .face {
+        width: 78px; height: 78px; border-radius: 24px; flex: none;
+        background: linear-gradient(150deg, #5BE8C8, #17A3A3);
+        box-shadow: inset 0 3px 0 rgba(255,255,255,.45), inset 0 -5px 12px rgba(0,0,0,.4);
+      }
+      #card .nm { font-size: 42px; font-weight: 700; color: #F4F7FF; letter-spacing: -.02em; }
+      #card .role { margin-top: 4px; font-size: 23px; color: #92A6CC; }
+      #card .done { margin-top: 26px; font-size: 22px; line-height: 1.75; color: #B9C8E4; }
+      #card .done b { color: #5BE8C8; font-weight: 600; }
+
+      #close { position: absolute; left: 56px; top: 300px; width: 470px; }
+      #close .mark { font-size: 86px; font-weight: 700; color: #F4F7FF; letter-spacing: -.035em; }
+      #close .rule { margin-top: 20px; width: 190px; height: 4px; background: #22D3EE; border-radius: 2px; }
+      #close .cmd {
+        display: inline-block; margin-top: 28px; padding: 18px 26px; border-radius: 16px;
+        background: #0A1120; border: 2px solid #2A3550;
+        font-family: ui-monospace, "JetBrains Mono", monospace; font-size: 23px; color: #7DD3FC;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="main"
+      data-start="0"
+      data-duration="9"
+      data-width="1080"
+      data-height="1080"
+    >
+      <div id="ground" class="layer clip" data-start="0" data-duration="9" data-track-index="0"></div>
+      <div id="grid" class="layer clip" data-start="0" data-duration="9" data-track-index="1"></div>
+
+      <div class="layer clip" data-start="0" data-duration="9" data-track-index="2">
+        <div id="orb-glow"></div>
+        <img id="character" src="assets/character.png" alt="" />
+      </div>
+
+      <div id="ask" class="clip" data-start="0" data-duration="6.6" data-track-index="3">
+        <span class="quote">“</span><span id="ask-text"></span><span class="quote">”</span><span id="caret"></span>
+      </div>
+
+      <div id="parts" class="clip" data-start="1.3" data-duration="5.3" data-track-index="4">
+        <div class="part"><div class="tile"><svg viewBox="0 0 64 64"><rect x="9" y="14" width="46" height="36" rx="7"/><circle cx="24" cy="30" r="7"/><path d="M38 26h10M38 38h10"/></svg></div><div class="name">Identity</div></div>
+        <div class="part"><div class="tile"><svg viewBox="0 0 64 64"><path d="M16 8h21l11 11v37H16z"/><path d="M37 8v11h11M24 32h16M24 42h16"/></svg></div><div class="name">SOUL.md</div></div>
+        <div class="part"><div class="tile"><svg viewBox="0 0 64 64"><path d="M32 12c-9 0-15 6-15 13 0 4 2 7 4 9v12h22V34c2-2 4-5 4-9 0-7-6-13-15-13z"/><path d="M26 46h12"/></svg></div><div class="name">Memory</div></div>
+        <div class="part"><div class="tile"><svg viewBox="0 0 64 64"><path d="M43 12a12 12 0 0 0-15 15L13 42a5 5 0 1 0 7 7l15-15a12 12 0 0 0 15-15l-8 8-7-7z"/></svg></div><div class="name">Tools</div></div>
+        <div class="part"><div class="tile"><svg viewBox="0 0 64 64"><circle cx="32" cy="34" r="19"/><path d="M32 23v11l8 5M22 10l-7 6M42 10l7 6"/></svg></div><div class="name">Routines</div></div>
+        <div class="part"><div class="tile"><svg viewBox="0 0 64 64"><path d="M22 10v14M42 10v14"/><rect x="15" y="24" width="34" height="16" rx="6"/><path d="M32 40v14"/></svg></div><div class="name">Gateway</div></div>
+      </div>
+
+      <div id="card" class="clip" data-start="5.25" data-duration="1.9" data-track-index="5">
+        <div class="who">
+          <div class="face"></div>
+          <div>
+            <div class="nm">Marlow</div>
+            <div class="role">social media manager</div>
+          </div>
+        </div>
+        <div class="done">
+          <b>✓</b> SOUL.md, memory, tools, routines<br />
+          <b>✓</b> Bot Chat opened · gateway running
+        </div>
+      </div>
+
+      <div id="close" class="clip" data-start="6.9" data-duration="2.1" data-track-index="6">
+        <div class="mark">Bot Forge</div>
+        <div class="rule"></div>
+        <div class="cmd">hermes plugins install bot-forge</div>
+      </div>
+    </div>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+
+      // 0.0–1.1 — the ask, typed the way a person types it
+      const ASK = "make me a social media manager";
+      const askEl = document.getElementById("ask-text");
+      tl.fromTo("#ask", { opacity: 0 }, { opacity: 1, duration: 0.25 }, 0.1);
+      tl.to({ n: 0 }, {
+        n: ASK.length, duration: 0.95, ease: "none",
+        onUpdate() { askEl.textContent = ASK.slice(0, Math.round(this.targets()[0].n)); },
+      }, 0.25);
+      tl.to("#caret", { opacity: 0, duration: 0.2 }, 1.3);
+
+      // she is already there; the orb wakes when the ask lands
+      tl.fromTo("#character", { opacity: 0, x: 40 },
+                { opacity: 1, x: 0, duration: 0.9, ease: "power2.out" }, 0);
+      tl.fromTo("#orb-glow", { opacity: 0.25, scale: 0.8 },
+                { opacity: 1, scale: 1.15, duration: 0.5, ease: "power2.out" }, 1.15);
+      tl.to("#orb-glow", { opacity: 0.55, scale: 1, duration: 1.4, ease: "sine.inOut" }, 1.65);
+
+      // 1.4–3.4 — each part of the Bot comes out of the orb and settles into place.
+      // Offsets are computed from the laid-out grid so the arc starts at the orb itself.
+      gsap.utils.toArray("#parts .part").forEach((part, i) => {
+        const box = part.getBoundingClientRect();
+        const fromX = 499 - (box.left + box.width / 2);
+        const fromY = 548 - (box.top + 64);
+        tl.fromTo(part,
+          { opacity: 0, x: fromX, y: fromY, scale: 0.25 },
+          { opacity: 1, x: 0, y: 0, scale: 1, duration: 0.72, ease: "back.out(1.5)" },
+          1.4 + i * 0.17);
+      });
+
+      // 4.75 — the parts hand over to the Bot they add up to
+      tl.to("#parts", { opacity: 0, y: -16, duration: 0.45, ease: "power2.in" }, 4.75);
+      tl.fromTo("#card", { opacity: 0, y: 34, scale: 0.97 },
+                { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "power3.out" }, 5.25);
+
+      // 6.5 — clear, then the signature
+      tl.to("#card", { opacity: 0, y: -18, duration: 0.4, ease: "power2.in" }, 6.5);
+      tl.to("#ask", { opacity: 0, duration: 0.4, ease: "power2.in" }, 6.3);
+      tl.fromTo("#close .mark", { opacity: 0, y: 22 },
+                { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 6.95);
+      tl.fromTo("#close .rule", { scaleX: 0 },
+                { scaleX: 1, duration: 0.4, ease: "power2.out", transformOrigin: "left center" }, 7.25);
+      tl.fromTo("#close .cmd", { opacity: 0, y: 16 },
+                { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 7.45);
+
+      // 8.6 — settle toward black so the loop does not jump
+      tl.to(["#close", "#character", "#orb-glow"], { opacity: 0, duration: 0.4, ease: "power2.in" }, 8.6);
+
+      window.__timelines["main"] = tl;
+      tl.seek(0);
+    </script>
+  </body>
+</html>

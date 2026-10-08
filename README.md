@@ -17,6 +17,11 @@
 hermes plugins install bot-forge
 ```
 
+<p align="center">
+  <img src="docs/demo.gif" alt="One sentence becomes a complete working Bot — identity, SOUL.md, memory, tools, routines and a running gateway" width="480">
+</p>
+
+
 Bot Forge is a [Hermes Agent](https://github.com/NousResearch/hermes-agent) plugin that lets any agent spawn a complete, working [Bot Mode](https://hermes-agent.nousresearch.com/docs/user-guide/bot-mode) Bot from one sentence — no New Agent dialog, no setup:
 
 | The new Bot gets | |

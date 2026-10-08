@@ -6,10 +6,15 @@ on:
   pull_request:
 
 jobs:
+  # The OS list here is the claim: tests/test_suite_integrity.py reads it and refuses a
+  # platform the skill advertises but this job does not run. Adding a platform to the skill
+  # means adding it here, which means actually running the suite there.
   unittest:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
+        os: [ubuntu-latest, macos-latest]
         python-version: ["3.11", "3.12"]
     steps:
       - uses: actions/checkout@v4

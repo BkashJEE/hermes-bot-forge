@@ -28,6 +28,25 @@ jobs:
       - name: Check the plugin manifest parses
         run: python -c "import yaml,sys; m=yaml.safe_load(open('plugin.yaml')); sys.exit(0 if m['name']=='bot-forge' and m['provides_tools'] else 1)"
 
+  # A passing suite proves nothing if the guard under test is inert. Each of these reverts one
+  # load-bearing shared-policy decision (or one fix for a defect found in review) and requires
+  # the suite to fail. They run the suite repeatedly, so they run once, not across the matrix.
+  shared-policy-mutations:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Policy decisions — every reverted decision must be caught
+        run: python bench/policy_mutation_check.py
+      - name: Review fixes — every reverted fix must be caught
+        run: python bench/shared_policy_mutation_check.py
+      - name: Drift-detector and fence-marker fixes — every reverted fix must be caught
+        run: python bench/policy_regression_mutation_check.py
+
   # The bug class that has cost two releases is the plugin not loading at all, and it always
   # looked like a passing suite: `python -m unittest` runs from inside the checkout, where ''
   # on sys.path resolves a bare `import forge` that Hermes cannot resolve. So load it the way

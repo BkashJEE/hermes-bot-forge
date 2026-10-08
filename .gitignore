@@ -16,3 +16,8 @@ videos/**/package-lock.json
 videos/**/meta.json
 videos/**/AGENTS.md
 videos/**/CLAUDE.md
+
+# coverage measurement artifacts
+.coverage
+.coverage.*
+htmlcov/

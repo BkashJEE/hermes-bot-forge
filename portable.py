@@ -10,8 +10,10 @@ from pathlib import Path
 
 if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
     from . import forge
+    from . import policy
 else:
     import forge
+    import policy
 
 FORMAT = "bot-forge/template"
 VERSION = 1
@@ -82,7 +84,13 @@ def build_template(pdir: Path, root: Path) -> dict:
         "role": forge.soul_role((pdir / "SOUL.md").read_text(errors="ignore")) if (pdir / "SOUL.md").exists() else title,
         "description": meta.get("description") or bots.get("description") or "",
         "one_job": meta.get("description") or "",
-        "soul_md": (pdir / "SOUL.md").read_text(errors="ignore") if (pdir / "SOUL.md").exists() else "",
+        # Strip the inlined shared policy from an exported template. A template carries no
+        # `shared_policy` key, so on import the receiving Bot would be built with this
+        # Bot's rules already inlined in its persona -- and `check_policies` would call the
+        # copy current. That silently overrides the importing user's own policy choice with
+        # rules the original owner wrote. The importer re-injects from the local canonical
+        # file, so dropping it here loses nothing.
+        "soul_md": policy.strip_block((pdir / "SOUL.md").read_text(errors="ignore")).lstrip() if (pdir / "SOUL.md").exists() else "",
         # the Bot's own starter facts; drop the auto-written identity line, the importer writes a fresh one
         "memory": [e for e in _memory_entries(pdir) if not e.startswith("My name is ")],
         "toolsets": [t for t in ((cfg.get("platform_toolsets") or {}).get("cli") or []) if t in forge.ALL_TOOLSETS],

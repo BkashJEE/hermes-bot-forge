@@ -10,6 +10,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
+    from . import policy as policy_mod
+else:
+    import policy as policy_mod
+
 PLUGIN_DIR = Path(__file__).resolve().parent
 NAME_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,63}$")
 NOISE = ("hermes update", "Gateways may", "hermes gateway restart", "tirith security scanner")
@@ -131,6 +136,87 @@ def check_agents(args: dict, **kwargs) -> str:
         return json.dumps(json.loads(out[out.index("{"):]))
     except ValueError:
         return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
+
+
+def _read_text_safe(path) -> str | None:
+    """Read a text file, or None if it cannot be read as text.
+
+    Separate from a plain `read_text()` because a UnicodeDecodeError is a ValueError, not an
+    OSError, and escapes `except OSError` — which turned a hand-edited file with one latin-1
+    apostrophe into a raised exception out of a read-only tool.
+    """
+    try:
+        return path.read_text(errors="replace")
+    except (OSError, ValueError):
+        return None
+
+
+def check_policies(args: dict, **kwargs) -> str:
+    """Report which Bots' shared operating policy is current, and which have drifted."""
+    root = hermes_root()
+    relative = (args or {}).get("policy_path") or policy_mod.DEFAULT_RELATIVE
+    try:
+        canon = policy_mod.policy_path(root, relative)
+    except policy_mod.PolicyPathError as exc:
+        return json.dumps({"ok": False, "error": str(exc)})
+
+    if not canon.exists():
+        return json.dumps({"ok": False, "error": f"no shared policy at {canon}",
+                          "hint": "create_agent writes one on first use; or create it yourself"})
+    # errors="replace": a policy or SOUL.md saved by a non-UTF-8 editor (or containing one
+    # latin-1 apostrophe) must degrade to "cannot read", not raise out of a read-only tool.
+    # UnicodeDecodeError is a ValueError, so `except OSError` does not catch it.
+    canon_text = _read_text_safe(canon)
+    if canon_text is None:
+        return json.dumps({"ok": False, "error": f"could not read {canon} as text"})
+    if not policy_mod.policy_body(canon_text):
+        return json.dumps({
+            "ok": False,
+            "error": f"shared policy at {canon} has no rules in it",
+            "hint": "it contains only comments, so every Bot would be built with an empty policy",
+        })
+    expected = policy_mod.fingerprint(canon_text)
+
+    bots, stale, without, unreadable = [], [], [], []
+    candidates = sorted((root / "profiles").glob("*")) if (root / "profiles").is_dir() else []
+    # The default profile's SOUL.md sits at the root, not under profiles/, so it is not in the
+    # glob above. It is deliberately NOT audited: `_require_bot` refuses it, so `forge` never
+    # writes a block there and no documented call can ever fix it. Reporting a permanent
+    # `no_shared_policy` for a profile no operation can act on would make the drift report
+    # untrustworthy -- the whole point of this tool is that every row it prints is actionable.
+    for prof in candidates:
+        name = prof.name
+        soul = prof / "SOUL.md"
+        try:
+            text = soul.read_text(errors="replace")
+        except OSError as exc:
+            bots.append({"profile": name, "error": str(exc)[:120], "current": False,
+                         "has_shared_policy": False, "reason": "unreadable",
+                         "fingerprint": None, "canonical_fingerprint": expected})
+            unreadable.append(name)
+            continue
+        report = policy_mod.audit_soul(text, expected)
+        report["profile"] = name
+        bots.append(report)
+        if not report["current"]:
+            (without if not report["has_shared_policy"] else stale).append(name)
+
+    return json.dumps({
+        "ok": True,
+        "canonical_policy": str(canon),
+        "canonical_fingerprint": expected,
+        "bots_checked": len(bots),
+        # counted from the rows themselves, not by subtraction: a row that errored belongs to
+        # no list, and `checked - stale - without` silently counted it as current.
+        "current": sum(1 for b in bots if b.get("current")),
+        "stale": stale,
+        "no_shared_policy": without,
+        "unreadable": unreadable,
+        "bots": bots,
+        "fix": ("ask the Bot's owner to re-create it, or run update_agent with soul_md to "
+                "rewrite its SOUL.md — create_agent refuses a name that is already taken, so "
+                "re-running it is not a way to refresh an existing Bot"),
+    })
 
 
 def agent_journal(args: dict, settings: dict | None = None, **kwargs) -> str:

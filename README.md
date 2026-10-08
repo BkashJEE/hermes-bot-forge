@@ -129,6 +129,41 @@ New Bots inherit the model of the Bot that created them. Whether they can use it
 
 ---
 
+## Shared operating policy
+
+One file — `~/.hermes/shared/BOT-POLICY.md` — holds the rules that apply to **every** Bot:
+spend nothing without asking, never paste a secret, report what you didn't check.
+`create_agent` inlines it into each Bot's `SOUL.md`, so **one edit reaches every Bot on the
+next build** instead of being pasted into N copies that drift apart. The file is created with a
+short starter policy on first use; edit it to taste.
+
+```bash
+$EDITOR ~/.hermes/shared/BOT-POLICY.md   # edit once
+check_policies                            # → which Bots are now stale
+```
+
+`check_policies` reports `stale` (built before your edit) and `no_shared_policy` (opted out),
+read-only. A Bot can opt out with `"shared_policy": false` in its spec. It audits only Bots
+`forge` created, so every row it prints is one you can act on.
+
+To bring a stale Bot up to date, run `update_agent` with `refresh_shared_policy: true` — it
+re-injects the policy in place and keeps the Bot's identity and persona. (`create_agent`
+refuses a name that is already taken, so re-running it is not how you refresh an existing Bot.)
+It refuses a Bot whose SOUL.md has no content of its own, rather than handing one house rules
+and no identity.
+
+A policy edit is compared by its *meaning*, not its bytes: comments, line endings, bullet
+markers and the indentation shared by a whole block are ignored, but a sub-bullet added,
+removed or re-nested is a real change and shows up as drift.
+
+This is prompt text, not enforcement: the policy sits in the Bot's system prompt and the model
+is asked to follow it, exactly as it is asked to follow the rest of `SOUL.md`. Nothing blocks a
+tool call that breaks a rule. It borrows the *discipline* from
+[steipete/agent-scripts](https://github.com/steipete/agent-scripts) — one canonical file,
+change once — but not its symlink mechanism, because a symlinked `SOUL.md` would give every Bot
+the same identity, and a pointer line would put the policy outside the system prompt. The
+reasoning, and the tests that hold it, are in [docs/shared-policy.md](docs/shared-policy.md).
+
 ## Settings
 
 Set per profile under `plugins.entries.bot-forge.settings` in that profile's `config.yaml`:
@@ -184,7 +219,7 @@ It copies the root profile's `auth.json` into an independent file with permissio
 
 ## Tools
 
-Thirteen tools, all driven by plain requests in chat:
+Fifteen tools, all driven by plain requests in chat:
 
 | Tool | Say this | What it does |
 |---|---|---|
@@ -196,6 +231,7 @@ Thirteen tools, all driven by plain requests in chat:
 | `list_agents` | *"what bots do I have?"* | Roster with description, model, routine count and hidden state. |
 | `check_install` | *"the tools aren't showing up"* | Checks the install itself: enabled profiles, whether each gateway runs the current code, Bot Mode, model sign-in, sandbox backends. |
 | `check_agents` | *"anything waiting on me?"* | Leads with `waiting_on_you` — every Bot blocked on something only you can do, with its age. Then the read-only health check: routines that run too often (and their cost in runs/day), paused or never-run routines, unused Bots, stopped gateways, a persona missing its name or approvals. |
+| `check_policies` | *"are my bots up to date with the house rules?"* | Read-only. Compares every Bot's inlined [shared operating policy](#shared-operating-policy) against `~/.hermes/shared/BOT-POLICY.md` and reports which are `stale` or have none. |
 | `agent_journal` | *"what did Inkwell work on this week?"* | Enables, appends to, and reads a Bot's dated work journal. Entries capture outcomes and evidence, never credentials or private reasoning. |
 | `ask_agent` | *"ask Inkwell for 3 post ideas"* | Sends a task to another Bot and returns its reply. |
 | `share_agent` | *"share Inkwell with a friend"* | Writes a readable `.botforge.json` template — persona, its own memory, tools, skills, routines. **Never chat history, facts about you, or keys**, and secret-scanned (CLEAN / WARN / BLOCK). `mode: backup` makes a full private backup instead. |

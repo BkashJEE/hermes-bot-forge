@@ -3,6 +3,21 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Shared operating policy: write a rule once, every Bot picks it up.** `~/.hermes/shared/BOT-POLICY.md` holds the rules that apply to every Bot; `create_agent` inlines it into each new Bot's `SOUL.md` between `<!-- forge:shared-policy:begin -->` / `<!-- forge:shared-policy:end -->` markers, so a rule is edited in one place instead of pasted into N drifting copies. A short starter policy is written on first use; `shared_policy: false` opts a Bot out, `shared_policy_path` points at a different file (relative to the Hermes root, containment-checked) and `shared_policy_create: false` makes a missing file an error instead of seeding the starter. Design and rejected alternatives (symlink, pointer line): `docs/shared-policy.md`.
+- **New tool `check_policies` (read-only).** Fingerprints each Bot's inlined block against the canonical file and reports `stale`, `no_shared_policy` and `unreadable` Bots. Only the policy body is hashed — comments, CRLF, trailing whitespace, bullet marker and block-wide indentation are cosmetic; a sub-bullet added, removed or re-nested is drift. The tool only reads `SOUL.md` files under the Hermes root; it has no network or write path.
+- **`update_agent` takes `refresh_shared_policy`.** Re-injects the current policy into an existing Bot in place (backs `SOUL.md` up first, idempotent, keeps identity and persona). Needed because `create_agent` refuses a taken name, so it cannot refresh a Bot.
+- `tests/test_shared_policy.py` (58 tests) covers the above.
+
+### Changed
+- Anything that assumed the `# Name — Role` heading is line 1 of `SOUL.md` now skips the policy block (`forge.persona_text`): `soul_role`, `ensure_identity` (which re-injects the block so a rename never drops a Bot's rules, and adds none to a Bot that had none), the `health` check that a SOUL.md states the Bot's name, the workspace survey's duplicate-Bot guard, and `share_agent` (an exported template no longer carries the originating Bot's inlined rules).
+- The inlined policy is prompt text the model is asked to follow, not enforcement. Nothing blocks a tool call that breaks a rule.
+
+### Fixed
+- README said "Thirteen tools"; the manifest already listed fourteen before this change, and lists fifteen with `check_policies`.
+
 ## [0.18.0] - 2026-10-05
 
 ### Added

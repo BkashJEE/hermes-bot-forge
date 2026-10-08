@@ -147,7 +147,7 @@ def check_bot(pdir: Path, gateways: dict, now: float, bundled: set | None = None
         flags.append(f"no chats for {idle_days} days but routines keep running — still needed?")
     elif idle_days is not None and idle_days >= STALE_DAYS * 4:
         flags.append(f"unused for {idle_days} days — hide or delete it?")
-    if soul and f"**{title}**" not in soul and title.lower() not in soul.lower()[:400]:
+    if soul and f"**{title}**" not in soul and title.lower() not in forge.persona_text(soul).lower()[:400]:
         flags.append("SOUL.md doesn't state the Bot's own name — it may introduce itself as another Bot")
     if soul and "## Ask first" not in soul and "approval" not in soul.lower():
         flags.append("no approval checkpoints in SOUL.md — add them with update_agent")

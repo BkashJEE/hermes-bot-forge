@@ -1,0 +1,43 @@
+manifest_version: 1
+name: bot-forge-sentinel
+version: 0.1.0
+description: >-
+  Decide what a Bot may actually do, outside the model. A Bot's "ask first" rules live in its
+  SOUL.md as prose that nothing checks; this turns them into pre_tool_call directives Hermes
+  enforces — refusing what the policy refuses, and sending the rest to the human approval gate.
+  Hooks only; grants the Bot no tools.
+author: Bikash Joshi
+license: MIT
+homepage: https://github.com/BkashJEE/hermes-bot-forge
+tags: [bots, approvals, safety, policy]
+kind: standalone
+requires_hermes: ">=0.21"
+provides_hooks:
+  - pre_tool_call
+config_schema:
+  refuse:
+    type: list
+    default: []
+    description: Tools this Bot may never call, whatever it or the user says in the moment.
+  ask:
+    type: list
+    default: []
+    description: Tools that always reach the human approval gate, even if the model does not think to ask.
+  allow:
+    type: list
+    default: []
+    description: >-
+      Tools that are fine without asking, even when they look like one of the built-in categories.
+      Use it to clear the one send or delete this Bot's job actually needs.
+  mode:
+    type: str
+    default: allow
+    description: >-
+      What happens to a tool in none of the lists — allow (default) or ask. Set ask for a Bot
+      that should be cleared tool by tool.
+  guard_defaults:
+    type: bool
+    default: true
+    description: >-
+      Apply the three categories a Bot's own approval wording already names — send/post/publish,
+      spend, delete — to tools not listed above. Off means only the explicit lists apply.

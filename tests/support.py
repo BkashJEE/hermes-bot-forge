@@ -24,8 +24,12 @@ import yaml  # noqa: E402
 # importable; the fallback existed only so a class could be skipped, which meant a plugin that
 # had stopped importing at all — v0.15.0, v0.15.3 — silently skipped 22 tests and left CI green.
 # A failure to import any of these is the thing the suite most needs to shout about.
+import health  # noqa: E402
 import journal  # noqa: E402
 import manage  # noqa: E402
+import policy  # noqa: E402
+import portable  # noqa: E402
+import survey  # noqa: E402
 import team  # noqa: E402
 import tools  # noqa: E402
 
@@ -65,4 +69,5 @@ class FakeCtx:
 
 # Re-exported for the test modules. They must take these from here rather than importing them
 # directly, because this module is what puts the plugin on sys.path.
-__all__ = ["ROOT", "FakeCtx", "make_root", "forge", "journal", "manage", "team", "tools", "yaml"]
+__all__ = ["ROOT", "FakeCtx", "make_root", "forge", "health", "journal", "manage", "policy", "portable",
+           "survey", "team", "tools", "yaml"]

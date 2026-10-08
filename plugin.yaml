@@ -21,6 +21,7 @@ provides_tools:
   - copy_agent
   - list_agents
   - check_agents
+  - check_policies
   - check_install
   - agent_journal
   - ask_agent

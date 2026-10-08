@@ -129,6 +129,13 @@ UPDATE_AGENT = {
         "properties": {
             "name": {"type": "string", "description": "profile name or Bot title from list_agents"},
             "soul_append": {"type": "string", "description": "markdown appended to its SOUL.md (preferred for small changes)"},
+            "refresh_shared_policy": {
+                "type": "boolean",
+                "description": "re-inject the current shared operating policy into this Bot's SOUL.md, in place. "
+                               "Use this after the user edits ~/.hermes/shared/BOT-POLICY.md and you want a Bot "
+                               "up to date — create_agent cannot refresh an existing Bot because its name is "
+                               "taken. Keeps the Bot's identity, persona and approvals, and backs SOUL.md up first.",
+            },
             "soul_md": {"type": "string", "description": "complete replacement SOUL.md — only for a full rewrite"},
             "role": {"type": "string", "description": "role title, used if the identity line has to be rewritten"},
             "display_name": {"type": "string", "description": "new Proper Case display name in the roster"},
@@ -338,6 +345,27 @@ TEACH_AGENT = {
     },
 }
 
+
+CHECK_POLICIES = {
+    "name": "check_policies",
+    "description": (
+        "Check whether each Bot's shared operating policy is current — read-only. Bot Forge writes the "
+        "canonical policy to ~/.hermes/shared/BOT-POLICY.md and inlines it into every Bot's SOUL.md, so a rule "
+        "you edit once applies everywhere on the next build. Returns each Bot's fingerprint, which Bots are "
+        "stale (built before your latest edit), and which have no shared policy at all. Use after editing the "
+        "policy file, to find out which Bots need rebuilding — report the stale names and offer to rebuild them, "
+        "don't rebuild without asking."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "policy_path": {
+                "type": "string",
+                "description": "optional: policy path relative to the Hermes root (default shared/BOT-POLICY.md)",
+            }
+        },
+    },
+}
 
 CHECK_AGENTS = {
     "name": "check_agents",

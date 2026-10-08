@@ -43,7 +43,7 @@ else:
             f"d = importlib.import_module({ROOT.name!r} + '.doctor'); "
             f"[importlib.import_module({ROOT.name!r} + '.' + n) for n in "
             "('forge', 'acks', 'health', 'journal', 'manage', 'survey', 'team', 'waiting', "
-            "'companion', 'portable', 'tapback', 'schemas', 'tools', 'doctor')]; "
+            "'companion', 'portable', 'tapback', 'schemas', 'tools', 'doctor', 'policy')]; "
             f"p = importlib.import_module({ROOT.name!r} + '.portable'); "
             "assert p.bundled_templates(); "
             f"a = importlib.import_module({ROOT.name!r} + '.acks'); "

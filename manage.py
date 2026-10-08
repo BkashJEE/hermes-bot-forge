@@ -19,8 +19,10 @@ from pathlib import Path
 
 if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
     from . import forge
+    from . import policy as policy_mod
 else:
     import forge
+    import policy as policy_mod
 
 MAX_SOUL_BYTES = 64_000
 
@@ -92,6 +94,49 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
     # persona
     soul_path = pdir / "SOUL.md"
     soul = soul_path.read_text() if soul_path.exists() else ""
+
+    # shared policy refresh. This is the documented fix for a stale Bot, and it has to exist
+    # as a real operation: create_agent refuses a name that is already taken, so telling
+    # someone to "re-run create_agent" for an existing Bot never converges.
+    refresh_policy = bool(s.get("refresh_shared_policy"))
+    pol_text = ""
+    if refresh_policy:
+        # `root` is the one the caller resolved in `manage()` and already used to find this
+        # Bot. Re-deriving it from the spec let the two disagree, and then the policy was read
+        # from the real ~/.hermes while the Bot was written somewhere else. Use the argument.
+        pol_root = Path(root)
+        rel = s.get("shared_policy_path") or policy_mod.DEFAULT_RELATIVE
+        try:
+            pol = policy_mod.policy_path(pol_root, rel)
+        except policy_mod.PolicyPathError as exc:
+            raise ValueError(str(exc)) from exc
+        if not pol.exists():
+            raise ValueError(f"no shared policy at {pol}")
+        try:
+            text = pol.read_text(errors="replace")
+        except OSError as exc:
+            raise ValueError(f"could not read shared policy {pol}: {exc}") from exc
+        if not policy_mod.policy_body(text):
+            raise ValueError(f"shared policy has no rules, only comments: {pol}")
+        pol_text = text
+        # A Bot with no persona of its own has nothing for the policy to sit on top of.
+        # Writing one would replace an empty SOUL.md with house rules and no identity --
+        # a Bot that is all policy and no Bot. Refuse instead, and say what to do.
+        if not forge.persona_text(soul).strip():
+            raise ValueError(
+                f"{name}'s SOUL.md has no content of its own, so a policy refresh would leave it "
+                "with rules and no identity. Give it a persona first (update_agent soul_md), "
+                "or leave it unmanaged -- a Bot with no SOUL.md is not a Bot that needs one."
+            )
+        refreshed = policy_mod.inject(text, soul)
+        if policy_mod.fingerprint(refreshed) == policy_mod.fingerprint(soul):
+            changed.append("shared_policy (already current)")
+        else:
+            backups["SOUL.md"] = _backup(pdir, "SOUL.md")
+            soul_path.write_text(refreshed)
+            soul = refreshed
+            changed.append("shared_policy")
+
     new_soul = s.get("soul_md")
     append = s.get("soul_append")
     if new_soul or append:
@@ -100,6 +145,12 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
         backups["SOUL.md"] = _backup(pdir, "SOUL.md")
         title = _bot_meta(pdir).get("title") or name.capitalize()
         soul = new_soul if new_soul else (soul.rstrip() + "\n\n" + append.strip() + "\n")
+        # `soul_md` replaces the whole file, so a policy injected moments ago is gone. Inject
+        # again when the caller asked for both, and drop the earlier claim from `changed` so
+        # the report does not say the policy is current when the write just removed it.
+        if refresh_policy and pol_text:
+            soul = policy_mod.inject(pol_text, soul)
+            changed = [c for c in changed if c != "shared_policy"]
         soul_path.write_text(forge.ensure_identity(soul, title, s.get("role") or "Bot", name))
         changed.append("soul")
 

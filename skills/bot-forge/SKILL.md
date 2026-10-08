@@ -105,6 +105,11 @@ Ask for it when the job needs a **real browser session a human may have to rescu
 
 Linux gateway hosts only. On macOS or Windows the call is refused, because there the Bot would act on the **user's own display** rather than its own — if the user genuinely wants that, they ask for the `computer_use` toolset explicitly. When the host is missing TigerVNC/Xfce or the cua-driver, the refusal says which and gives the command; relay it rather than retrying.
 
+## Shared operating policy
+Every new Bot gets the shared policy inlined into its `SOUL.md` from `~/.hermes/shared/BOT-POLICY.md` — the house rules (don't spend, don't paste secrets, report what you didn't check). It is on by default; do not pass `shared_policy: false` unless the user asks for a Bot that is deliberately unconstrained, and say so plainly when they do.
+
+The flip side: a Bot built before an edit to that file holds the old text. If the user edits the policy and asks which Bots are affected — or asks whether their Bots are up to date — call `check_policies` (read-only) and report `stale` and `no_shared_policy` by name. Offer to refresh the stale ones with `update_agent` + `refresh_shared_policy: true`; don't refresh without asking, and don't hand-edit a Bot's `SOUL.md` to "fix" drift. It is prompt text the Bot is asked to follow, not a sandbox — say so if the user treats it as a guarantee.
+
 ## Sandboxes
 Any Bot you give `terminal` or `code_execution` should get `sandbox: "docker"` so its shell runs in a container instead of on the user's machine — say so in your reply. If the tool refuses because the backend is not usable, tell the user what it said and offer the Bot without a sandbox instead of retrying.
 

@@ -142,6 +142,15 @@ config_schema:
       Send that mail as soon as a Bot journals a blocked or failed entry, instead of waiting for
       you to ask what needs you. Rate limited per Bot so a stuck routine cannot become a mail
       storm, and silently skipped when email is not configured.
+  enforce_approvals:
+    type: bool
+    default: true
+    description: >-
+      Ship the policy layer (bot-forge-sentinel) into each new Bot, so the `approvals` written
+      into its SOUL.md are enforced at the tool call rather than left to the model to remember.
+      A Bot that declared no approvals gets the layer with no categories on. Refusals and
+      approval prompts come from Hermes' own gate; the policy lives in that Bot's config.yaml
+      and an operator edit is never overwritten.
   journal_enabled:
     type: bool
     default: true

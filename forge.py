@@ -628,6 +628,22 @@ def forge(s: dict) -> dict:
             installed = companion.ensure_reactions(pdir)
             marks = companion.marks_version() if installed.get("ok") else f"not installed: {installed.get('error')}"
 
+        # The Bot's `approvals` are prose in its SOUL.md and nothing checks them. Sentinel turns
+        # the same list into pre_tool_call directives Hermes enforces, so the Bot is held to what
+        # it already promises rather than trusted to remember it. A Bot that declared no approvals
+        # gets the layer with no categories on — see companion.policy_for.
+        sentinel = None
+        if s.get("enforce_approvals", True) is not False:
+            if __package__:
+                from . import companion
+            else:
+                import companion
+
+            guard = companion.install_sentinel(pdir, approvals)
+            sentinel = (f"enforcing {', '.join(approvals)}" if guard.get("enforcing")
+                        else "installed, no categories on (this Bot declared no approvals)"
+                        ) if guard.get("ok") else f"not installed: {guard.get('error')}"
+
         # `profile create --clone-from` copies config.yaml — with the root's plugins.enabled list — but not
         # the plugin directories, so a user plugin on the root profile is enabled-but-inert in the Bot. Opt in
         # (the setting, or the call) to carry them across; Bot Forge itself and credentials never travel.
@@ -755,7 +771,8 @@ def forge(s: dict) -> dict:
                                f"for a login, hand back: hermes -p {profile_id} computer-use screen start"
                                if bot_screen else None),
                 "skills_disabled": len(disabled), "routines": routines, "gateway": gateway, "intro": reply[-600:],
-                "journal": journal_path, "reactions": marks, "plugins": plugins, "workspace": workspace,
+                "journal": journal_path, "reactions": marks, "approvals_enforced": sentinel,
+                "plugins": plugins, "workspace": workspace,
                 "note": "done — it already introduced itself. Do not message, test or change this Bot; just report."}
     except Exception as e:
         rolled_back = False

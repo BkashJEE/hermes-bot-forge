@@ -196,3 +196,76 @@ class TheManifestIsTrue(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ShippedIntoEveryBot(unittest.TestCase):
+    """The policy layer is only worth anything if Bots actually get it."""
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = support.make_root(Path(self.tmp.name), profiles=())
+        self.bot = self.root / "profiles" / "marlow"
+        self.bot.mkdir(parents=True)
+        (self.bot / "config.yaml").write_text("{}")
+
+    def test_a_bots_declared_approvals_become_its_policy(self):
+        import companion
+        out = companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
+        self.assertTrue(out["ok"], out)
+        self.assertTrue(out["enforcing"])
+        self.assertEqual((self.bot / "plugins" / "bot-forge-sentinel" / "plugin.yaml").exists(), True)
+
+    def test_the_policy_is_switched_on_in_that_bots_config(self):
+        import companion
+        companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
+        cfg = support.yaml.safe_load((self.bot / "config.yaml").read_text())
+        self.assertIn("bot-forge-sentinel", cfg["plugins"]["enabled"])
+        self.assertTrue(cfg["bot-forge-sentinel"]["guard_defaults"])
+
+    def test_a_bot_that_promised_nothing_is_not_given_rules_it_never_claimed(self):
+        """Enforcing categories a Bot never declared would be us inventing its policy."""
+        import companion
+        out = companion.install_sentinel(self.bot, [])
+        self.assertTrue(out["ok"], out)
+        self.assertFalse(out["enforcing"])
+
+    def test_an_operator_edit_is_never_overwritten(self):
+        """Re-creating or updating a Bot must not quietly undo a rule someone added by hand."""
+        import companion
+        companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
+        cfg_path = self.bot / "config.yaml"
+        cfg = support.yaml.safe_load(cfg_path.read_text())
+        cfg["bot-forge-sentinel"]["refuse"] = ["delete_profile"]
+        cfg["bot-forge-sentinel"]["mode"] = "ask"
+        support.forge.dump_yaml(cfg_path, cfg)
+
+        companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
+
+        after = support.yaml.safe_load(cfg_path.read_text())["bot-forge-sentinel"]
+        self.assertEqual(after["refuse"], ["delete_profile"])
+        self.assertEqual(after["mode"], "ask")
+
+    def test_the_policy_a_bot_gets_actually_governs_it(self):
+        """End to end: what install writes is what guard reads."""
+        import companion
+        companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
+        policy = support.yaml.safe_load((self.bot / "config.yaml").read_text())["bot-forge-sentinel"]
+        self.assertEqual(guard.decide("send_email", policy)["action"], "approve")
+        self.assertIsNone(guard.decide("read_file", policy))
+
+
+class PolicyFollowsTheWording(unittest.TestCase):
+    def test_each_declared_category_turns_the_guard_on(self):
+        import companion
+        for wording in ("send, post or publish anything", "spend money or buy anything",
+                        "delete files or data"):
+            with self.subTest(wording=wording):
+                self.assertTrue(companion.policy_for([wording])["guard_defaults"], wording)
+
+    def test_nothing_declared_means_nothing_enforced_by_default(self):
+        import companion
+        for approvals in ([], None, ["review the plan with me first"]):
+            with self.subTest(approvals=approvals):
+                self.assertFalse(companion.policy_for(approvals)["guard_defaults"])

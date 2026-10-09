@@ -94,6 +94,70 @@ class TheThreeCategories(unittest.TestCase):
             "block")
 
 
+class ArgumentLimits(unittest.TestCase):
+    """"May email me, not anyone else" — the rule a tool-name gate cannot express."""
+
+    POLICY = {"limits": {"send_email": {"to": ["me@example.com"]}}}
+
+    def test_a_call_within_its_limit_needs_no_asking(self):
+        """The user already said this shape is fine; asking again would train them to click yes."""
+        self.assertIsNone(guard.decide("send_email", self.POLICY, {"to": "me@example.com"}))
+
+    def test_a_call_outside_its_limit_is_refused_and_says_which_argument(self):
+        out = guard.decide("send_email", self.POLICY, {"to": "stranger@example.com"})
+        self.assertEqual(out["action"], "block")
+        self.assertIn("to", out["message"])
+        self.assertIn("stranger@example.com", out["message"])
+
+    def test_a_limit_beats_the_name_based_lists(self):
+        """Naming the address must buy something, or the feature is decorative."""
+        policy = {**self.POLICY, "ask": ["send_email"]}
+        self.assertIsNone(guard.decide("send_email", policy, {"to": "me@example.com"}))
+
+    def test_refuse_still_wins_over_a_satisfied_limit(self):
+        policy = {**self.POLICY, "refuse": ["send_email"]}
+        self.assertEqual(guard.decide("send_email", policy, {"to": "me@example.com"})["action"],
+                         "block")
+
+    def test_every_recipient_in_a_list_must_be_permitted(self):
+        """One allowed address alongside one that is not is still sending to the stranger."""
+        out = guard.decide("send_email", self.POLICY,
+                           {"to": ["me@example.com", "stranger@example.com"]})
+        self.assertEqual(out["action"], "block")
+        self.assertIsNone(guard.decide("send_email", self.POLICY, {"to": ["me@example.com"]}))
+
+    def test_case_and_padding_do_not_slip_past_a_limit(self):
+        for value in ("  Me@Example.com ", "ME@EXAMPLE.COM"):
+            with self.subTest(value=value):
+                self.assertIsNone(guard.decide("send_email", self.POLICY, {"to": value}))
+
+    def test_an_unreadable_argument_falls_through_rather_than_being_allowed(self):
+        """A value we cannot read is a question, not a yes."""
+        for value in ({"nested": "thing"}, 42, None, [], ["ok", 7]):
+            with self.subTest(value=value):
+                out = guard.decide("send_email", self.POLICY, {"to": value})
+                self.assertEqual(out["action"], "approve", value)
+
+    def test_an_absent_argument_does_not_satisfy_a_limit_on_its_own(self):
+        """Omitting `to` must not be a way to skip the check on `to`."""
+        out = guard.decide("send_email", self.POLICY, {"subject": "hello"})
+        self.assertEqual(out["action"], "approve")
+
+    def test_a_limit_on_one_tool_says_nothing_about_another(self):
+        self.assertEqual(guard.decide("post_tweet", self.POLICY, {"to": "me@example.com"})["action"],
+                         "approve")
+
+    def test_a_malformed_limit_governs_nothing_and_permits_nothing(self):
+        for limits in ({"send_email": {"to": []}}, {"send_email": {"to": "  "}},
+                       {"send_email": {}}, {"send_email": "not a mapping"}, "not a mapping"):
+            with self.subTest(limits=limits):
+                out = guard.decide("send_email", {"limits": limits}, {"to": "anyone@example.com"})
+                self.assertEqual(out["action"], "approve", limits)
+
+    def test_limits_do_not_disturb_a_tool_with_no_rule(self):
+        self.assertIsNone(guard.decide("read_file", self.POLICY, {"path": "/tmp/x"}))
+
+
 class LockedDownMode(unittest.TestCase):
     def test_ask_mode_gates_everything_not_cleared(self):
         self.assertEqual(guard.decide("read_file", {"mode": "ask"})["action"], "approve")
@@ -181,6 +245,73 @@ class TheHook(unittest.TestCase):
             tool_name="send_email", args={"to": "x"}, task_id="t", session_id="s",
             tool_call_id="c", turn_id=1, api_request_id="a", middleware_trace=[])
         self.assertEqual(out["action"], "approve")
+
+
+class EverySettingIsActuallyRead(unittest.TestCase):
+    """A setting the manifest advertises but the code never reads is a rule nobody applies.
+
+    This is how `limits` shipped broken for an hour: declared in plugin.yaml, documented, unit
+    tested through guard.decide directly — and absent from the key list the hook builds its
+    policy from, so no real call ever saw it. The unit tests could not catch that, because they
+    never went through the hook.
+    """
+
+    def test_the_hook_reads_every_setting_the_manifest_declares(self):
+        import yaml as y
+        declared = set(y.safe_load(
+            (ROOT / "sentinel" / "plugin.yaml").read_text(encoding="utf-8"))["config_schema"])
+        asked = set()
+
+        class Ctx:
+            def get_config(self, key, default=None):
+                asked.add(key)
+                return default
+
+            def register_hook(self, event, handler):
+                self.handler = handler
+
+        ctx = Ctx()
+        spec = importlib.util.spec_from_file_location(
+            "bot_forge_sentinel_settings", ROOT / "sentinel" / "__init__.py",
+            submodule_search_locations=[str(ROOT / "sentinel")])
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["bot_forge_sentinel_settings"] = mod
+        spec.loader.exec_module(mod)
+        mod.register(ctx)
+        ctx.handler(tool_name="send_email", args={})
+
+        self.assertEqual(declared - asked, set(),
+                         "declared in plugin.yaml but never read by the hook")
+        self.assertEqual(asked - declared, set(),
+                         "read by the hook but never declared in plugin.yaml")
+
+
+class LimitsThroughTheHook(unittest.TestCase):
+    """The unit tests call guard.decide directly; a real call arrives through the hook."""
+
+    def _hook(self, config):
+        spec = importlib.util.spec_from_file_location(
+            "bot_forge_sentinel_limits", ROOT / "sentinel" / "__init__.py",
+            submodule_search_locations=[str(ROOT / "sentinel")])
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules["bot_forge_sentinel_limits"] = mod
+        spec.loader.exec_module(mod)
+        captured = {}
+
+        class Ctx:
+            def get_config(self, key, default=None):
+                return config.get(key, default)
+
+            def register_hook(self, event, handler):
+                captured["h"] = handler
+
+        mod.register(Ctx())
+        return captured["h"]
+
+    def test_a_limit_reaches_a_real_call(self):
+        hook = self._hook({"limits": {"send_email": {"to": ["me@example.com"]}}})
+        self.assertIsNone(hook(tool_name="send_email", args={"to": "me@example.com"}))
+        self.assertEqual(hook(tool_name="send_email", args={"to": "x@evil.com"})["action"], "block")
 
 
 class TheManifestIsTrue(unittest.TestCase):

@@ -55,9 +55,29 @@ With `guard_defaults` on, a tool whose **name** contains a send, spend or delete
 the human gate. The match is on word parts, not substrings, so `undelete_draft` and
 `posture_report` are not caught.
 
-Deliberately about the name: a tool called `send_email` is asking to send whatever its
-arguments say, and a policy layer that needed to understand every tool's arguments would
-understand none of them. Argument-level rules are a later question — see the design note.
+## "May email me, not anyone else"
+
+A tool-name gate cannot say that, so limits name the argument and the values that are fine:
+
+```yaml
+bot-forge-sentinel:
+  limits:
+    send_email:
+      to: ["me@example.com"]
+```
+
+A call whose limited arguments are all within their lists is **allowed without asking** — the
+user already said that shape is fine, and asking again just trains them to click yes. One
+outside its list is refused, and the message names the argument and the offending value.
+
+Limits are checked before the name lists, because they are the more specific statement:
+"send_email is fine, to this address" has to beat "ask about send_email", or naming the address
+would buy nothing. `refuse` still wins over everything.
+
+An argument that cannot be read — a nested object, a number, a list with a non-string in it —
+falls through to the ordinary gate rather than being permitted. **A value we cannot read is a
+question, not a yes.** An absent argument does not satisfy a limit either, so omitting `to` is
+not a way to skip the check on `to`.
 
 ## It fails closed
 

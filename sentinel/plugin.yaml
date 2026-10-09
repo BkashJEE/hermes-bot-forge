@@ -29,6 +29,16 @@ config_schema:
     description: >-
       Tools that are fine without asking, even when they look like one of the built-in categories.
       Use it to clear the one send or delete this Bot's job actually needs.
+  limits:
+    type: dict
+    default: {}
+    description: >-
+      Per-tool argument allowlists — {tool: {argument: [permitted values]}}. "May email me, not
+      anyone else" is the rule a tool-name gate cannot express. A call whose limited arguments
+      are all within their lists is allowed without asking, because the user already said that
+      shape is fine; one outside its list is refused and the message names the argument. An
+      argument that cannot be read falls through to the ordinary gate rather than being
+      permitted.
   mode:
     type: str
     default: allow

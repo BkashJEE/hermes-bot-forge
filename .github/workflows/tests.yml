@@ -70,6 +70,28 @@ jobs:
         working-directory: /tmp
         run: python -B "$GITHUB_WORKSPACE/checkout/tests/catalog_callback_probe.py" "$GITHUB_WORKSPACE/checkout" "$(mktemp -d)"
 
+  # Reported, never gated. Two things make the raw number a floor rather than a measurement:
+  # the probes that exercise register() and the tool handlers run in subprocesses coverage
+  # cannot see, and marks/tapback.py is byte-identical to tapback.py by design (a test enforces
+  # it), so it reads 0% while being covered through its twin. A threshold on a number that
+  # understates for structural reasons would be a check that teaches people to game it.
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install
+        run: pip install -r requirements-dev.txt coverage==7.6.9
+      - name: Measure
+        run: |
+          coverage run --source=. --omit="tests/*,videos/*,docs/*,bench/*" -m unittest discover -s tests
+          coverage report --sort=cover
+      - name: Summary
+        if: always()
+        run: coverage report --sort=cover >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || true
+
   lint:
     runs-on: ubuntu-latest
     steps:

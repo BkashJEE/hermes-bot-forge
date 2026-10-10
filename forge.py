@@ -915,7 +915,7 @@ def forge(s: dict) -> dict:
                 "skills_disabled": len(disabled), "routines": routines, "gateway": gateway, "intro": reply[-600:],
                 "journal": journal_path, "reactions": marks, "plugins": plugins, "workspace": workspace,
                 "shared_policy": shared_policy,
-                "note": "done — it already introduced itself. Do not message, test or change this Bot; just report."}
+                "note": "profile created; report the actual intro, warning and gateway readiness"}
     except Exception as e:
         rolled_back = False
         if created:

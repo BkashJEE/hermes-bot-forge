@@ -18,7 +18,6 @@ import forge
 import schemas
 import team
 import tools
-import yaml
 
 
 class ModelToolBoundary(unittest.TestCase):
@@ -37,7 +36,9 @@ class ModelToolBoundary(unittest.TestCase):
                    {"default": "w", "provider": "p", "base_url": []},
                    {"default": "w", "provider": "p", "api_key": "DO_NOT_ECHO"}]
         for model in invalid:
-            with self.subTest(model_type=type(model).__name__), patch.object(tools.subprocess, "run", return_value=CompletedProcess([], 0, '{"ok":true}', "")) as run:
+            with self.subTest(model_type=type(model).__name__), \
+                 patch.object(tools.subprocess, "run",
+                              return_value=CompletedProcess([], 0, '{"ok":true}', "")) as run:
                 result = json.loads(tools.create_agent({"role": "Writer", "model": model}))
                 self.assertFalse(result["ok"])
                 self.assertNotIn("DO_NOT_ECHO", json.dumps(result))
@@ -47,7 +48,9 @@ class ModelToolBoundary(unittest.TestCase):
         for bad_part in ("lead", "member"):
             args = {"lead": {"role": "Lead"}, "members": [{"role": "First"}, {"role": "Second"}]}
             (args["lead"] if bad_part == "lead" else args["members"][1])["model"] = {}
-            with self.subTest(part=bad_part), patch.object(tools.subprocess, "run", return_value=CompletedProcess([], 0, '{"ok":true}', "")) as run:
+            with self.subTest(part=bad_part), \
+                 patch.object(tools.subprocess, "run",
+                              return_value=CompletedProcess([], 0, '{"ok":true}', "")) as run:
                 result = json.loads(tools.create_team(args))
                 self.assertFalse(result["ok"])
                 run.assert_not_called()

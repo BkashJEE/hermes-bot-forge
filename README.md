@@ -577,4 +577,3 @@ People outside this repo who found things in it, and what they found:
 ## License
 
 MIT © Bikash Joshi
-

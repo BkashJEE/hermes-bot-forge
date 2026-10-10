@@ -7,7 +7,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Added
 - **Sentinel hook implementation (manual setup required).** The repository includes a hooks-only `sentinel/` plugin with tool-name policy rules and argument limits. When separately installed, enabled and configured in a profile, its `pre_tool_call` hook returns block or approval directives for Hermes to handle. In v0.19.0, `create_agent` does not install or enable Sentinel and does not derive a Sentinel policy from `approvals`; those approvals remain guidance in `SOUL.md`. The advertised `enforce_approvals` setting is not implemented in this release. Hook unit tests do not establish activation or enforcement in a running Bot. See `sentinel/README.md` for the policy shape and `docs/sentinel.md` for the design proposal.
-- **Limits on arguments, not just tool names.** `limits: {tool: {argument: [permitted values]}}` expresses the rule a name gate cannot — *"may email me, not anyone else"*. A call within its limits runs without asking, because the user already said that shape is fine; one outside is refused and the message names the argument and the value. Unreadable input is a question, not a yes: a nested object, a malformed rule or an absent argument falls through to the ordinary gate rather than permitting the call.
+- **Limits on arguments, not just tool names (when Sentinel is separately active).** `limits: {tool: {argument: [permitted values]}}` expresses the rule a name gate cannot — *"may email me, not anyone else"*. A call within its limits runs without asking, because the user already said that shape is fine; one outside is refused and the message names the argument and the value. Unreadable input is a question, not a yes: a nested object, a malformed rule or an absent argument falls through to the ordinary gate rather than permitting the call.
 - **`check_agents` says which Bots hold a readable login.** A Bot with its own `auth.json` can read that token — that is how an independent login works, and it was invisible. A private copy is reported as reach; one other users can read is a finding, with the fix.
 - **A demo loop in the README.** `docs/demo.gif` — one sentence becoming a complete Bot, built as `videos/bot-spawn/`.
 
@@ -280,4 +280,3 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 - `list_agents`, `ask_agent`.
 - Bundled skill `bot-forge:bot-forge` with role defaults and a SOUL.md template.
 - Settings: `inherit_model`, `fallback_model`, `probe_local_models`, `install_gateway`, and opt-in `share_login`.
-

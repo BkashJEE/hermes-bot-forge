@@ -133,4 +133,3 @@ the user's own machine, by a file they can read.**
 3. **`rule_key` grain.** Hermes lets an `approve` directive name the allowlist key behind the
    user's `[a]lways` answer. Choosing it per tool, per tool+argument, or per Bot decides what
    "always allow this" actually means later.
-

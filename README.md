@@ -472,7 +472,10 @@ On a Linux gateway host each Bot can have its **own desktop** — not yours. It 
 > **Ask first** — never do these without the user saying yes: publish or send anything; spend money; delete files.
 > **Escalate to** — @ceo for scope, priorities and final calls.
 
-So a Bot that drafts posts never publishes one, and knows who to escalate to.
+These are instructions the model is asked to follow, not an enforced tool gate.
+In v0.19.0, `create_agent` does not install or enable the bundled `sentinel/` plugin
+or derive its policy from `approvals`. A drafting Bot is instructed to ask before
+publishing and knows who to escalate to; this does not guarantee it cannot publish.
 
 Bundled skill: `bot-forge:bot-forge` — role defaults, naming rules and a SOUL.md template your agent follows.
 
@@ -574,3 +577,4 @@ People outside this repo who found things in it, and what they found:
 ## License
 
 MIT © Bikash Joshi
+

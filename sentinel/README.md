@@ -21,7 +21,10 @@ That was tolerable when a Bot could write files and answer questions. It is not 
 session, including whatever the user signed into when they handed control back — and a Bot can
 hand work to another Bot, which then acts on instructions it did not get from the user.
 
-Sentinel turns those three lines into directives Hermes enforces.
+Sentinel evaluates a separately configured policy and returns directives for Hermes.
+In v0.19.0, `create_agent` does not install or enable this plugin or convert those
+approval lines into its policy. The hook must be installed, enabled and configured
+separately; its presence in this repository does not establish live enforcement.
 
 ## How
 

@@ -1,5 +1,14 @@
 # Sentinel — approvals that are enforced, not requested
 
+> **Status in v0.19.0:** this is a design proposal, not the fresh-Bot creation contract.
+> The `sentinel/` hook implementation is present, but `create_agent` does not install or
+> enable it, compile `approvals` into policy, or implement `enforce_approvals`.
+> Approval wording remains prompt guidance. The compilation and automatic per-Bot
+> delivery described below are proposed work; they were not merged with PR #59.
+> A separately installed, enabled and configured Sentinel needs runtime verification
+> against the Hermes version in use before claiming enforcement. The current policy
+> shape is in [sentinel/README.md](../sentinel/README.md).
+
 ## The problem
 
 `create_agent` writes a Bot's approval rules into its `SOUL.md`:

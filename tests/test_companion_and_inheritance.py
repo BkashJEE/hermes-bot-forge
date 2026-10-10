@@ -390,6 +390,11 @@ class InheritedPlugins(unittest.TestCase):
                 out = forge.forge(self._spec(root))
             self.assertTrue(out["ok"], out)
             self.assertIsNone(out["plugins"])
+            bot = root / "profiles" / "marlow"
+            cfg = yaml.safe_load((bot / "config.yaml").read_text(encoding="utf-8"))
+            self.assertNotIn("bot-forge-sentinel", cfg.get("plugins", {}).get("enabled", []))
+            self.assertNotIn("bot-forge-sentinel", cfg)
+            self.assertIn("## Ask first", (bot / "SOUL.md").read_text(encoding="utf-8"))
             self.assertEqual(sorted(p.name for p in (root / "profiles" / "marlow" / "plugins").iterdir()),
                              ["bot-forge-marks"])
 

@@ -3,13 +3,22 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.19.0] - 2026-10-10
 
 ### Added
+- **Approvals are enforced, not requested.** A Bot's `approvals` were prose in its `SOUL.md` that nothing checked. The new `sentinel/` companion — hooks only, no tools, shipped into every Bot the way the reaction companion is — answers Hermes' `pre_tool_call` gate with directives Hermes acts on: `block` refuses the call and its message becomes the tool result, `approve` routes it to the human approval gate. The policy a Bot gets is the one its own declared approvals imply, so a Bot that promised nothing is given no categories; enforcing rules it never claimed would be inventing its policy rather than holding it to its word. Off with `enforce_approvals: false`. Design note and open questions: `docs/sentinel.md`.
+- **Limits on arguments, not just tool names.** `limits: {tool: {argument: [permitted values]}}` expresses the rule a name gate cannot — *"may email me, not anyone else"*. A call within its limits runs without asking, because the user already said that shape is fine; one outside is refused and the message names the argument and the value. Unreadable input is a question, not a yes: a nested object, a malformed rule or an absent argument falls through to the ordinary gate rather than permitting the call.
+- **`check_agents` says which Bots hold a readable login.** A Bot with its own `auth.json` can read that token — that is how an independent login works, and it was invisible. A private copy is reported as reach; one other users can read is a finding, with the fix.
+- **A demo loop in the README.** `docs/demo.gif` — one sentence becoming a complete Bot, built as `videos/bot-spawn/`.
+
 - **Shared operating policy: write a rule once, every Bot picks it up.** `~/.hermes/shared/BOT-POLICY.md` holds the rules that apply to every Bot; `create_agent` inlines it into each new Bot's `SOUL.md` between `<!-- forge:shared-policy:begin -->` / `<!-- forge:shared-policy:end -->` markers, so a rule is edited in one place instead of pasted into N drifting copies. A short starter policy is written on first use; `shared_policy: false` opts a Bot out, `shared_policy_path` points at a different file (relative to the Hermes root, containment-checked) and `shared_policy_create: false` makes a missing file an error instead of seeding the starter. Design and rejected alternatives (symlink, pointer line): `docs/shared-policy.md`.
 - **New tool `check_policies` (read-only).** Fingerprints each Bot's inlined block against the canonical file and reports `stale`, `no_shared_policy` and `unreadable` Bots. Only the policy body is hashed — comments, CRLF, trailing whitespace, bullet marker and block-wide indentation are cosmetic; a sub-bullet added, removed or re-nested is drift. The tool only reads `SOUL.md` files under the Hermes root; it has no network or write path.
 - **`update_agent` takes `refresh_shared_policy`.** Re-injects the current policy into an existing Bot in place (backs `SOUL.md` up first, idempotent, keeps identity and persona). Needed because `create_agent` refuses a taken name, so it cannot refresh a Bot.
 - `tests/test_shared_policy.py` (58 tests) covers the above.
+
+- **Bots hand work to each other.** `handoff_agent(to, task, context)` moves a task from the Bot the user is talking to onto another Bot, which then owns it. The receiving Bot is told who handed it over, what it owns, what is already known and what "done" looks like, and the work runs in **its own Bot Chat**, so the user can watch it in Desktop rather than find it buried in a lead Bot's transcript. `ask_agent` stays what it was — a question and an answer — this is ownership moving.
+- **The outcome is a state, not prose.** Every Bot Forge Bot already begins its replies with one acknowledgement emoji; the handoff reads it. ✅ is `completed`, ✋ is `needs_you`, ⚠️ is `blocked`, ⏳ is `scheduled`, and a reply with none of them is reported as such instead of guessed at. A ✋ or ⚠️ writes a `blocked` entry in the receiving Bot's journal, so it is already in *what's waiting on you* and already mailed, with nothing extra to wire.
+- **The record survives the chat.** Each handoff is written to the receiving Bot's `handoffs/<id>.json` before the turn runs, updated with the outcome after, and both Bots journal it (*Handed off to Inkwell* / *Handoff from Marshal*). `check_agents` lists every handoff that has not ended in ✅ under `handoffs`, newest first, with its age — the first answer to "where did that task go?".
 
 ### Changed
 - Anything that assumed the `# Name — Role` heading is line 1 of `SOUL.md` now skips the policy block (`forge.persona_text`): `soul_role`, `ensure_identity` (which re-injects the block so a rename never drops a Bot's rules, and adds none to a Bot that had none), the `health` check that a SOUL.md states the Bot's name, the workspace survey's duplicate-Bot guard, and `share_agent` (an exported template no longer carries the originating Bot's inlined rules).
@@ -17,17 +26,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ### Fixed
 - README said "Thirteen tools"; the manifest already listed fourteen before this change, and lists fifteen with `check_policies`.
-## [0.19.0] - 2026-10-07
 
-### Added
-- **Bots hand work to each other.** `handoff_agent(to, task, context)` moves a task from the Bot the user is talking to onto another Bot, which then owns it. The receiving Bot is told who handed it over, what it owns, what is already known and what "done" looks like, and the work runs in **its own Bot Chat**, so the user can watch it in Desktop rather than find it buried in a lead Bot's transcript. `ask_agent` stays what it was — a question and an answer — this is ownership moving.
-- **The outcome is a state, not prose.** Every Bot Forge Bot already begins its replies with one acknowledgement emoji; the handoff reads it. ✅ is `completed`, ✋ is `needs_you`, ⚠️ is `blocked`, ⏳ is `scheduled`, and a reply with none of them is reported as such instead of guessed at. A ✋ or ⚠️ writes a `blocked` entry in the receiving Bot's journal, so it is already in *what's waiting on you* and already mailed, with nothing extra to wire.
-- **The record survives the chat.** Each handoff is written to the receiving Bot's `handoffs/<id>.json` before the turn runs, updated with the outcome after, and both Bots journal it (*Handed off to Inkwell* / *Handoff from Marshal*). `check_agents` lists every handoff that has not ended in ✅ under `handoffs`, newest first, with its age — the first answer to "where did that task go?".
+- The platform claim is derived from CI rather than asserted. The previous check compared the skill's `platforms:` against a constant in the test file — two values the maintainer typed — and went green while every job ran `ubuntu-latest` and a test failed deterministically on macOS. The workflow is now the evidence, and **macOS actually runs**: it joined the matrix and passes on 3.11 and 3.12.
+- Two bugs reported from macOS: `ask_agent` dropped `USER` from the child environment, so the Claude CLI reported no login (found by @akinduroifedayo), and a credential-copy test compared an unresolved temp path against a resolved one, failing on every fresh macOS checkout (found by @ChrisCarlCao).
 
 ### Security
 - **Only words cross between Bots.** The receiving Bot's turn runs with the same environment allowlist `ask_agent` has used since #22 (network and config, never `SSH_AUTH_SOCK` or the caller's `.env`), now shared as `forge.safe_env` rather than duplicated. The task and context are secret-scanned before anything is sent; a credential in either is refused with the reason and nothing runs. The sender is the profile whose turn called the tool, never a tool argument, so a Bot cannot hand work over in another Bot's name.
 
-## [0.18.0] - 2026-10-05
+### Internal
+- Coverage is reported per module in CI — never gated, because subprocess probes and a deliberately duplicated file make the number a floor rather than a measurement.
+- `tools.py` coverage 39% → 60%, by testing what the handlers do when creation times out, when the subprocess prints something other than JSON, and when a profile's config will not parse.
+
+## [0.18.0] - 2026-10-06
 
 ### Added
 - **The waiting queue can deliver itself.** `notify.py schedule "0 8 * * *"` writes a small launcher into the running profile's `scripts/` and creates a Hermes cron job for it with `--no-agent` — so it costs no model turn, and Hermes delivers the output wherever that profile already delivers. **No email configuration is needed**, which matters because the mail path needs SMTP credentials and the queue was otherwise only visible when someone remembered to ask.

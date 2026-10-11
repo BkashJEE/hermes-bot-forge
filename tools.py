@@ -293,6 +293,23 @@ def delete_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
     return _manage("delete", args, settings)
 
 
+def request_takeover(args: dict, settings: dict | None = None, **kwargs) -> str:
+    """Ask the user onto this Bot's screen. The caller is the profile whose turn this is."""
+    root = hermes_root()
+    spec = {**args, "from": launch_profile(kwargs.get("session_id"), root),
+            "hermes_root": str(root), "settings": settings or {}}
+    try:
+        p = subprocess.run([sys.executable, str(PLUGIN_DIR / "takeover.py"), "-"],
+                           input=json.dumps(spec), capture_output=True, text=True, timeout=120)
+    except subprocess.TimeoutExpired:
+        return json.dumps({"ok": False, "error": "request_takeover timed out"})
+    out = p.stdout.strip()
+    try:
+        return json.dumps(json.loads(out[out.index("{"):]))
+    except ValueError:
+        return json.dumps({"ok": False, "error": _clean(p.stderr or out)[-1500:]})
+
+
 def handoff_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
     """Pass a task, with context, to another Bot; it runs in that Bot's own Bot Chat."""
     root = hermes_root()

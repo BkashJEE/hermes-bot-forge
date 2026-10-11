@@ -456,6 +456,13 @@ On a Linux gateway host each Bot can have its **own desktop** — not yours. It 
 
 `bot_screen: true` grants `computer_use` and `browser`. It is off by default — a screen costs roughly 1.1–1.5 GB while it is open — and it is for jobs that need a real browser session a human may have to rescue, not for reading public pages.
 
+**When it cannot get past a sign-in, it asks for you.** A Bot that hits a login, a 2FA prompt or a
+CAPTCHA calls `request_takeover` with the reason. That writes a blocked entry — so you are mailed and
+it appears in *what's waiting on you* — carrying the command that opens that Bot's screen. You sign
+in there, not in chat: Hermes' desktop lease discards any frame captured across the hand-over, so
+what you type never reaches the Bot. It will not resume by itself; tell it to carry on once you have
+handed back.
+
 **It refuses rather than half-delivering.** On macOS or Windows there is no separate screen to give, so the Bot would act on *your* display; Bot Forge says so and declines instead of quietly handing a Bot your desktop. If the host is missing TigerVNC/Xfce or the cua-driver, the refusal names what is missing and the command that fixes it, and no Bot is created.
 
 ### Cost and safety built in

@@ -135,6 +135,27 @@ ASK_AGENT = {
 }
 
 
+REQUEST_TAKEOVER = {
+    "name": "request_takeover",
+    "description": ("Ask the user to take this Bot's screen because it cannot get past something "
+                    "itself — a sign-in, a 2FA prompt, a CAPTCHA. Writes a blocked entry so they "
+                    "are told, and gives them the command that opens the screen. Only a Bot with a "
+                    "running Bot Screen can ask. Never ask the user for a password: they type it on "
+                    "the Bot's screen, which the Bot cannot see."),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "reason": {"type": "string", "description": (
+                "What you are stuck on, in one line, as the user will read it: "
+                "'the site wants a 2FA code sent to your phone'.")},
+            "task": {"type": "string", "description": "What you were in the middle of, if it helps them judge urgency."},
+            "resume": {"type": "string", "description": "What you should do once they hand the screen back."},
+        },
+        "required": ["reason"],
+    },
+}
+
+
 HANDOFF_AGENT = {
     "name": "handoff_agent",
     "description": (

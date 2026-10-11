@@ -31,6 +31,7 @@ import policy  # noqa: E402
 import portable  # noqa: E402
 import survey  # noqa: E402
 import team  # noqa: E402
+import takeover  # noqa: E402
 import tools  # noqa: E402
 
 
@@ -70,4 +71,4 @@ class FakeCtx:
 # Re-exported for the test modules. They must take these from here rather than importing them
 # directly, because this module is what puts the plugin on sys.path.
 __all__ = ["ROOT", "FakeCtx", "make_root", "forge", "health", "journal", "manage", "policy", "portable",
-           "survey", "team", "tools", "yaml"]
+           "survey", "takeover", "team", "tools", "yaml"]

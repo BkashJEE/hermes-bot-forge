@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **A Bot stuck at a sign-in asks for you.** `request_takeover(reason, task, resume)` is how a Bot says it cannot get past a login, a 2FA prompt or a CAPTCHA. It writes a `blocked` journal entry — already the thing that mails you and already what *what's waiting on you* reads — carrying the reason and the command that opens that Bot's screen. Hermes already owned the mechanics: `tools/bot_desktop/lease.py` refuses the Bot while a human holds the desktop and discards any frame captured across the transition, so what you type at the sign-in never reaches the Bot. What was missing was the Bot being able to ask, and you being told. Refused when the Bot has no running screen to hand over, when the caller is the main profile, and when no reason is given — the reason is what you read before deciding to go and look. **It does not resume on hand-back**; the entry says so rather than implying otherwise.
+
 ## [0.19.1] - 2026-10-11
 
 ### Fixed

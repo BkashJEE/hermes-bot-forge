@@ -26,6 +26,7 @@ provides_tools:
   - agent_journal
   - ask_agent
   - handoff_agent
+  - request_takeover
   - share_agent
   - import_agent
   - hide_agent

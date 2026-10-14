@@ -44,6 +44,22 @@ composition (`#orb-glow` at 499,548, and the same pair in the tile stagger). Tho
 follow from the character being 1000px tall with its right edge 40px off-canvas — change either and
 the tiles will fly out of the wrong place rather than out of her hand.
 
+The loop opens on the same lockup it ends on. Frame 0 is the thumbnail — the README, a social
+card and any paused player all show it — so it has to be the finished composition rather than the
+first frame of a build-in. The last frame matches it, so the loop does not jump and there is no
+fade to black for a player to freeze on.
+
+Two things that will quietly break that if you edit the timeline:
+
+- A GSAP `fromTo` applies its **from** state at build time (`immediateRender` defaults to true),
+  even when the tween starts at 7.5s. The three tweens that bring the lockup back therefore pass
+  `immediateRender: false`; without it they blank the lockup at t=0, which is exactly the frame
+  that has to show it.
+- Every clip spans the full 10s and GSAP alone decides what is lit. When the lockup's clip window
+  started at 6.9s it did not exist as an object at t=0 and could not be shown there.
+
+Check both after any timeline change: the first and last frames of the render should be identical.
+
 `docs/demo.gif` is made from the render:
 
 ```bash
@@ -53,5 +69,5 @@ ffmpeg -i renders/<render>.mp4 -i /tmp/pal.png \
   -y ../../docs/demo.gif
 ```
 
-480px at 13fps lands around 1.6 MB, which keeps the README's first screen quick to load. The GIF is
+480px at 13fps lands under 1 MB (the two holds compress to almost nothing), which keeps the README's first screen quick to load. The GIF is
 committed because the README needs it; the MP4 it came from is not.

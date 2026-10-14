@@ -82,6 +82,12 @@ CREATE_AGENT = {
                 "things this Bot must ask the user before doing. Defaults to sending/publishing, spending money and "
                 "deleting data when omitted; pass [] only if the user explicitly wants none. Written into its SOUL.md "
                 "and memory as hard checkpoints.")},
+            "needs": {"type": "object", "additionalProperties": {"type": "string"}, "description": (
+                "what work handed to this Bot must come with before it can start, as short label -> plain "
+                "sentence, e.g. {\"draft\": \"the text you want reviewed\", \"deadline\": \"when it ships\"}. "
+                "Where `approvals` says what it will not do without asking, this says what it cannot begin "
+                "without. Written into its SOUL.md and memory, and handoff_agent refuses a handoff that "
+                "does not carry them rather than letting it spend a turn finding out. Up to 8.")},
             "reports_to": {"type": "string", "description": (
                 "profile name of the Bot it escalates scope and priority calls to (its chief of staff), e.g. 'ceo'")},
             "inherit_plugins": {"type": "array", "items": {"type": "string"}, "description": (
@@ -178,6 +184,11 @@ HANDOFF_AGENT = {
             "context": {"type": "string", "description": (
                 "what you already know that it needs: findings so far, links, files by path, constraints, the "
                 "user's preferences. Plain text, up to ~8,000 characters; summarise and point to the rest.")},
+            "brings": {"type": "object", "additionalProperties": {"type": "string"}, "description": (
+                "the things that Bot says it needs before it can start, by the labels it declared. If it "
+                "declared any and you leave one out, the handoff is refused before it is sent and the error "
+                "names what is missing in that Bot's own words — so pass what you have, or ask the user for "
+                "what you do not.")},
         },
         "required": ["to", "task"],
     },
@@ -197,6 +208,9 @@ UPDATE_AGENT = {
         "type": "object",
         "properties": {
             "name": {"type": "string", "description": "profile name or Bot title from list_agents"},
+            "needs": {"type": "object", "additionalProperties": {"type": "string"}, "description": (
+                "replace what work handed to this Bot must come with, as label -> plain sentence. "
+                "Pass {} to clear it.")},
             "soul_append": {"type": "string", "description": "markdown appended to its SOUL.md (preferred for small changes)"},
             "refresh_shared_policy": {
                 "type": "boolean",
@@ -364,6 +378,7 @@ CREATE_TEAM = {
         "toolsets": {"type": "array", "items": {"type": "string", "enum": TOOLSETS}},
         "skill_categories": {"type": "array", "items": {"type": "string"}},
         "approvals": {"type": "array", "items": {"type": "string"}},
+        "needs": {"type": "object", "additionalProperties": {"type": "string"}},
         "memory": {"type": "array", "items": {"type": "string"}},
         "routines": {"type": "array", "items": {
             "type": "object",

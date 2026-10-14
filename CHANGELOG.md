@@ -5,6 +5,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 
 ## [Unreleased]
 
+### Added
+- **A Bot can say what it needs before it can start.** `create_agent(needs={...})` takes short labels mapped to plain sentences — `{"draft": "the text you want reviewed", "deadline": "when it has to ship"}`. Where `approvals` says what a Bot will not do without asking, this says what it cannot begin without. It goes into the Bot's SOUL.md as **Before I can start**, into its memory in the first person, and into its profile beside the rest of its traits. `handoff_agent` then refuses a handoff that does not carry them **before sending it**, naming what is missing in the Bot's own words, so the sender fixes the handoff instead of reading a ✋ back a turn later. Pass them with `brings={...}`; they reach the other Bot as data, under the labels it asked for, and are secret-scanned with the rest. A Bot that declares nothing behaves exactly as before.
+
 ### Changed
 - **A handoff's context now travels as data, not as part of the briefing.** `handoff_agent` carries whatever the sending Bot had gathered — notes it wrote, but also pages it fetched, mail it read, comments it was shown. That text was interpolated straight into the receiving Bot's briefing, which put someone else's words in instruction position with nothing marking where the sender stopped speaking. The context is now JSON-encoded inside a `<handoff-context-json>` delimiter and named in the prompt as untrusted data, with the task line called out as the only instruction in the handoff. `json.dumps` does not escape `/`, so a context holding the literal closing delimiter would have survived encoding and appeared to end the block early; `</` is escaped to `<\/`, a valid JSON escape that decodes to the same string. This does not block a malicious handoff — it removes the ambiguity about who is speaking.
 

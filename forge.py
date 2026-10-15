@@ -291,12 +291,32 @@ def pick_name(requested, taken):
 
 
 # ── identity ─────────────────────────────────────────────────────────────────
-def guardrails_block(approvals, reports_to) -> str:
+def normalise_needs(needs) -> dict:
+    """What a Bot must be given before it can start, as {label: plain sentence}.
+
+    "Ask first" says what it will not do without asking. This says what it cannot begin without.
+    The label is what a handoff passes; the sentence is what the sender reads when it is missing.
+    """
+    if not isinstance(needs, dict):
+        return {}
+    out = {}
+    for label, why in list(needs.items())[:8]:
+        label = re.sub(r"[^a-z0-9_]", "", str(label).lower())[:40]
+        if label and isinstance(why, str) and why.strip():
+            out[label] = re.sub(r"\s+", " ", why).strip()[:200]
+    return out
+
+
+def guardrails_block(approvals, reports_to, needs=None) -> str:
     """Explicit approval checkpoints + escalation target, appended when the author's SOUL.md lacks them."""
     parts = []
     if approvals:
         parts.append("## Ask first\nNever do these without the user saying yes in this chat:\n"
                      + "\n".join(f"- {a}" for a in approvals))
+    if needs:
+        parts.append("## Before I can start\nWork handed to me has to come with these. If one is "
+                     "missing, say so and stop rather than guessing:\n"
+                     + "\n".join(f"- **{label}** — {why}" for label, why in needs.items()))
     if reports_to:
         parts.append(f"## Escalate to\n- @{reports_to} for scope, priorities and final calls.")
     return ("\n\n" + "\n\n".join(parts) + "\n") if parts else ""
@@ -541,7 +561,7 @@ def check_routine(r: dict) -> str:
 
 
 # ── bot mode ─────────────────────────────────────────────────────────────────
-def write_bot_meta(pdir: Path, display, description, kind):
+def write_bot_meta(pdir: Path, display, description, kind, needs=None):
     """Mirror what Desktop's New Agent dialog saves (profiles.configure → ui_meta['hermes-bots'])."""
     path = pdir / "profile.yaml"
     data = load_yaml(path)
@@ -555,6 +575,12 @@ def write_bot_meta(pdir: Path, display, description, kind):
     revisions = data.get("_ui_meta_revisions") if isinstance(data.get("_ui_meta_revisions"), dict) else {}
     revisions["hermes-bots"] = int(revisions.get("hermes-bots", 0)) + 1
     data.update({"display_name": display, "ui_meta": ui_meta, "_ui_meta_revisions": revisions})
+    if needs:
+        # Bot Forge's own block. ui_meta belongs to Desktop; what a Bot needs before it can start
+        # is ours, and it lives beside the rest of its traits rather than in a second file.
+        block = data.get("bot_forge") if isinstance(data.get("bot_forge"), dict) else {}
+        block["needs"] = dict(needs)
+        data["bot_forge"] = block
     dump_yaml(path, data)
 
 
@@ -772,9 +798,11 @@ def forge(s: dict) -> dict:
         return {"ok": False, "error": problem, "rolled_back": False}
     approvals = s.get("approvals")
     approvals = list(DEFAULT_APPROVALS) if approvals is None else [a for a in approvals if isinstance(a, str)]
+    needs = normalise_needs(s.get("needs"))
     reports_to = (s.get("reports_to") or "").strip().lstrip("@")
     soul = soul.rstrip() + "\n" + guardrails_block(approvals if "## Ask first" not in soul else [],
-                                                   reports_to if "## Escalate to" not in soul else "")
+                                                   reports_to if "## Escalate to" not in soul else "",
+                                                   needs if "## Before I can start" not in soul else {})
     if settings.get("ack_reactions", True) and s.get("ack_reactions", True):
         if __package__:
             from . import acks
@@ -804,7 +832,7 @@ def forge(s: dict) -> dict:
             raise RuntimeError(f"profile dir {pdir} missing config.yaml after create")
 
         # 2. Bot Mode identity + SOUL.md
-        write_bot_meta(pdir, display, description, s.get("avatar_kind"))
+        write_bot_meta(pdir, display, description, s.get("avatar_kind"), needs)
         (pdir / "SOUL.md").write_text(soul)
         journal_path = None
         if settings.get("journal_enabled", True):
@@ -873,6 +901,10 @@ def forge(s: dict) -> dict:
                  f"as {display}, never by another Bot's name. My one job: {s['one_job']}."] + list(s.get("memory") or [])
         if approvals:
             facts.append("I ask the user before: " + "; ".join(approvals) + ".")
+        if needs:
+            facts.append("Before I can start, work handed to me must come with: "
+                         + "; ".join(f"{label} ({why})" for label, why in needs.items())
+                         + ". If one is missing I say so and stop.")
         if reports_to:
             facts.append(f"I escalate scope and priority calls to @{reports_to}.")
         (mem / "MEMORY.md").write_text("\n§\n".join(facts) + "\n")
@@ -963,7 +995,7 @@ def forge(s: dict) -> dict:
 
         return {"ok": True, "name": profile_id, "display_name": display, "description": description, "model": model,
                 "connect_next": connect_next, "sandbox": sandbox,
-                "approvals": approvals, "reports_to": reports_to or None,
+                "approvals": approvals, "needs": needs or None, "reports_to": reports_to or None,
                 "warning": warning, "toolsets": sorted(tools),
                 "bot_screen": ("its own screen on this host — watch it in Hermes Desktop, take over "
                                f"for a login, hand back: hermes -p {profile_id} computer-use screen start"

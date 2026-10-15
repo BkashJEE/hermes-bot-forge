@@ -136,7 +136,13 @@ ASK_AGENT = {
             "name": {"type": "string", "description": "profile name from list_agents"},
             "message": {"type": "string", "description": "self-contained message or task"},
             "reading_only": {"type": "boolean", "description": (
-                "true to run that Bot's turn with only the toolsets that cannot reach outside the conversation — web search and vision. Hermes enforces it by not offering the rest to the model at all, so it is a restriction and not a request. It stops the Bot running commands, driving the desktop or browser, scheduling, delegating onward, or touching connected services. It does NOT let it read local files: Hermes' file toolset is read and write together, so file access is off entirely here. Use it for look-it-up work.")},
+                "true to run that Bot's turn with only the toolsets that cannot reach outside "
+                "the conversation — web search and vision. Hermes enforces it by not offering the "
+                "rest to the model at all, so it is a restriction and not a request. It stops the "
+                "Bot running commands, driving the desktop or browser, scheduling, delegating "
+                "onward, or touching connected services. It does NOT let it read local files: "
+                "Hermes' file toolset is read and write together, so file access is off entirely "
+                "here. Use it for look-it-up work.")},
         },
         "required": ["name", "message"],
     },
@@ -187,7 +193,13 @@ HANDOFF_AGENT = {
                 "what you already know that it needs: findings so far, links, files by path, constraints, the "
                 "user's preferences. Plain text, up to ~8,000 characters; summarise and point to the rest.")},
             "reading_only": {"type": "boolean", "description": (
-                "true to run that Bot's turn with only the toolsets that cannot reach outside the conversation — web search and vision. Hermes enforces it by not offering the rest to the model at all, so it is a restriction and not a request. It stops the Bot running commands, driving the desktop or browser, scheduling, delegating onward, or touching connected services. It does NOT let it read local files: Hermes' file toolset is read and write together, so file access is off entirely here. Use it for look-it-up work.")},
+                "true to run that Bot's turn with only the toolsets that cannot reach outside "
+                "the conversation — web search and vision. Hermes enforces it by not offering the "
+                "rest to the model at all, so it is a restriction and not a request. It stops the "
+                "Bot running commands, driving the desktop or browser, scheduling, delegating "
+                "onward, or touching connected services. It does NOT let it read local files: "
+                "Hermes' file toolset is read and write together, so file access is off entirely "
+                "here. Use it for look-it-up work.")},
             "brings": {"type": "object", "additionalProperties": {"type": "string"}, "description": (
                 "the things that Bot says it needs before it can start, by the labels it declared. If it "
                 "declared any and you leave one out, the handoff is refused before it is sent and the error "

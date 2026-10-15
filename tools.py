@@ -373,7 +373,8 @@ def ask_agent(args: dict, **kwargs) -> str:
     # whole .env. forge.safe_env is the one allowlist for running another Bot's turn.
     env = forge.safe_env(root)
     try:
-        p = subprocess.run(["hermes", "-p", name, "chat", "-Q", "--max-turns", "30", "-q", message],
+        limit = forge.reading_only_args(args.get("reading_only"))
+        p = subprocess.run(["hermes", "-p", name, "chat", "-Q", "--max-turns", "30", *limit, "-q", message],
                            capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=900, env=env)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": f"{name} did not answer within 15 min"})

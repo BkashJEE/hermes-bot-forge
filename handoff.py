@@ -219,6 +219,7 @@ def handoff(s: dict, now: datetime | None = None) -> dict:
     now = now or datetime.now(UTC)
     task = re.sub(r"\s+", " ", str(s.get("task") or "")).strip()
     context = str(s.get("context") or "").strip()
+    reading_only = bool(s.get("reading_only"))
     if not task:
         return {"ok": False, "error": "a handoff needs a task — what the other Bot now owns"}
     if len(task) > MAX_TASK:
@@ -267,7 +268,8 @@ def handoff(s: dict, now: datetime | None = None) -> dict:
     path = _write_record(pdir, record)
 
     try:
-        ok, reply = forge.bot_chat(root, to, message, max_turns=MAX_TURNS, timeout=CHAT_TIMEOUT, env=forge.safe_env(root))
+        ok, reply = forge.bot_chat(root, to, message, max_turns=MAX_TURNS, timeout=CHAT_TIMEOUT,
+                               env=forge.safe_env(root), reading_only=reading_only)
     except Exception as exc:  # the CLI missing, a timeout — the record stays, marked as undelivered
         record.update({"status": "failed", "error": str(exc)[:300]})
         _write_record(pdir, record)

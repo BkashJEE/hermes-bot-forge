@@ -560,6 +560,23 @@ def check_routine(r: dict) -> str:
     return ""
 
 
+
+# Toolsets that cannot reach outside the conversation. Hermes' `file` toolset is read_file,
+# write_file and patch together, so it is not here: there is no toolset-level way to let a Bot
+# read a file without also letting it write one. That is why this is called reading_only rather
+# than read-only, and why the refusal text says what it does and does not cover.
+READING_ONLY_TOOLSETS = ("web", "vision")
+
+
+def reading_only_args(reading_only) -> list:
+    """`hermes chat -t ...` for a turn that may look things up and nothing else.
+
+    Hermes enforces this, not the prompt: a toolset left out of -t is not offered to the model at
+    all, so this is a restriction rather than a request.
+    """
+    return ["-t", ",".join(READING_ONLY_TOOLSETS)] if reading_only else []
+
+
 # ── bot mode ─────────────────────────────────────────────────────────────────
 def write_bot_meta(pdir: Path, display, description, kind, needs=None):
     """Mirror what Desktop's New Agent dialog saves (profiles.configure → ui_meta['hermes-bots'])."""
@@ -618,7 +635,7 @@ def newest_session(root, profile_id: str) -> str:
 
 
 def bot_chat(root, profile_id, message, source: str = "", max_turns: int = 3, timeout: int = CHAT_TIMEOUT,
-             env: dict | None = None):
+             env: dict | None = None, reading_only: bool = False):
     """Send a message in the Bot's canonical Bot Chat (created on first use).
 
     The source stamped here is permanent, and Hermes decides a session's client surface from it
@@ -629,14 +646,15 @@ def bot_chat(root, profile_id, message, source: str = "", max_turns: int = 3, ti
     existing = has_bot_chat(root, profile_id)
     if existing or source == "cli":
         p = run(root, "-p", profile_id, "chat", "-c", BOT_CHAT_TITLE, "--create-if-missing", "-Q",
-                "--max-turns", str(max_turns), "-q", message, timeout=timeout, check=False, env=env)
+                "--max-turns", str(max_turns), *reading_only_args(reading_only), "-q", message,
+                timeout=timeout, check=False, env=env)
     else:
         # `chat -c <title> --create-if-missing` hardcodes source="cli" (hermes_cli/main.py), and a session's
         # stored source is what decides its client surface — a cli-stamped chat never gets the desktop
         # toolset, so the Bot cannot react to a message in Desktop. Start it with the right source, then
         # give it the canonical title.
-        p = run(root, "-p", profile_id, "chat", "--source", source, "-Q", "--max-turns", str(max_turns), "-q",
-                message, timeout=timeout, check=False, env=env)
+        p = run(root, "-p", profile_id, "chat", "--source", source, "-Q", "--max-turns", str(max_turns),
+                *reading_only_args(reading_only), "-q", message, timeout=timeout, check=False, env=env)
         session_id = newest_session(root, profile_id)  # -Q hides the session_id line, so read it back
         if session_id:
             run(root, "-p", profile_id, "sessions", "rename", session_id, BOT_CHAT_TITLE, check=False, timeout=60,

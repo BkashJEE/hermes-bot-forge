@@ -11,6 +11,7 @@ import os
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 if __package__:  # Hermes imports this as a package; the CLI entry points run it as a script
@@ -85,11 +86,46 @@ def _code_mtime(folder: Path) -> float:
     return max((f.stat().st_mtime for f in folder.glob("*.py")), default=0.0)
 
 
-def _proc_start(pid: int) -> float:
+def _etime_seconds(text: str) -> float | None:
+    """`ps -o etime=` elapsed time -> seconds. Formats: MM:SS, HH:MM:SS, DD-HH:MM:SS."""
+    text = text.strip()
+    if not text:
+        return None
+    days, _, clock = text.rpartition("-")
+    parts = clock.split(":")
+    if not all(p.isdigit() for p in parts) or not 2 <= len(parts) <= 3:
+        return None
+    if days and not days.isdigit():
+        return None
+    seconds = 0.0
+    for part in parts:
+        seconds = seconds * 60 + int(part)
+    return seconds + int(days or 0) * 86400
+
+
+def _proc_start(pid: int) -> float | None:
+    """When the process started, or None when this host will not say.
+
+    None means unknown and must not be compared: the caller reports "not checked" rather than
+    guessing. Returning 0.0 here was the bug — every mtime is greater than 0.0, so a host without
+    /proc called every gateway stale, and the only fix it offered (restart the gateway) could
+    never clear it.
+    """
     try:
         return Path(f"/proc/{pid}").stat().st_mtime
     except OSError:
-        return 0.0
+        pass
+    # macOS and the BSDs have no /proc. `ps -o etime=` is POSIX and locale-independent, unlike
+    # lstart, whose month names change with LC_TIME.
+    try:
+        out = subprocess.run(["ps", "-o", "etime=", "-p", str(pid)], capture_output=True, text=True,
+                             timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    elapsed = _etime_seconds(out.stdout)
+    return None if elapsed is None else time.time() - elapsed
 
 
 def check(root: Path | None = None, settings: dict | None = None) -> dict:
@@ -118,8 +154,17 @@ def check(root: Path | None = None, settings: dict | None = None) -> dict:
 
     # a gateway started before the plugin files changed is still serving the old code
     pids = _gateway_pids(root)
-    stale = [n for n, pdir in enabled
-             if pids.get(n) and _proc_start(pids[n]) < _code_mtime(installed_dir(root, n, pdir))]
+    stale, unknown = [], []
+    for n, pdir in enabled:
+        if not pids.get(n):
+            continue
+        started = _proc_start(pids[n])
+        if started is None:
+            # Unknown is not stale. Saying FAIL here would send the user to restart a gateway
+            # that is already current, and the restart could never clear it.
+            unknown.append(n)
+        elif started < _code_mtime(installed_dir(root, n, pdir)):
+            stale.append(n)
     down = [n for n, _ in enabled if n in pids and not pids.get(n)]
     if stale:
         checks.append({"check": "gateway", "status": FAIL,
@@ -129,6 +174,10 @@ def check(root: Path | None = None, settings: dict | None = None) -> dict:
         steps.append("then quit and reopen Hermes Desktop")
     elif down:
         checks.append({"check": "gateway", "status": WARN, "detail": "not running: " + ", ".join(down)})
+    elif unknown:
+        checks.append({"check": "gateway", "status": WARN,
+                       "detail": "running, but this host would not say when it started, so whether it "
+                                 "predates the plugin files was not checked: " + ", ".join(unknown)})
     else:
         checks.append({"check": "gateway", "status": OK, "detail": "up to date with the plugin files"})
 

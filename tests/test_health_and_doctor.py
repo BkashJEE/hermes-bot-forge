@@ -3,6 +3,7 @@
 Split out of tests/test_forge.py, which had grown past 2,300 lines; the shared helpers
 and the sys.path setup Hermes-style imports need live in tests/support.py.
 """
+import os
 import subprocess
 import tempfile
 import time
@@ -150,7 +151,7 @@ class Doctor(unittest.TestCase):
         from unittest import mock
         root = self._root(enabled=True)
         with mock.patch.object(doctor, "_gateway_pids", return_value={"default": 123}), \
-                mock.patch.object(doctor, "_proc_start", return_value=0.0), \
+                mock.patch.object(doctor, "_proc_start", return_value=time.time() - 7200), \
                 mock.patch.object(doctor, "_code_mtime", return_value=time.time()), \
                 mock.patch.object(doctor, "sandbox_backends", return_value={}):
             out = doctor.check(root)
@@ -322,3 +323,97 @@ class CredentialReach(unittest.TestCase):
             self.assertEqual(len(flagged), 1)
             self.assertIn("readable by other users", flagged[0])
             self.assertIn("chmod 600", flagged[0])
+
+
+class GatewayStartTime(unittest.TestCase):
+    """A host that will not say when the gateway started must not be told its gateway is stale.
+
+    `_proc_start` returned 0.0 when it could not read /proc. Every file mtime is greater than 0.0,
+    so on macOS — which has no /proc — every gateway was reported stale, with a restart as the only
+    remedy, and the restart could never clear it. Reported in #64 with a gateway demonstrably newer
+    than the plugin files.
+    """
+
+    def _root(self):
+        import yaml as y
+        root = make_root(Path(tempfile.mkdtemp()))
+        (root / "config.yaml").write_text(y.safe_dump(
+            {"model": {"default": "m", "provider": "custom"}, "plugins": {"enabled": ["bot-forge"]}}))
+        return root
+
+    def _gateway_check(self, started):
+        import doctor
+        with mock.patch.object(doctor, "_gateway_pids", return_value={"default": 123}), \
+                mock.patch.object(doctor, "_proc_start", return_value=started), \
+                mock.patch.object(doctor, "_code_mtime", return_value=time.time()), \
+                mock.patch.object(doctor, "sandbox_backends", return_value={}):
+            out = doctor.check(self._root())
+        return next(c for c in out["checks"] if c["check"] == "gateway"), out
+
+    def test_an_unknown_start_time_is_not_reported_as_stale(self):
+        """The whole bug: unknown was indistinguishable from ancient."""
+        gateway, out = self._gateway_check(None)
+        self.assertNotEqual(gateway["status"], "fail")
+        self.assertNotIn("hermes gateway restart", out["next_steps"])
+
+    def test_an_unknown_start_time_says_the_check_was_skipped(self):
+        """Silence would be worse than the false FAIL — the user should know it was not checked."""
+        gateway, _ = self._gateway_check(None)
+        self.assertEqual(gateway["status"], "warn")
+        self.assertIn("not checked", gateway["detail"])
+
+    def test_a_genuinely_old_gateway_is_still_caught(self):
+        """The check carries real signal on Linux; the fix must not disable it."""
+        gateway, out = self._gateway_check(time.time() - 7200)
+        self.assertEqual(gateway["status"], "fail")
+        self.assertIn("hermes gateway restart", out["next_steps"])
+
+    def test_a_gateway_newer_than_the_files_passes(self):
+        gateway, _ = self._gateway_check(time.time() + 60)
+        self.assertEqual(gateway["status"], "ok")
+
+
+class ProcessStartTime(unittest.TestCase):
+    def test_elapsed_time_parsing(self):
+        import doctor
+        for text, want in (("00:42", 42), ("01:00:00", 3600), ("2-03:04:05", 183845),
+                           ("  10:30  ", 630)):
+            self.assertEqual(doctor._etime_seconds(text), want, text)
+
+    def test_unparseable_elapsed_time_is_unknown_rather_than_zero(self):
+        import doctor
+        for text in ("", "   ", "garbage", "1:2:3:4", "--", "x-01:00"):
+            self.assertIsNone(doctor._etime_seconds(text), text)
+
+    def test_a_host_without_proc_falls_back_to_ps(self):
+        """macOS and the BSDs have no /proc. `ps -o etime=` is POSIX and locale-independent."""
+        import doctor
+        real = Path.stat
+
+        def no_proc(self, *a, **k):
+            if str(self).startswith("/proc/"):
+                raise OSError("no /proc on this host")
+            return real(self, *a, **k)
+
+        with mock.patch.object(Path, "stat", no_proc):
+            started = doctor._proc_start(os.getpid())
+        self.assertIsNotNone(started)
+        self.assertNotEqual(started, 0.0)
+        self.assertLess(abs(time.time() - started), 86400)
+
+    def test_a_pid_that_does_not_exist_is_unknown(self):
+        import doctor
+        self.assertIsNone(doctor._proc_start(999999))
+
+    def test_ps_failing_entirely_is_unknown_not_zero(self):
+        import doctor
+        real = Path.stat
+
+        def no_proc(self, *a, **k):
+            if str(self).startswith("/proc/"):
+                raise OSError("no /proc")
+            return real(self, *a, **k)
+
+        with mock.patch.object(Path, "stat", no_proc), \
+             mock.patch.object(doctor.subprocess, "run", side_effect=OSError("no ps")):
+            self.assertIsNone(doctor._proc_start(os.getpid()))

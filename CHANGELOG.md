@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.21.0] - 2026-10-15
 
 ### Added
 - **A handoff or question can be reading-only.** `handoff_agent(reading_only=True)` and `ask_agent(reading_only=True)` run that Bot's turn with only the toolsets that cannot reach outside the conversation — web search and vision. Hermes enforces it: a toolset left out of `chat -t` is never offered to the model, so this is a restriction, not a line of prompt asking nicely. It stops the Bot running commands, driving the desktop or browser, scheduling, delegating onward, or touching connected services. **It does not let it read local files** — Hermes' `file` toolset is `read_file`, `write_file` and `patch` together, and there is no toolset-level way to separate them, so file access is off entirely rather than quietly allowing writes. For anything finer-grained than that, the Bot's own Sentinel policy is the tool.

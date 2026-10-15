@@ -1,7 +1,7 @@
 ---
 name: bot-forge
 description: "Design a new Hermes Bot from one sentence and spawn it with the create_agent tool. Role defaults, SOUL.md template, zero questions."
-version: 0.20.0
+version: 0.21.0
 author: Bikash Joshi
 license: MIT
 platforms: [linux, macos]
@@ -161,6 +161,17 @@ When a Bot journals a `blocked` or `failed` entry, the plugin emails the user by
 - Report the outcome, don't redo the work. `needs_you` means the user has to approve something: say what. `blocked` is already in the waiting queue.
 - Both Bots journal the handoff, and `check_agents` lists the ones still in flight under `handoffs`, so "where did that task go?" has an answer.
 - It waits for the other Bot (up to 15 minutes). Use `ask_agent` for a quick question with no ownership change.
+- **If the Bot declared what it needs** (see below), a handoff that does not carry it is refused *before* it is sent, and the error names what is missing in that Bot's own words. Pass them in `brings={...}` under the labels it asked for, or go and get what you do not have — do not retry the same handoff.
+- **For look-it-up work, pass `reading_only: true`.** That Bot's turn then runs with only web search and vision, so it cannot run commands, drive the desktop or browser, schedule, delegate onward or touch connected services. Hermes enforces it, so it is a real restriction. It cannot read local files either (Hermes' `file` toolset bundles writing with reading), so do not use it for anything that must open a file. `ask_agent` takes the same flag.
+
+## What a Bot needs before it can start
+`approvals` says what a Bot will not do without asking. `needs` says what it cannot *begin* without — short labels mapped to plain sentences:
+
+```
+needs: {"draft": "the text you want reviewed", "deadline": "when it has to ship"}
+```
+
+Give it to a Bot whose work always arrives with the same few things (a reviewer needs the draft; an editor needs the deadline). It lands in the Bot's SOUL.md under **Before I can start** and in its memory, and `handoff_agent` checks it before spending a turn. Leave it off for a Bot whose inputs vary — a declaration that is wrong is worse than none, because every handoff then gets refused.
 
 ## Teams
 Apply the same preflight to each proposed responsibility, including the lead. A request for a

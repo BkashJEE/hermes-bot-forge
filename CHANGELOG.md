@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **`check_install` called every gateway stale on macOS** (#64, reported by @rocco-commits with a gateway demonstrably newer than the plugin files). `_proc_start` read `/proc/<pid>`, which does not exist on Darwin, and returned `0.0` when it could not — and every file mtime is greater than `0.0`, so the comparison was always true. The only remedy it offered was restarting the gateway, which could never clear it, so a user followed the advice in a loop. The start time now falls back to `ps -o etime=`, which is POSIX and locale-independent (unlike `lstart`, whose month names move with `LC_TIME`). More importantly, "cannot determine" is now `None` rather than `0.0`: unknown is reported as a warning saying the check was skipped, instead of a confident FAIL. A genuinely old gateway is still caught — a test asserts that, so the fix cannot quietly disable the check where it carries real signal.
+
 ## [0.21.0] - 2026-10-15
 
 ### Added

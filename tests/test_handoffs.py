@@ -346,3 +346,56 @@ class WhatABotNeedsBeforeItCanStart(unittest.TestCase):
         out = self._hand(brings={"token": "ghp_" + "a" * 36})
         self.assertFalse(out["ok"])
         self.assertIn("credential", out["error"])
+
+
+class ReadingOnly(unittest.TestCase):
+    """A handoff or question that may look things up and do nothing else.
+
+    Hermes enforces it: a toolset left out of `chat -t` is never offered to the model, so this is
+    a restriction rather than a line of prompt asking nicely. The honest limit is that Hermes'
+    `file` toolset is read_file, write_file and patch together — there is no toolset-level way to
+    allow reading a file without also allowing writing one — so file access is off entirely.
+    """
+
+    def test_it_restricts_the_turn_to_toolsets_that_cannot_act(self):
+        self.assertEqual(forge.reading_only_args(True), ["-t", "web,vision"])
+
+    def test_it_is_off_unless_asked_for(self):
+        for value in (False, None, 0, ""):
+            with self.subTest(value=value):
+                self.assertEqual(forge.reading_only_args(value), [])
+
+    def test_no_acting_toolset_is_reachable(self):
+        """The point of the flag. If one of these ever appears, it is not reading-only any more."""
+        for acting in ("terminal", "code_execution", "computer_use", "browser",
+                       "connections", "cronjob", "delegation", "image_gen", "tts"):
+            self.assertNotIn(acting, forge.READING_ONLY_TOOLSETS, acting)
+
+    def test_file_is_excluded_because_it_bundles_writes(self):
+        """read_file, write_file and patch share one toolset, so allowing reads would allow writes."""
+        self.assertNotIn("file", forge.READING_ONLY_TOOLSETS)
+
+    def test_the_flag_reaches_the_hermes_invocation(self):
+        seen = {}
+
+        def fake_run(root, *argv, **kw):
+            seen["argv"] = argv
+            return subprocess.CompletedProcess([], 0, "✅ done", "")
+
+        with mock.patch.object(forge, "run", fake_run), \
+             mock.patch.object(forge, "has_bot_chat", return_value=True):
+            forge.bot_chat(Path("/tmp"), "nova", "hi", reading_only=True)
+        self.assertIn("-t", seen["argv"])
+        self.assertEqual(seen["argv"][seen["argv"].index("-t") + 1], "web,vision")
+
+    def test_an_ordinary_handoff_is_not_restricted(self):
+        seen = {}
+
+        def fake_run(root, *argv, **kw):
+            seen["argv"] = argv
+            return subprocess.CompletedProcess([], 0, "✅ done", "")
+
+        with mock.patch.object(forge, "run", fake_run), \
+             mock.patch.object(forge, "has_bot_chat", return_value=True):
+            forge.bot_chat(Path("/tmp"), "nova", "hi")
+        self.assertNotIn("-t", seen["argv"])

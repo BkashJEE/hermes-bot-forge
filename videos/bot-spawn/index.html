@@ -106,23 +106,23 @@
       id="root"
       data-composition-id="main"
       data-start="0"
-      data-duration="9"
+      data-duration="10"
       data-width="1080"
       data-height="1080"
     >
-      <div id="ground" class="layer clip" data-start="0" data-duration="9" data-track-index="0"></div>
-      <div id="grid" class="layer clip" data-start="0" data-duration="9" data-track-index="1"></div>
+      <div id="ground" class="layer clip" data-start="0" data-duration="10" data-track-index="0"></div>
+      <div id="grid" class="layer clip" data-start="0" data-duration="10" data-track-index="1"></div>
 
-      <div class="layer clip" data-start="0" data-duration="9" data-track-index="2">
+      <div class="layer clip" data-start="0" data-duration="10" data-track-index="2">
         <div id="orb-glow"></div>
         <img id="character" src="assets/character.png" alt="" />
       </div>
 
-      <div id="ask" class="clip" data-start="0" data-duration="6.6" data-track-index="3">
+      <div id="ask" class="clip" data-start="0" data-duration="10" data-track-index="3">
         <span class="quote">“</span><span id="ask-text"></span><span class="quote">”</span><span id="caret"></span>
       </div>
 
-      <div id="parts" class="clip" data-start="1.3" data-duration="5.3" data-track-index="4">
+      <div id="parts" class="clip" data-start="0" data-duration="10" data-track-index="4">
         <div class="part"><div class="tile"><svg viewBox="0 0 64 64"><rect x="9" y="14" width="46" height="36" rx="7"/><circle cx="24" cy="30" r="7"/><path d="M38 26h10M38 38h10"/></svg></div><div class="name">Identity</div></div>
         <div class="part"><div class="tile"><svg viewBox="0 0 64 64"><path d="M16 8h21l11 11v37H16z"/><path d="M37 8v11h11M24 32h16M24 42h16"/></svg></div><div class="name">SOUL.md</div></div>
         <div class="part"><div class="tile"><svg viewBox="0 0 64 64"><path d="M32 12c-9 0-15 6-15 13 0 4 2 7 4 9v12h22V34c2-2 4-5 4-9 0-7-6-13-15-13z"/><path d="M26 46h12"/></svg></div><div class="name">Memory</div></div>
@@ -131,7 +131,7 @@
         <div class="part"><div class="tile"><svg viewBox="0 0 64 64"><path d="M22 10v14M42 10v14"/><rect x="15" y="24" width="34" height="16" rx="6"/><path d="M32 40v14"/></svg></div><div class="name">Gateway</div></div>
       </div>
 
-      <div id="card" class="clip" data-start="5.25" data-duration="1.9" data-track-index="5">
+      <div id="card" class="clip" data-start="0" data-duration="10" data-track-index="5">
         <div class="who">
           <div class="face"></div>
           <div>
@@ -145,7 +145,7 @@
         </div>
       </div>
 
-      <div id="close" class="clip" data-start="6.9" data-duration="2.1" data-track-index="6">
+      <div id="close" class="clip" data-start="0" data-duration="10" data-track-index="6">
         <div class="mark">Bot Forge</div>
         <div class="rule"></div>
         <div class="cmd">hermes plugins install bot-forge</div>
@@ -155,24 +155,42 @@
     <script>
       const tl = gsap.timeline({ paused: true });
 
-      // 0.0–1.1 — the ask, typed the way a person types it
       const ASK = "make me a social media manager";
       const askEl = document.getElementById("ask-text");
-      tl.fromTo("#ask", { opacity: 0 }, { opacity: 1, duration: 0.25 }, 0.1);
+
+      // Frame 0 is the thumbnail. Wherever this loop is shown without autoplay — the README,
+      // a social card, a paused player — the still frame has to be the finished composition,
+      // not the first frame of a build-in. So the loop opens on the lockup it ends on: the
+      // character lit, the name, the install line. Nothing fades up from nothing.
+      askEl.textContent = ASK;
+      gsap.set("#character", { opacity: 1, x: 0 });
+      gsap.set("#orb-glow", { opacity: 0.85, scale: 1.05 });
+      gsap.set("#close", { opacity: 1 });
+      gsap.set("#close .mark", { opacity: 1, y: 0 });
+      gsap.set("#close .rule", { scaleX: 1, transformOrigin: "left center" });
+      gsap.set("#close .cmd", { opacity: 1, y: 0 });
+      gsap.set(["#ask", "#parts", "#card"], { opacity: 0 });
+      gsap.set("#caret", { opacity: 0 });
+
+      // 0.0-1.15 - hold the poster, so a scrubbed or paused frame near the start still reads
+      tl.to({}, { duration: 1.15 }, 0);
+
+      // 1.15 - the lockup steps aside and the ask is typed the way a person types it
+      tl.to("#close", { opacity: 0, duration: 0.3, ease: "power2.in" }, 1.15);
+      tl.set(askEl, { textContent: "" }, 1.45);
+      tl.to("#ask", { opacity: 1, duration: 0.2 }, 1.5);
+      tl.set("#caret", { opacity: 1 }, 1.5);
       tl.to({ n: 0 }, {
         n: ASK.length, duration: 0.95, ease: "none",
         onUpdate() { askEl.textContent = ASK.slice(0, Math.round(this.targets()[0].n)); },
-      }, 0.25);
-      tl.to("#caret", { opacity: 0, duration: 0.2 }, 1.3);
+      }, 1.6);
+      tl.to("#caret", { opacity: 0, duration: 0.2 }, 2.65);
 
-      // she is already there; the orb wakes when the ask lands
-      tl.fromTo("#character", { opacity: 0, x: 40 },
-                { opacity: 1, x: 0, duration: 0.9, ease: "power2.out" }, 0);
-      tl.fromTo("#orb-glow", { opacity: 0.25, scale: 0.8 },
-                { opacity: 1, scale: 1.15, duration: 0.5, ease: "power2.out" }, 1.15);
-      tl.to("#orb-glow", { opacity: 0.55, scale: 1, duration: 1.4, ease: "sine.inOut" }, 1.65);
+      // the orb answers the ask
+      tl.to("#orb-glow", { opacity: 1, scale: 1.2, duration: 0.5, ease: "power2.out" }, 2.5);
+      tl.to("#orb-glow", { opacity: 0.6, scale: 1, duration: 1.4, ease: "sine.inOut" }, 3.0);
 
-      // 1.4–3.4 — each part of the Bot comes out of the orb and settles into place.
+      // 2.75-4.9 - each part of the Bot comes out of the orb and settles into place.
       // Offsets are computed from the laid-out grid so the arc starts at the orb itself.
       gsap.utils.toArray("#parts .part").forEach((part, i) => {
         const box = part.getBoundingClientRect();
@@ -181,26 +199,32 @@
         tl.fromTo(part,
           { opacity: 0, x: fromX, y: fromY, scale: 0.25 },
           { opacity: 1, x: 0, y: 0, scale: 1, duration: 0.72, ease: "back.out(1.5)" },
-          1.4 + i * 0.17);
+          2.75 + i * 0.17);
       });
+      tl.set("#parts", { opacity: 1 }, 2.75);
 
-      // 4.75 — the parts hand over to the Bot they add up to
-      tl.to("#parts", { opacity: 0, y: -16, duration: 0.45, ease: "power2.in" }, 4.75);
+      // 5.3 - the parts hand over to the Bot they add up to
+      tl.to("#parts", { opacity: 0, y: -16, duration: 0.45, ease: "power2.in" }, 5.3);
       tl.fromTo("#card", { opacity: 0, y: 34, scale: 0.97 },
-                { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "power3.out" }, 5.25);
+                { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "power3.out" }, 5.8);
 
-      // 6.5 — clear, then the signature
-      tl.to("#card", { opacity: 0, y: -18, duration: 0.4, ease: "power2.in" }, 6.5);
-      tl.to("#ask", { opacity: 0, duration: 0.4, ease: "power2.in" }, 6.3);
+      // 7.0 - clear, and the lockup comes back to exactly where it started
+      tl.to("#card", { opacity: 0, y: -18, duration: 0.4, ease: "power2.in" }, 7.0);
+      tl.to("#ask", { opacity: 0, duration: 0.4, ease: "power2.in" }, 6.9);
+      tl.to("#close", { opacity: 1, duration: 0.01 }, 7.5);
+      // immediateRender:false on all three — a fromTo otherwise applies its "from" state at
+      // build time, which would blank the lockup that frame 0 exists to show.
       tl.fromTo("#close .mark", { opacity: 0, y: 22 },
-                { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 6.95);
+                { opacity: 1, y: 0, duration: 0.5, ease: "power2.out", immediateRender: false }, 7.55);
       tl.fromTo("#close .rule", { scaleX: 0 },
-                { scaleX: 1, duration: 0.4, ease: "power2.out", transformOrigin: "left center" }, 7.25);
+                { scaleX: 1, duration: 0.4, ease: "power2.out", transformOrigin: "left center",
+                  immediateRender: false }, 7.85);
       tl.fromTo("#close .cmd", { opacity: 0, y: 16 },
-                { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 7.45);
+                { opacity: 1, y: 0, duration: 0.45, ease: "power2.out", immediateRender: false }, 8.05);
 
-      // 8.6 — settle toward black so the loop does not jump
-      tl.to(["#close", "#character", "#orb-glow"], { opacity: 0, duration: 0.4, ease: "power2.in" }, 8.6);
+      // 8.6-10 - hold the lockup. The last frame matches the first, so the loop does not jump
+      // and there is no fade to black for a player to freeze on.
+      tl.to({}, { duration: 1.4 }, 8.6);
 
       window.__timelines["main"] = tl;
       tl.seek(0);

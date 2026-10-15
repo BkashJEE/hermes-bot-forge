@@ -3,6 +3,11 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **A handoff's context now travels as data, not as part of the briefing.** `handoff_agent` carries whatever the sending Bot had gathered — notes it wrote, but also pages it fetched, mail it read, comments it was shown. That text was interpolated straight into the receiving Bot's briefing, which put someone else's words in instruction position with nothing marking where the sender stopped speaking. The context is now JSON-encoded inside a `<handoff-context-json>` delimiter and named in the prompt as untrusted data, with the task line called out as the only instruction in the handoff. `json.dumps` does not escape `/`, so a context holding the literal closing delimiter would have survived encoding and appeared to end the block early; `</` is escaped to `<\/`, a valid JSON escape that decodes to the same string. This does not block a malicious handoff — it removes the ambiguity about who is speaking.
+
 ## [0.20.0] - 2026-10-12
 
 ### Added

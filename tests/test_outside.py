@@ -7,7 +7,6 @@ layer sees nothing at all.
 So these tests are mostly about what is decided *before* it starts — the mode, the directory, the
 environment, the credential scan — plus the plugin saying plainly what it just did.
 """
-import json
 import subprocess
 import tempfile
 import unittest

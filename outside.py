@@ -25,7 +25,6 @@ never gets `bypassPermissions`, it is given a scrubbed environment rather than t
 the work is journalled the way a handoff is.
 """
 import json
-import os
 import re
 import shutil
 import subprocess

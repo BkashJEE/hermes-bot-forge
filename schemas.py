@@ -537,3 +537,36 @@ AGENT_JOURNAL = {
         "required": ["action"],
     },
 }
+
+
+DELEGATE_OUTSIDE = {
+    "name": "delegate_outside",
+    "description": (
+        "Hand a coding job to Claude Code, a different agent running on this machine — 'let Claude "
+        "refactor this', 'get Claude to work out why these tests flake'. Use it for work inside one "
+        "directory that needs a long autonomous session. It is NOT handoff_agent: Claude Code is not "
+        "a Hermes Bot, Hermes does not dispatch its tools, and this Bot's Sentinel policy does not "
+        "see them — once it starts, Hermes sees one subprocess. It reads and reports without "
+        "changing anything unless may_edit is true, and it can never be given Claude Code's "
+        "bypass-permissions mode. It spends the user's Claude subscription. Prefer handoff_agent or "
+        "create_team when another Hermes Bot could do the job, and say in your reply that the work "
+        "was done outside Hermes."
+    ),
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "task": {"type": "string", "description": (
+                "the job, in a sentence or two, including what 'done' looks like")},
+            "directory": {"type": "string", "description": (
+                "absolute path it runs in; it sees this directory, not the user's whole machine")},
+            "context": {"type": "string", "description": (
+                "what it needs to know that it cannot read from the directory. Carried as data, "
+                "never a key or password — say where the secret lives instead.")},
+            "may_edit": {"type": "boolean", "description": (
+                "false (default) runs it in plan mode: it reads and reports but changes nothing in "
+                "the directory. true lets it edit files. Ask the user before passing true, and tell "
+                "them to check the diff afterwards.")},
+        },
+        "required": ["task", "directory"],
+    },
+}

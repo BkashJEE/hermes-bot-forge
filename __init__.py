@@ -38,6 +38,10 @@ def register(ctx):
                       handler=lambda args, **kw: tools.request_takeover(args, settings=settings(), **kw),
                       emoji="🙋",
                       description="Ask the user to take this Bot's screen for a sign-in it cannot pass")
+    ctx.register_tool(name="delegate_outside", toolset="bot_forge", schema=schemas.DELEGATE_OUTSIDE,
+                      handler=lambda args, **kw: tools.delegate_outside(args, settings=settings(), **kw),
+                      emoji="🛫",
+                      description="Hand a coding job to Claude Code — outside Hermes, outside Sentinel")
     ctx.register_tool(name="handoff_agent", toolset="bot_forge", schema=schemas.HANDOFF_AGENT,
                       handler=lambda args, **kw: tools.handoff_agent(args, settings=settings(), **kw),
                       emoji="🤝",

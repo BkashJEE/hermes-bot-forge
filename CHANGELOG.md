@@ -8,6 +8,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Fixed
 - **`check_install` called every gateway stale on macOS** (#64, reported by @rocco-commits with a gateway demonstrably newer than the plugin files). `_proc_start` read `/proc/<pid>`, which does not exist on Darwin, and returned `0.0` when it could not — and every file mtime is greater than `0.0`, so the comparison was always true. The only remedy it offered was restarting the gateway, which could never clear it, so a user followed the advice in a loop. The start time now falls back to `ps -o etime=`, which is POSIX and locale-independent (unlike `lstart`, whose month names move with `LC_TIME`). More importantly, "cannot determine" is now `None` rather than `0.0`: unknown is reported as a warning saying the check was skipped, instead of a confident FAIL. A genuinely old gateway is still caught — a test asserts that, so the fix cannot quietly disable the check where it carries real signal.
 
+## [Unreleased]
+
+### Added
+- **A Bot can hand a coding job to Claude Code.** `delegate_outside(task, directory, may_edit)` spawns Claude Code in one directory and returns what it said. This is not `handoff_agent`: Claude Code is **not a Hermes Bot**, Hermes does not dispatch its tools, and the Bot's Sentinel policy never sees them — once it starts, Hermes sees one subprocess. Because of that the job is narrowed before it begins rather than governed while it runs: it runs in Claude Code's **plan mode** unless `may_edit` is set, so by default it reads and reports without changing the working tree; `bypassPermissions` is unreachable whatever the caller passes; it gets `forge.safe_env` rather than the Bot's own environment, so a gateway holding the main profile's `.env` cannot leak it outward; the task and context are secret-scanned like a handoff; context travels as data in a delimiter it cannot forge; and the run is journalled saying where it ran and that Sentinel did not see it. It spends the user's Claude subscription. Prefer `handoff_agent` or `create_team` when a Hermes Bot could do the job.
+
 ## [0.21.0] - 2026-10-15
 
 ### Added

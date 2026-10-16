@@ -173,6 +173,13 @@ needs: {"draft": "the text you want reviewed", "deadline": "when it has to ship"
 
 Give it to a Bot whose work always arrives with the same few things (a reviewer needs the draft; an editor needs the deadline). It lands in the Bot's SOUL.md under **Before I can start** and in its memory, and `handoff_agent` checks it before spending a turn. Leave it off for a Bot whose inputs vary — a declaration that is wrong is worse than none, because every handoff then gets refused.
 
+## Work that goes outside Hermes
+`delegate_outside` hands a coding job to **Claude Code**, a different agent on this machine. Use it for a long autonomous session inside one directory — "let Claude work out why these tests flake".
+
+Say plainly in your reply that the work ran outside Hermes. It is not a handoff: Hermes did not dispatch its tools and this Bot's Sentinel policy did not see them, so "it was allowed" means nothing here. It defaults to plan mode (reads, reports, changes nothing); ask the user before passing `may_edit: true`, and afterwards tell them to check the diff rather than assuming the change is right. It spends their Claude subscription.
+
+Reach for `handoff_agent` or `create_team` first — a Hermes Bot doing the job stays inside the approval layer and costs nothing extra.
+
 ## Teams
 Apply the same preflight to each proposed responsibility, including the lead. A request for a
 team does not prescribe a fixed headcount: existing Bots, skills, delegation and routines may

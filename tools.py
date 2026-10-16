@@ -361,6 +361,18 @@ def list_agents(args: dict, **kwargs) -> str:
     return json.dumps({"agents": agents})
 
 
+def delegate_outside(args: dict, settings: dict | None = None, **kwargs) -> str:
+    """Spawn Claude Code. The caller is resolved the way every other tool resolves it — from the
+    running profile, never from a tool argument."""
+    if __package__:
+        from . import outside
+    else:
+        import outside
+    spec = {**args, "hermes_root": str(hermes_root()), "settings": settings or {},
+            "from": launch_profile(kwargs.get("session_id"), hermes_root())}
+    return json.dumps(outside.delegate(spec))
+
+
 def ask_agent(args: dict, **kwargs) -> str:
     root = hermes_root()
     name = (args.get("name") or "").strip().lower()

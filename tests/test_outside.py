@@ -39,8 +39,11 @@ class ItRunsNarrowed(unittest.TestCase):
     def test_it_cannot_change_anything_unless_asked(self):
         self.assertEqual(self._run()["mode"], outside.PLAN)
 
-    def test_asking_for_edits_is_explicit(self):
-        self.assertEqual(self._run(may_edit=True)["mode"], outside.EDIT)
+    def test_editing_outside_a_repository_is_refused(self):
+        """Without git there is no way to isolate the work or undo it afterwards."""
+        out = self._run(may_edit=True)
+        self.assertFalse(out["ok"])
+        self.assertIn("not inside a git repository", out["error"])
 
     def _argv_for(self, **over):
         """Let the real runner build argv, so the flags are what actually get executed."""
@@ -175,3 +178,136 @@ class TheManifestIsTrue(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EditingNeverTouchesTheWorkingCopy(unittest.TestCase):
+    """A job that may edit gets its own checkout on its own branch.
+
+    Two Bots on one repo would otherwise collide, and a Bot would be editing the files the user
+    has open. A worktree also starts from the current commit, so uncommitted work does not travel
+    into the job — and what comes back is a diff someone can read before any of it is kept.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = make_root(Path(self.tmp.name), profiles=("marlow",))
+        self.repo = Path(self.tmp.name) / "repo"
+        self.repo.mkdir()
+        self._git("init", "-q", ".")
+        (self.repo / "f.txt").write_text("committed\n")
+        self._git("add", "f.txt")
+        self._git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init")
+
+    def _git(self, *argv):
+        return subprocess.run(["git", "-C", str(self.repo), *argv], capture_output=True, text=True)
+
+    def _run(self, **over):
+        spec = {"hermes_root": str(self.root), "from": "marlow", "task": "fix it",
+                "directory": str(self.repo), "may_edit": True, **over}
+        with mock.patch.object(outside, "ready", return_value=(True, "")):
+            return outside.delegate(spec, runner=lambda: _proc())
+
+    def test_it_runs_in_a_worktree_not_the_users_directory(self):
+        out = self._run()
+        self.assertTrue(out["ok"], out)
+        self.assertNotEqual(out["directory"], str(self.repo))
+        self.assertIn("worktree", out)
+        self.assertTrue(Path(out["worktree"]).is_dir())
+
+    def test_the_branch_is_its_own(self):
+        out = self._run()
+        self.assertTrue(out["branch"].startswith("bot-forge/"))
+        self.assertIn(out["branch"], self._git("branch", "--list", out["branch"]).stdout)
+
+    def test_uncommitted_work_does_not_travel_into_the_job(self):
+        """The agent sees committed state — the only state a diff can be reviewed against."""
+        (self.repo / "f.txt").write_text("committed\nuncommitted\n")
+        out = self._run()
+        self.assertEqual((Path(out["worktree"]) / "f.txt").read_text(), "committed\n")
+        self.assertIn("uncommitted", (self.repo / "f.txt").read_text())
+
+    def test_two_jobs_do_not_collide(self):
+        a, b = self._run(), self._run()
+        self.assertNotEqual(a["worktree"], b["worktree"])
+        self.assertNotEqual(a["branch"], b["branch"])
+
+    def test_it_hands_back_how_to_review_keep_or_discard(self):
+        out = self._run()
+        self.assertIn("diff", out["review"])
+        self.assertIn("merge", out["keep"])
+        self.assertIn("worktree remove", out["discard"])
+
+    def test_the_bot_is_told_not_to_merge_it_itself(self):
+        note = self._run()["note"].lower()
+        self.assertIn("never merge it yourself", note)
+        self.assertIn("not in the user's working copy", note)
+
+    def test_plan_mode_needs_no_worktree(self):
+        out = self._run(may_edit=False)
+        self.assertEqual(out["directory"], str(self.repo))
+        self.assertNotIn("worktree", out)
+
+
+class TheWorkIsCommittedSoItCanBeReviewed(unittest.TestCase):
+    """The branch has to actually hold the work.
+
+    Left uncommitted in the worktree, `diff HEAD...branch` is empty, `merge branch` is a no-op, and
+    removing the worktree throws the job away — so the review/keep/discard commands handed back
+    would all have been lies.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = make_root(Path(self.tmp.name), profiles=("marlow",))
+        self.repo = Path(self.tmp.name) / "repo"
+        self.repo.mkdir()
+        for argv in (["init", "-q", "."], ["add", "-A"]):
+            subprocess.run(["git", "-C", str(self.repo), *argv], capture_output=True)
+        (self.repo / "app.py").write_text("one\n")
+        subprocess.run(["git", "-C", str(self.repo), "add", "-A"], capture_output=True)
+        subprocess.run(["git", "-C", str(self.repo), "-c", "user.email=t@t", "-c", "user.name=t",
+                        "commit", "-qm", "init"], capture_output=True)
+
+    def _run_with(self, writer):
+        real = subprocess.run
+
+        def agent(argv, **kw):
+            if argv and argv[0] == "claude" and "-p" in argv:
+                writer(Path(kw["cwd"]))
+                return subprocess.CompletedProcess(argv, 0, "done", "")
+            return real(argv, **kw)
+
+        spec = {"hermes_root": str(self.root), "from": "marlow", "task": "change it",
+                "directory": str(self.repo), "may_edit": True}
+        with mock.patch.object(outside, "ready", return_value=(True, "")), \
+             mock.patch.object(outside.subprocess, "run", agent):
+            return outside.delegate(spec)
+
+    def test_the_branch_holds_a_diff_the_review_command_can_show(self):
+        out = self._run_with(lambda d: (d / "app.py").write_text("one\ntwo\n"))
+        self.assertTrue(out["changed_anything"])
+        diff = subprocess.run(["git", "-C", str(self.repo), "diff", f"HEAD...{out['branch']}"],
+                              capture_output=True, text=True).stdout
+        self.assertIn("+two", diff)
+
+    def test_a_job_that_changed_nothing_says_so(self):
+        """Better than handing back a review command for an empty diff."""
+        out = self._run_with(lambda d: None)
+        self.assertTrue(out["ok"])
+        self.assertFalse(out["changed_anything"])
+
+    def test_the_users_working_copy_is_untouched(self):
+        self._run_with(lambda d: (d / "app.py").write_text("one\ntwo\n"))
+        self.assertEqual((self.repo / "app.py").read_text(), "one\n")
+
+    def test_a_repository_with_no_git_identity_still_commits(self):
+        """A machine with no global git config must still produce a reviewable commit."""
+        subprocess.run(["git", "-C", str(self.repo), "config", "--unset", "user.email"],
+                       capture_output=True)
+        subprocess.run(["git", "-C", str(self.repo), "config", "--unset", "user.name"],
+                       capture_output=True)
+        out = self._run_with(lambda d: (d / "app.py").write_text("one\nthree\n"))
+        self.assertTrue(out["ok"], out)
+        self.assertTrue(out["changed_anything"])

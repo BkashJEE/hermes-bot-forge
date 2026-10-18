@@ -13,6 +13,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and
 ### Added
 - **A Bot can hand a coding job to Claude Code.** `delegate_outside(task, directory, may_edit)` spawns Claude Code in one directory and returns what it said. This is not `handoff_agent`: Claude Code is **not a Hermes Bot**, Hermes does not dispatch its tools, and the Bot's Sentinel policy never sees them — once it starts, Hermes sees one subprocess. Because of that the job is narrowed before it begins rather than governed while it runs: it runs in Claude Code's **plan mode** unless `may_edit` is set, so by default it reads and reports without changing the working tree; `bypassPermissions` is unreachable whatever the caller passes; it gets `forge.safe_env` rather than the Bot's own environment, so a gateway holding the main profile's `.env` cannot leak it outward; the task and context are secret-scanned like a handoff; context travels as data in a delimiter it cannot forge; and the run is journalled saying where it ran and that Sentinel did not see it. It spends the user's Claude subscription. Prefer `handoff_agent` or `create_team` when a Hermes Bot could do the job.
 
+## [Unreleased]
+
+### Changed
+- **An editing job never touches your working copy.** `delegate_outside(may_edit=True)` now runs in its own `git worktree` on its own branch, and commits what it changed there. Your working copy is untouched, two jobs cannot collide, and uncommitted work does not travel into the job — the agent sees committed state, which is the only state a diff can be reviewed against. The result hands back the three commands that matter: review (`git diff HEAD...<branch>`), keep (`git merge <branch>`), discard (remove the worktree and delete the branch), plus `changed_anything` so a job that did nothing says so instead of pointing at an empty diff. An editing job outside a git repository is **refused** — there would be no way to isolate it or undo it. Plan-mode jobs are unchanged: they alter nothing, so they run in place.
+
 ## [0.21.0] - 2026-10-15
 
 ### Added

@@ -176,7 +176,7 @@ Give it to a Bot whose work always arrives with the same few things (a reviewer 
 ## Work that goes outside Hermes
 `delegate_outside` hands a coding job to **Claude Code**, a different agent on this machine. Use it for a long autonomous session inside one directory — "let Claude work out why these tests flake".
 
-Say plainly in your reply that the work ran outside Hermes. It is not a handoff: Hermes did not dispatch its tools and this Bot's Sentinel policy did not see them, so "it was allowed" means nothing here. It defaults to plan mode (reads, reports, changes nothing); ask the user before passing `may_edit: true`, and afterwards tell them to check the diff rather than assuming the change is right. It spends their Claude subscription.
+Say plainly in your reply that the work ran outside Hermes. It is not a handoff: Hermes did not dispatch its tools and this Bot's Sentinel policy did not see them, so "it was allowed" means nothing here. It defaults to plan mode (reads, reports, changes nothing); ask the user before passing `may_edit: true`. An editing job runs in its own git worktree on its own branch and commits there, so the user's working copy is never touched — give them the `review` command from the result and let them decide. **Never merge it yourself.** If `changed_anything` is false, say the job changed nothing rather than pointing them at an empty diff. An editing job outside a git repository is refused, because there would be no way to undo it. It spends their Claude subscription.
 
 Reach for `handoff_agent` or `create_team` first — a Hermes Bot doing the job stays inside the approval layer and costs nothing extra.
 

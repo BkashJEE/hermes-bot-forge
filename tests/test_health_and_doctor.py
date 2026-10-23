@@ -417,3 +417,71 @@ class ProcessStartTime(unittest.TestCase):
         with mock.patch.object(Path, "stat", no_proc), \
              mock.patch.object(doctor.subprocess, "run", side_effect=OSError("no ps")):
             self.assertIsNone(doctor._proc_start(os.getpid()))
+
+
+class WindowsCanDelegate(unittest.TestCase):
+    """Path.home() on Windows reads USERPROFILE, then HOMEDRIVE + HOMEPATH — never HOME.
+
+    Without them the spawned hermes aborted at startup with "Could not determine home directory",
+    so every ask_agent and handoff_agent failed on Windows with no workaround at the tool level
+    (#82, reported by @chizee).
+    """
+
+    def test_the_windows_profile_paths_are_allowlisted(self):
+        for key in ("USERPROFILE", "HOMEDRIVE", "HOMEPATH", "TEMP"):
+            self.assertIn(key, forge.SAFE_ENV_KEYS, key)
+
+    def test_they_travel_when_the_host_sets_them(self):
+        with mock.patch.dict(os.environ, {"USERPROFILE": r"C:\Users\someone"}, clear=False):
+            self.assertEqual(forge.safe_env({}).get("USERPROFILE"), r"C:\Users\someone")
+
+    def test_the_allowlist_still_excludes_credentials(self):
+        """The point of the allowlist: a caller's .env must not reach a Bot with its own logins."""
+        for secret in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "AWS_SECRET_ACCESS_KEY", "GH_TOKEN"):
+            self.assertNotIn(secret, forge.SAFE_ENV_KEYS, secret)
+
+
+class WeStopBeforeCoreGivesUp(unittest.TestCase):
+    """Core abandons a tool call at `timeouts.tools.sequential_call` (420s default).
+
+    Our subprocess timeouts were longer, so a 7-15 minute reply was lost: the caller had already
+    been told "timed out after 420.0s" while the callee finished into nothing, and the plugin's
+    own timeout message never ran (#83, reported by @rzyns).
+    """
+
+    def _root(self, timeouts=None):
+        import yaml as y
+        root = make_root(Path(tempfile.mkdtemp()))
+        cfg = {"model": {"default": "m", "provider": "custom"}}
+        if timeouts is not None:
+            cfg["timeouts"] = timeouts
+        (root / "config.yaml").write_text(y.safe_dump(cfg))
+        return root
+
+    def test_the_default_deadline_is_cores(self):
+        self.assertEqual(forge.core_tool_deadline(self._root()), 420.0)
+
+    def test_a_configured_deadline_is_read(self):
+        """A user who raised the limit should get the longer wait they asked for."""
+        root = self._root({"tools": {"sequential_call": 960}})
+        self.assertEqual(forge.core_tool_deadline(root), 960.0)
+        self.assertGreater(forge.within_deadline(900, root), 420)
+
+    def test_a_long_wait_is_capped_below_the_deadline(self):
+        root = self._root()
+        self.assertLess(forge.within_deadline(900, root), 420)
+
+    def test_a_short_wait_is_left_alone(self):
+        self.assertEqual(forge.within_deadline(120, self._root()), 120)
+
+    def test_a_broken_timeouts_block_falls_back_rather_than_failing(self):
+        for bad in ({"tools": {"sequential_call": "soon"}}, {"tools": True}, {"tools": {}},
+                    {"tools": {"sequential_call": True}}, {"tools": {"sequential_call": -5}}):
+            with self.subTest(bad=bad):
+                self.assertEqual(forge.core_tool_deadline(self._root(bad)), 420.0)
+
+    def test_the_message_names_the_setting_to_raise(self):
+        """A bare timeout teaches nothing; this one says what to change."""
+        hint = forge.deadline_hint(self._root())
+        self.assertIn("timeouts.tools.sequential_call", hint)
+        self.assertIn("420", hint)

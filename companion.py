@@ -116,6 +116,43 @@ def policy_for(approvals) -> dict:
             "refuse": [], "ask": [], "allow": []}
 
 
+# Where Hermes actually looks for a plugin's settings. `PluginContext.get_config` reads
+# `plugins.entries.<plugin_id>.settings.<key>`, falling back to `.config`, and never a top-level
+# key (hermes_cli/plugins_state.py::_plugin_settings_entry). v0.19.0 through v0.22.0 wrote the
+# policy to a top-level `bot-forge-sentinel:` key, so every per-Bot refuse/ask/allow/mode/limits
+# resolved to None and only guard.py's built-in categories acted — a refusal silently became an
+# approval prompt (#86). One constant, used by both the writer and the reader, so they cannot
+# drift apart again.
+SENTINEL_SETTINGS_PATH = ("plugins", "entries", SENTINEL_NAME, "settings")
+
+
+def read_sentinel_policy(cfg: dict) -> dict:
+    """The policy as Hermes will read it. Anything else is not in force."""
+    node = cfg
+    for part in SENTINEL_SETTINGS_PATH:
+        if not isinstance(node, dict):
+            return {}
+        node = node.get(part)
+    return node if isinstance(node, dict) else {}
+
+
+def _legacy_policy(cfg: dict) -> dict:
+    """A policy left at the old top-level key by v0.19.0-v0.22.0, so an upgrade keeps it."""
+    old = cfg.get(SENTINEL_NAME)
+    return old if isinstance(old, dict) else {}
+
+
+def write_sentinel_policy(cfg: dict, policy: dict) -> None:
+    node = cfg
+    for part in SENTINEL_SETTINGS_PATH[:-1]:
+        child = node.get(part)
+        if not isinstance(child, dict):
+            child = {}
+            node[part] = child
+        node = child
+    node[SENTINEL_SETTINGS_PATH[-1]] = policy
+
+
 def install_sentinel(pdir: Path, approvals=None) -> dict:
     """Ship the policy layer into a Bot and write the policy its own approvals imply."""
     pdir = Path(pdir)
@@ -127,11 +164,15 @@ def install_sentinel(pdir: Path, approvals=None) -> dict:
     policy = policy_for(approvals)
     cfg_path = pdir / "config.yaml"
     cfg = forge.load_yaml(cfg_path)
-    existing = cfg.get(SENTINEL_NAME)
-    if isinstance(existing, dict):
-        # Never undo a rule an operator added by hand; only fill in what is missing.
+
+    # Everything an operator already set, from either location, wins over what we derive.
+    existing = {**_legacy_policy(cfg), **read_sentinel_policy(cfg)}
+    if existing:
+        # Never undo a rule added by hand; only fill in what is missing.
         policy = {**policy, **existing}
-    cfg[SENTINEL_NAME] = policy
+
+    write_sentinel_policy(cfg, policy)
+    cfg.pop(SENTINEL_NAME, None)  # drop the key that was never read, so there is one source
     forge.dump_yaml(cfg_path, cfg)
     return {**result, "policy": policy, "enforcing": bool(policy.get("guard_defaults"))}
 

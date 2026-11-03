@@ -207,14 +207,15 @@ def delegate(spec: dict, runner=None) -> dict:
     workdir = worktree or where
     argv = ["claude", "-p", compose(task, context, may_edit), "--permission-mode", mode,
             "--output-format", "text"]
+    wait = forge.within_deadline(TIMEOUT, root)
     run = runner or (lambda: subprocess.run(argv, capture_output=True, text=True, cwd=str(workdir),
-                                            timeout=TIMEOUT, stdin=subprocess.DEVNULL,
+                                            timeout=wait, stdin=subprocess.DEVNULL,
                                             env=forge.safe_env(root)))
     try:
         out = run()
     except subprocess.TimeoutExpired:
         return {"ok": False, "worktree": str(worktree) if worktree else None, "branch": branch,
-                "error": f"Claude Code did not finish within {TIMEOUT // 60} minutes. "
+                "error": f"Claude Code did not finish within {wait}s. {forge.deadline_hint(root)} "
                          + (f"Anything it changed is in {worktree} on {branch}, not in your "
                             "working copy." if worktree else "It ran in your working copy; look "
                             "before retrying.")}

@@ -268,7 +268,8 @@ def handoff(s: dict, now: datetime | None = None) -> dict:
     path = _write_record(pdir, record)
 
     try:
-        ok, reply = forge.bot_chat(root, to, message, max_turns=MAX_TURNS, timeout=CHAT_TIMEOUT,
+        ok, reply = forge.bot_chat(root, to, message, max_turns=MAX_TURNS,
+                               timeout=forge.within_deadline(CHAT_TIMEOUT, root),
                                env=forge.safe_env(root), reading_only=reading_only)
     except Exception as exc:  # the CLI missing, a timeout — the record stays, marked as undelivered
         record.update({"status": "failed", "error": str(exc)[:300]})

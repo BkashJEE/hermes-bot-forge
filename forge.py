@@ -48,6 +48,43 @@ ALL_TOOLSETS = set(BASE_TOOLSETS) | {"code_execution", "computer_use", "connecti
 ALWAYS_KEEP_CATEGORIES = {"autonomous-ai-agents", "research", "web"}
 BOT_CHAT_TITLE = "Bot Chat"          # the canonical chat title Bot Mode looks for
 KICKOFF = "Hey, tell me about yourself!"  # same first message Desktop's New Agent sends
+# Hermes core abandons a tool call at `timeouts.tools.sequential_call` (420s by default). Our own
+# subprocess timeouts were longer, so a reply that took 7-15 minutes was lost: core had already
+# told the caller "timed out after 420.0s" while the callee ran on and finished into nothing, and
+# the plugin's own timeout message never ran (#83). Core offers no per-tool override
+# (NousResearch/hermes-agent#141862), so the next best thing is to finish *before* core gives up
+# and say so ourselves, in a message that names the setting to raise.
+CORE_TOOL_DEADLINE = 420.0
+DEADLINE_MARGIN = 20.0
+
+
+def core_tool_deadline(root=None) -> float:
+    """What core will wait for one tool call, from `timeouts.tools.sequential_call`."""
+    try:
+        cfg = load_yaml(Path(root or default_root()) / "config.yaml")
+        node = (cfg.get("timeouts") or {}).get("tools") or {}
+        raw = node.get("sequential_call", node.get("concurrent_call"))
+        if raw is not None and not isinstance(raw, bool):
+            value = float(raw)
+            if value == value and value > 0:  # not NaN
+                return value
+    except Exception:
+        pass
+    return CORE_TOOL_DEADLINE
+
+
+def within_deadline(preferred: int, root=None) -> int:
+    """`preferred` seconds, capped so our timeout fires before core abandons the call."""
+    return max(30, int(min(float(preferred), core_tool_deadline(root) - DEADLINE_MARGIN)))
+
+
+def deadline_hint(root=None) -> str:
+    """Said when we stop early, so the limit is actionable rather than mysterious."""
+    return (f"Hermes abandons a tool call after {core_tool_deadline(root):.0f}s, so this stopped "
+            f"before then. Raise `timeouts.tools.sequential_call` in the Hermes config for longer "
+            f"jobs, or hand the work over with a routine instead of waiting on it.")
+
+
 CHAT_TIMEOUT = 300
 AUTH_ERRORS = ("credential", "authenticate", "auth ", "api key", "401", "unauthorized", "not logged in", "login")
 DEFAULT_LOCAL_ENDPOINTS = ("http://127.0.0.1:8080/v1", "http://127.0.0.1:11434/v1", "http://127.0.0.1:1234/v1")
@@ -91,6 +128,12 @@ SAFE_ENV_KEYS = (
     # process essentials
     "PATH", "HOME", "LANG", "LC_ALL", "TZ", "TERM", "TMPDIR",
     "SYSTEMROOT", "WINDIR", "PATHEXT", "VIRTUAL_ENV",
+    # where the account lives on Windows. Path.home() resolves USERPROFILE, then HOMEDRIVE +
+    # HOMEPATH — it does not fall back to HOME, so without these the spawned hermes aborts at
+    # startup with "Could not determine home directory" before the model is reached, and every
+    # ask_agent and handoff_agent fails on Windows (#82). These are paths and an account's
+    # location; they carry no authority, so the allowlist's intent is unchanged.
+    "USERPROFILE", "HOMEDRIVE", "HOMEPATH", "TEMP",
     # who this machine's account is. The account *name* carries no authority — it is not a
     # credential and not a handle to one — but tools that already hold a login look it up to
     # find that login. Without USER the Claude CLI reported no login at all in this sanitized

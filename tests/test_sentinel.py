@@ -6,10 +6,15 @@ category, and anything that would make the layer fail open.
 """
 import importlib.util
 import sys
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 import support  # noqa: F401  (arranges sys.path; see tests/support.py)
+
+import companion  # noqa: E402  (support.py put the plugin on sys.path)
+import forge  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -353,7 +358,7 @@ class ShippedIntoEveryBot(unittest.TestCase):
         companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
         cfg = support.yaml.safe_load((self.bot / "config.yaml").read_text())
         self.assertIn("bot-forge-sentinel", cfg["plugins"]["enabled"])
-        self.assertTrue(cfg["bot-forge-sentinel"]["guard_defaults"])
+        self.assertTrue(core_get_config(cfg, "bot-forge-sentinel", "guard_defaults"))
 
     def test_a_bot_that_promised_nothing_is_not_given_rules_it_never_claimed(self):
         """Enforcing categories a Bot never declared would be us inventing its policy."""
@@ -368,21 +373,30 @@ class ShippedIntoEveryBot(unittest.TestCase):
         companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
         cfg_path = self.bot / "config.yaml"
         cfg = support.yaml.safe_load(cfg_path.read_text())
-        cfg["bot-forge-sentinel"]["refuse"] = ["delete_profile"]
-        cfg["bot-forge-sentinel"]["mode"] = "ask"
+        edited = companion.read_sentinel_policy(cfg)
+        edited["refuse"] = ["delete_profile"]
+        edited["mode"] = "ask"
+        companion.write_sentinel_policy(cfg, edited)
         support.forge.dump_yaml(cfg_path, cfg)
 
         companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
 
-        after = support.yaml.safe_load(cfg_path.read_text())["bot-forge-sentinel"]
-        self.assertEqual(after["refuse"], ["delete_profile"])
-        self.assertEqual(after["mode"], "ask")
+        after = support.yaml.safe_load(cfg_path.read_text())
+        self.assertEqual(core_get_config(after, "bot-forge-sentinel", "refuse"), ["delete_profile"])
+        self.assertEqual(core_get_config(after, "bot-forge-sentinel", "mode"), "ask")
 
     def test_the_policy_a_bot_gets_actually_governs_it(self):
-        """End to end: what install writes is what guard reads."""
+        """End to end, through the path Hermes actually reads.
+
+        This test used to load the policy straight from the top-level key, which skipped the one
+        hop that was broken: it proved the writer agreed with guard, never that Hermes could see
+        what the writer wrote (#86). It now reads the file the way core reads it.
+        """
         import companion
         companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
-        policy = support.yaml.safe_load((self.bot / "config.yaml").read_text())["bot-forge-sentinel"]
+        cfg = support.yaml.safe_load((self.bot / "config.yaml").read_text())
+        policy = {k: core_get_config(cfg, "bot-forge-sentinel", k)
+                  for k in ("refuse", "ask", "allow", "mode", "guard_defaults", "limits")}
         self.assertEqual(guard.decide("send_email", policy)["action"], "approve")
         self.assertIsNone(guard.decide("read_file", policy))
 
@@ -400,3 +414,108 @@ class PolicyFollowsTheWording(unittest.TestCase):
         for approvals in ([], None, ["review the plan with me first"]):
             with self.subTest(approvals=approvals):
                 self.assertFalse(companion.policy_for(approvals)["guard_defaults"])
+
+
+def core_get_config(cfg, plugin_id, key, default=None):
+    """What Hermes actually does, from hermes_cli/plugins_state.py.
+
+    Reimplemented rather than mocked on purpose. The bug in #86 was that our tests asserted our
+    own assumption about where settings live, through a fake Ctx, so they agreed with the writer
+    and nobody checked the writer against core. This reads the file the way core reads it.
+    """
+    node = cfg
+    for part in ("plugins", "entries", plugin_id):
+        if not isinstance(node, dict):
+            return default
+        node = node.get(part)
+    if not isinstance(node, dict):
+        return default
+    for sub in ("settings", "config"):
+        block = node.get(sub)
+        if isinstance(block, dict) and key in block:
+            return block[key]
+    return default
+
+
+class ThePolicyLandsWhereHermesLooks(unittest.TestCase):
+    """v0.19.0-v0.22.0 wrote the policy to a top-level `bot-forge-sentinel:` key.
+
+    `PluginContext.get_config` reads `plugins.entries.<id>.settings.<key>` and never a top-level
+    key, so every per-Bot refuse/ask/allow/mode/limits resolved to None: a refusal silently became
+    an approval prompt and argument limits did nothing (#86, reported by @thealps01-netizen).
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.pdir = Path(self.tmp.name)
+        (self.pdir / "config.yaml").write_text("model:\n  default: m\n")
+
+    def _write(self, policy):
+        cfg = forge.load_yaml(self.pdir / "config.yaml")
+        companion.write_sentinel_policy(cfg, policy)
+        forge.dump_yaml(self.pdir / "config.yaml", cfg)
+        return forge.load_yaml(self.pdir / "config.yaml")
+
+    def test_every_setting_is_readable_by_core(self):
+        policy = {"refuse": ["delete_profile"], "ask": ["send_email"], "allow": [],
+                  "mode": "allow", "guard_defaults": True,
+                  "limits": {"send_email": {"to": ["me@example.com"]}}}
+        cfg = self._write(policy)
+        for key, want in policy.items():
+            self.assertEqual(core_get_config(cfg, companion.SENTINEL_NAME, key), want, key)
+
+    def test_a_refusal_is_not_lost(self):
+        """The sharpest symptom: a refuse rule that core cannot see downgrades to a prompt."""
+        cfg = self._write({"refuse": ["delete_profile"]})
+        self.assertEqual(core_get_config(cfg, companion.SENTINEL_NAME, "refuse"), ["delete_profile"])
+
+    def test_a_top_level_key_alone_is_not_readable(self):
+        """Guards the regression directly: this is exactly what the old writer produced."""
+        cfg = {"model": {"default": "m"}, companion.SENTINEL_NAME: {"refuse": ["delete_profile"]}}
+        self.assertIsNone(core_get_config(cfg, companion.SENTINEL_NAME, "refuse"))
+
+    def test_the_reader_and_the_writer_agree(self):
+        cfg = self._write({"mode": "ask"})
+        self.assertEqual(companion.read_sentinel_policy(cfg), {"mode": "ask"})
+
+    def test_an_existing_plugins_block_is_not_clobbered(self):
+        cfg = forge.load_yaml(self.pdir / "config.yaml")
+        cfg["plugins"] = {"enabled": ["bot-forge"], "entries": {"other": {"settings": {"x": 1}}}}
+        companion.write_sentinel_policy(cfg, {"mode": "ask"})
+        self.assertEqual(cfg["plugins"]["enabled"], ["bot-forge"])
+        self.assertEqual(cfg["plugins"]["entries"]["other"]["settings"], {"x": 1})
+
+
+class UpgradingFromTheBrokenLocation(unittest.TestCase):
+    """A Bot built by v0.19-v0.22 has its policy at the old key. The upgrade must carry it over,
+    not silently start from defaults and not leave two copies to disagree."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.pdir = Path(self.tmp.name)
+
+    def _install(self, cfg_text, approvals=None):
+        (self.pdir / "config.yaml").write_text(cfg_text)
+        with mock.patch.object(companion, "install_plugin", return_value={"ok": True}):
+            out = companion.install_sentinel(self.pdir, approvals)
+        return out, forge.load_yaml(self.pdir / "config.yaml")
+
+    def test_a_hand_written_legacy_rule_survives_the_move(self):
+        out, cfg = self._install(
+            "model:\n  default: m\nbot-forge-sentinel:\n  refuse: [wire_money]\n")
+        self.assertTrue(out["ok"], out)
+        self.assertEqual(core_get_config(cfg, companion.SENTINEL_NAME, "refuse"), ["wire_money"])
+
+    def test_the_old_key_is_removed_so_there_is_one_source(self):
+        _, cfg = self._install("model:\n  default: m\nbot-forge-sentinel:\n  mode: ask\n")
+        self.assertNotIn(companion.SENTINEL_NAME, cfg)
+        self.assertEqual(core_get_config(cfg, companion.SENTINEL_NAME, "mode"), "ask")
+
+    def test_an_operator_rule_at_the_new_path_still_wins(self):
+        _, cfg = self._install(
+            "model:\n  default: m\nplugins:\n  entries:\n    bot-forge-sentinel:\n"
+            "      settings:\n        mode: ask\n",
+            approvals=["send, post or publish anything"])
+        self.assertEqual(core_get_config(cfg, companion.SENTINEL_NAME, "mode"), "ask")

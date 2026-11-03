@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.23.0] - 2026-11-03
 
 ### Fixed
 - **Every `ask_agent` and `handoff_agent` failed on Windows** (#82, reported by @chizee). `SAFE_ENV_KEYS` was POSIX-shaped and carried no Windows profile paths, but `Path.home()` on Windows resolves `USERPROFILE`, then `HOMEDRIVE` + `HOMEPATH` — it never falls back to `HOME`. The spawned `hermes` aborted at startup with *"Could not determine home directory"* before the model was reached, and the `hermes pm repair` pointer it printed was a red herring. `USERPROFILE`, `HOMEDRIVE`, `HOMEPATH` and `TEMP` are now allowlisted: they are paths and an account's location, carry no authority, and leave the allowlist's purpose — a caller's `.env` must not reach a Bot with credentials of its own — unchanged.

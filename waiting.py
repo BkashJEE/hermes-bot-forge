@@ -30,7 +30,7 @@ def _entries(pdir: Path) -> list:
     found = []
     for path in sorted(folder.glob("????-??-??.md")):
         try:
-            text = path.read_text(errors="ignore")
+            text = path.read_text(errors="ignore", encoding="utf-8")
         except OSError:
             continue
         marks = list(ENTRY.finditer(text))

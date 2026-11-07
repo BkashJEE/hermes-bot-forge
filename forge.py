@@ -165,7 +165,7 @@ def safe_env(root: Path) -> dict:
 
 
 def run(root, *args, timeout=180, check=True, env=None):
-    p = subprocess.run(["hermes", *args], capture_output=True, text=True, stdin=subprocess.DEVNULL,
+    p = subprocess.run(["hermes", *args], capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL,
                        timeout=timeout, env=env if env is not None else cli_env(root))
     if check and p.returncode != 0:
         raise RuntimeError(f"hermes {' '.join(args)} failed ({p.returncode}): {clean(p.stderr or p.stdout)[-800:]}")
@@ -757,7 +757,7 @@ def disabled_skills(skills_dir: Path, keep_categories: set) -> set:
     for skill_md in skills_dir.rglob("SKILL.md"):
         if skill_md.relative_to(skills_dir).parts[0] in keep_categories:
             continue
-        m = re.search(r"^name:\s*['\"]?([^'\"\n]+)", skill_md.read_text(errors="ignore"), re.M)
+        m = re.search(r"^name:\s*['\"]?([^'\"\n]+)", skill_md.read_text(errors="ignore", encoding="utf-8"), re.M)
         names.add(m.group(1).strip() if m else skill_md.parent.name)
     return names
 
@@ -826,7 +826,7 @@ def forge(s: dict) -> dict:
                 return {"ok": False, "error": f"shared policy not found: {pol}", "rolled_back": False}
             try:
                 pol.parent.mkdir(parents=True, exist_ok=True)
-                pol.write_text(policy_mod.STARTER_POLICY)
+                pol.write_text(policy_mod.STARTER_POLICY, encoding="utf-8")
             except (OSError, ValueError) as exc:
                 # ValueError too: `Path.write_text` raises `embedded null byte` on a path
                 # containing NUL. A Bot that cannot be given the shared floor is not
@@ -834,7 +834,7 @@ def forge(s: dict) -> dict:
                 return {"ok": False, "error": f"could not write shared policy {pol}: {exc}"[:200],
                         "rolled_back": False}
         try:
-            text = pol.read_text()
+            text = pol.read_text(encoding="utf-8")
         except (OSError, ValueError) as exc:
             return {"ok": False, "error": f"could not read shared policy {pol}: {exc}"[:200],
                     "rolled_back": False}
@@ -894,7 +894,7 @@ def forge(s: dict) -> dict:
 
         # 2. Bot Mode identity + SOUL.md
         write_bot_meta(pdir, display, description, s.get("avatar_kind"), needs)
-        (pdir / "SOUL.md").write_text(soul)
+        (pdir / "SOUL.md").write_text(soul, encoding="utf-8")
         journal_path = None
         if settings.get("journal_enabled", True):
             if __package__:
@@ -952,12 +952,12 @@ def forge(s: dict) -> dict:
         user_md = root / "memories" / "USER.md"
         if user_md.exists():
             others = {n for n in existing_bot_names(root) if n not in GENERIC_NAMES and n != profile_id}
-            (mem / "USER.md").write_text(filter_user_memory(user_md.read_text(), others))
+            (mem / "USER.md").write_text(filter_user_memory(user_md.read_text(encoding="utf-8"), others), encoding="utf-8")
         for skill, doc in (s.get("taught_skills") or {}).items():
             skill_id = re.sub(r"[^a-z0-9-]+", "-", str(skill).lower()).strip("-")[:48]
             if skill_id and isinstance(doc, str) and doc.strip():
                 (pdir / "skills" / "taught" / skill_id).mkdir(parents=True, exist_ok=True)
-                (pdir / "skills" / "taught" / skill_id / "SKILL.md").write_text(doc)
+                (pdir / "skills" / "taught" / skill_id / "SKILL.md").write_text(doc, encoding="utf-8")
         facts = [f"My name is {display}. I am the {s['role']} (profile `{profile_id}`). I always introduce myself "
                  f"as {display}, never by another Bot's name. My one job: {s['one_job']}."] + list(s.get("memory") or [])
         if approvals:
@@ -968,7 +968,7 @@ def forge(s: dict) -> dict:
                          + ". If one is missing I say so and stop.")
         if reports_to:
             facts.append(f"I escalate scope and priority calls to @{reports_to}.")
-        (mem / "MEMORY.md").write_text("\n§\n".join(facts) + "\n")
+        (mem / "MEMORY.md").write_text("\n§\n".join(facts) + "\n", encoding="utf-8")
 
         # Where it landed: read once, written into its memory, so it never researches this again.
         workspace = None
@@ -1082,7 +1082,7 @@ def forge(s: dict) -> dict:
 
 
 def main():
-    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text()
+    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text(encoding="utf-8")
     result = forge(json.loads(raw))
     print(json.dumps(result, indent=2))
     sys.exit(0 if result.get("ok") else 1)

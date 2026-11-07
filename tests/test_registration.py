@@ -24,7 +24,7 @@ def run_probe(repo: Path):
         env.update(HOME=str(home), USERPROFILE=str(home), LOCALAPPDATA=str(home),
                    PYTHONUTF8="1")
         return subprocess.run([sys.executable, "-B", str(PROBE), str(repo), str(home)],
-                              cwd=tmp, env=env, capture_output=True, text=True, timeout=60)
+                              cwd=tmp, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
 
 
 class Registration(unittest.TestCase):

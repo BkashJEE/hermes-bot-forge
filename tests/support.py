@@ -38,15 +38,15 @@ import tools  # noqa: E402
 def make_root(tmp: Path, profiles=(), titles=None, root_display=None):
     root = tmp / ".hermes"
     (root / "profiles").mkdir(parents=True)
-    (root / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "root-model", "provider": "p"}}))
+    (root / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "root-model", "provider": "p"}}), encoding="utf-8")
     if root_display:
-        (root / "profile.yaml").write_text(yaml.safe_dump({"display_name": root_display}))
+        (root / "profile.yaml").write_text(yaml.safe_dump({"display_name": root_display}), encoding="utf-8")
     for name in profiles:
         d = root / "profiles" / name
         d.mkdir()
-        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": f"{name}-model", "provider": "p"}}))
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": f"{name}-model", "provider": "p"}}), encoding="utf-8")
         if titles and name in titles:
-            (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": titles[name]}}}))
+            (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": titles[name]}}}), encoding="utf-8")
     return root
 
 

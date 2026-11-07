@@ -195,12 +195,12 @@ class EditingNeverTouchesTheWorkingCopy(unittest.TestCase):
         self.repo = Path(self.tmp.name) / "repo"
         self.repo.mkdir()
         self._git("init", "-q", ".")
-        (self.repo / "f.txt").write_text("committed\n")
+        (self.repo / "f.txt").write_text("committed\n", encoding="utf-8")
         self._git("add", "f.txt")
         self._git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init")
 
     def _git(self, *argv):
-        return subprocess.run(["git", "-C", str(self.repo), *argv], capture_output=True, text=True)
+        return subprocess.run(["git", "-C", str(self.repo), *argv], capture_output=True, text=True, encoding="utf-8", errors="replace")
 
     def _run(self, **over):
         spec = {"hermes_root": str(self.root), "from": "marlow", "task": "fix it",
@@ -222,10 +222,10 @@ class EditingNeverTouchesTheWorkingCopy(unittest.TestCase):
 
     def test_uncommitted_work_does_not_travel_into_the_job(self):
         """The agent sees committed state — the only state a diff can be reviewed against."""
-        (self.repo / "f.txt").write_text("committed\nuncommitted\n")
+        (self.repo / "f.txt").write_text("committed\nuncommitted\n", encoding="utf-8")
         out = self._run()
-        self.assertEqual((Path(out["worktree"]) / "f.txt").read_text(), "committed\n")
-        self.assertIn("uncommitted", (self.repo / "f.txt").read_text())
+        self.assertEqual((Path(out["worktree"]) / "f.txt").read_text(encoding="utf-8"), "committed\n")
+        self.assertIn("uncommitted", (self.repo / "f.txt").read_text(encoding="utf-8"))
 
     def test_two_jobs_do_not_collide(self):
         a, b = self._run(), self._run()
@@ -265,7 +265,7 @@ class TheWorkIsCommittedSoItCanBeReviewed(unittest.TestCase):
         self.repo.mkdir()
         for argv in (["init", "-q", "."], ["add", "-A"]):
             subprocess.run(["git", "-C", str(self.repo), *argv], capture_output=True)
-        (self.repo / "app.py").write_text("one\n")
+        (self.repo / "app.py").write_text("one\n", encoding="utf-8")
         subprocess.run(["git", "-C", str(self.repo), "add", "-A"], capture_output=True)
         subprocess.run(["git", "-C", str(self.repo), "-c", "user.email=t@t", "-c", "user.name=t",
                         "commit", "-qm", "init"], capture_output=True)
@@ -286,10 +286,10 @@ class TheWorkIsCommittedSoItCanBeReviewed(unittest.TestCase):
             return outside.delegate(spec)
 
     def test_the_branch_holds_a_diff_the_review_command_can_show(self):
-        out = self._run_with(lambda d: (d / "app.py").write_text("one\ntwo\n"))
+        out = self._run_with(lambda d: (d / "app.py").write_text("one\ntwo\n", encoding="utf-8"))
         self.assertTrue(out["changed_anything"])
         diff = subprocess.run(["git", "-C", str(self.repo), "diff", f"HEAD...{out['branch']}"],
-                              capture_output=True, text=True).stdout
+                              capture_output=True, text=True, encoding="utf-8", errors="replace").stdout
         self.assertIn("+two", diff)
 
     def test_a_job_that_changed_nothing_says_so(self):
@@ -299,8 +299,8 @@ class TheWorkIsCommittedSoItCanBeReviewed(unittest.TestCase):
         self.assertFalse(out["changed_anything"])
 
     def test_the_users_working_copy_is_untouched(self):
-        self._run_with(lambda d: (d / "app.py").write_text("one\ntwo\n"))
-        self.assertEqual((self.repo / "app.py").read_text(), "one\n")
+        self._run_with(lambda d: (d / "app.py").write_text("one\ntwo\n", encoding="utf-8"))
+        self.assertEqual((self.repo / "app.py").read_text(encoding="utf-8"), "one\n")
 
     def test_a_repository_with_no_git_identity_still_commits(self):
         """A machine with no global git config must still produce a reviewable commit."""
@@ -308,6 +308,6 @@ class TheWorkIsCommittedSoItCanBeReviewed(unittest.TestCase):
                        capture_output=True)
         subprocess.run(["git", "-C", str(self.repo), "config", "--unset", "user.name"],
                        capture_output=True)
-        out = self._run_with(lambda d: (d / "app.py").write_text("one\nthree\n"))
+        out = self._run_with(lambda d: (d / "app.py").write_text("one\nthree\n", encoding="utf-8"))
         self.assertTrue(out["ok"], out)
         self.assertTrue(out["changed_anything"])

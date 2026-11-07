@@ -34,7 +34,7 @@ OK, WARN, FAIL = "ok", "warn", "fail"
 def _run(*args, timeout=30):
     env = {k: v for k, v in os.environ.items() if not k.startswith("HERMES_")}
     try:
-        return subprocess.run(args, capture_output=True, text=True, stdin=subprocess.DEVNULL,
+        return subprocess.run(args, capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL,
                               timeout=timeout, env=env)
     except (OSError, subprocess.SubprocessError):
         return None
@@ -118,7 +118,7 @@ def _proc_start(pid: int) -> float | None:
     # macOS and the BSDs have no /proc. `ps -o etime=` is POSIX and locale-independent, unlike
     # lstart, whose month names change with LC_TIME.
     try:
-        out = subprocess.run(["ps", "-o", "etime=", "-p", str(pid)], capture_output=True, text=True,
+        out = subprocess.run(["ps", "-o", "etime=", "-p", str(pid)], capture_output=True, text=True, encoding="utf-8", errors="replace",
                              timeout=10)
     except (OSError, subprocess.SubprocessError):
         return None

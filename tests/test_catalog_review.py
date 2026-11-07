@@ -17,7 +17,7 @@ class RegisteredCallbacks(unittest.TestCase):
                    if not k.startswith(('HERMES_', 'EMAIL_', 'PYTHON'))}
             env.update(HOME=tmp, USERPROFILE=tmp, LOCALAPPDATA=tmp, PYTHONUTF8='1')
             proc = subprocess.run([sys.executable, '-B', str(probe), str(ROOT), tmp],
-                                  cwd=tmp, env=env, capture_output=True, text=True, timeout=60)
+                                  cwd=tmp, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
         self.assertEqual(proc.returncode, 0, proc.stderr + proc.stdout)
 
 
@@ -37,9 +37,9 @@ class IndependentCredentials(unittest.TestCase):
         self.root = Path(self.tmp.name).resolve()
         self.bot = self.root / 'profiles' / 'quill'
         self.bot.mkdir(parents=True)
-        (self.bot / 'config.yaml').write_text('{}')
-        (self.root / 'auth.json').write_text('{"synthetic":"test-only"}')
-        (self.root / 'auth.lock').write_text('synthetic lock')
+        (self.bot / 'config.yaml').write_text('{}', encoding="utf-8")
+        (self.root / 'auth.json').write_text('{"synthetic":"test-only"}', encoding="utf-8")
+        (self.root / 'auth.lock').write_text('synthetic lock', encoding="utf-8")
 
     def test_copy_is_private_independent_and_never_shares_lock(self):
         self.helper.copy_login(self.root, 'quill')
@@ -48,8 +48,8 @@ class IndependentCredentials(unittest.TestCase):
         self.assertEqual(dest.stat().st_mode & 0o777, 0o600)
         self.assertEqual(dest.read_bytes(), (self.root / 'auth.json').read_bytes())
         self.assertFalse((self.bot / 'auth.lock').exists())
-        dest.write_text('changed in Bot')
-        self.assertEqual((self.root / 'auth.json').read_text(), '{"synthetic":"test-only"}')
+        dest.write_text('changed in Bot', encoding="utf-8")
+        self.assertEqual((self.root / 'auth.json').read_text(encoding="utf-8"), '{"synthetic":"test-only"}')
 
     def test_old_links_are_detached_without_changing_root(self):
         for name in ('auth.json', 'auth.lock'):
@@ -59,7 +59,7 @@ class IndependentCredentials(unittest.TestCase):
         self.helper.link(self.root, 'quill')
         self.assertFalse((self.bot / 'auth.lock').is_symlink())
         self.assertFalse((self.bot / 'auth.json').is_symlink())
-        (self.bot / 'auth.json').write_text('independent')
+        (self.bot / 'auth.json').write_text('independent', encoding="utf-8")
         for name, expected in before.items():
             self.assertEqual(((self.root / name).read_bytes(), (self.root / name).stat().st_mode), expected)
 
@@ -67,8 +67,8 @@ class IndependentCredentials(unittest.TestCase):
         os.link(self.root / 'auth.json', self.bot / 'auth.json')
         (self.bot / 'auth.json.linking').symlink_to(self.root / 'auth.json')
         self.helper.copy_login(self.root, 'quill')
-        (self.bot / 'auth.json').write_text('independent')
-        self.assertEqual((self.root / 'auth.json').read_text(), '{"synthetic":"test-only"}')
+        (self.bot / 'auth.json').write_text('independent', encoding="utf-8")
+        self.assertEqual((self.root / 'auth.json').read_text(encoding="utf-8"), '{"synthetic":"test-only"}')
 
     def test_rejects_traversal_and_profile_directory_links(self):
         for name in ('..', '../quill', 'default', '/tmp', 'quill/../../'):
@@ -79,11 +79,11 @@ class IndependentCredentials(unittest.TestCase):
     def test_failure_keeps_old_destination_and_cleans_temp(self):
         from unittest import mock
         dest = self.bot / 'auth.json'
-        dest.write_text('old synthetic credentials')
+        dest.write_text('old synthetic credentials', encoding="utf-8")
         with mock.patch.object(self.helper.os, 'replace', side_effect=OSError('test failure')):
             with self.assertRaises(OSError):
                 self.helper.copy_login(self.root, 'quill')
-        self.assertEqual(dest.read_text(), 'old synthetic credentials')
+        self.assertEqual(dest.read_text(encoding="utf-8"), 'old synthetic credentials')
         self.assertEqual(list(self.bot.glob('.auth-copy-*')), [])
 
     def test_a_root_reached_through_a_symlink_is_handled(self):
@@ -94,8 +94,8 @@ class IndependentCredentials(unittest.TestCase):
         """
         real = Path(self.tmp.name) / 'real-home'
         (real / 'profiles' / 'quill').mkdir(parents=True)
-        (real / 'profiles' / 'quill' / 'config.yaml').write_text('{}')
-        (real / 'auth.json').write_text('{"synthetic":"test-only"}')
+        (real / 'profiles' / 'quill' / 'config.yaml').write_text('{}', encoding="utf-8")
+        (real / 'auth.json').write_text('{"synthetic":"test-only"}', encoding="utf-8")
         link = Path(self.tmp.name) / 'linked-home'
         link.symlink_to(real, target_is_directory=True)
 
@@ -135,7 +135,7 @@ class NotificationSubcommands(unittest.TestCase):
             for action in ('status', 'digest'):
                 with self.subTest(action=action):
                     proc = subprocess.run([sys.executable, '-B', str(ROOT / 'notify.py'), action],
-                                          cwd=tmp, env=env, capture_output=True, text=True, timeout=30)
+                                          cwd=tmp, env=env, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
                     self.assertEqual(proc.returncode, 0, proc.stderr)
                     result = json.loads(proc.stdout)
                     self.assertTrue(result['ok'])

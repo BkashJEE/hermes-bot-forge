@@ -56,7 +56,7 @@ def ready(which=shutil.which, probe=None) -> tuple[bool, str]:
                        "work to. Install it, then `claude auth login`.")
     try:
         out = (probe or (lambda: subprocess.run(["claude", "auth", "status"], capture_output=True,
-                                                text=True, timeout=60,
+                                                text=True, encoding="utf-8", errors="replace", timeout=60,
                                                 stdin=subprocess.DEVNULL)))()
         state = json.loads(getattr(out, "stdout", "") or "{}")
     except Exception as exc:
@@ -95,7 +95,7 @@ def repo_root(where: Path) -> Path | None:
     """The git repository `where` sits in, or None when it is not in one."""
     try:
         out = subprocess.run(["git", "-C", str(where), "rev-parse", "--show-toplevel"],
-                             capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60, stdin=subprocess.DEVNULL)
     except (OSError, subprocess.SubprocessError):
         return None
     top = (out.stdout or "").strip()
@@ -112,7 +112,7 @@ def open_worktree(root: Path, job: str) -> tuple[Path, str]:
     branch = f"bot-forge/{job}"
     path = root.parent / f"{root.name}--{job}"
     out = subprocess.run(["git", "-C", str(root), "worktree", "add", "-b", branch, str(path), "HEAD"],
-                         capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, stdin=subprocess.DEVNULL)
     if out.returncode != 0:
         raise RuntimeError((out.stderr or out.stdout or "could not create a worktree").strip()[:300])
     return path, branch
@@ -125,21 +125,21 @@ def commit_worktree(path: Path, message: str) -> bool:
     `merge branch` is a no-op, and removing the worktree throws the work away. Returns False when
     the job changed nothing, which is worth telling the user rather than implying a diff exists.
     """
-    add = subprocess.run(["git", "-C", str(path), "add", "-A"], capture_output=True, text=True,
+    add = subprocess.run(["git", "-C", str(path), "add", "-A"], capture_output=True, text=True, encoding="utf-8", errors="replace",
                          timeout=300, stdin=subprocess.DEVNULL)
     if add.returncode != 0:
         raise RuntimeError((add.stderr or "could not stage the job's changes").strip()[:240])
     if not subprocess.run(["git", "-C", str(path), "status", "--porcelain"], capture_output=True,
-                          text=True, timeout=120).stdout.strip():
+                          text=True, encoding="utf-8", errors="replace", timeout=120).stdout.strip():
         return False
     # The repository's own identity when it has one; a neutral fallback when it does not, so a
     # machine with no global git config still produces a reviewable commit.
     out = subprocess.run(["git", "-C", str(path), "commit", "-m", message],
-                         capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
+                         capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, stdin=subprocess.DEVNULL)
     if out.returncode != 0:
         out = subprocess.run(["git", "-C", str(path), "-c", "user.name=bot-forge",
                               "-c", "user.email=bot-forge@localhost", "commit", "-m", message],
-                             capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300, stdin=subprocess.DEVNULL)
     if out.returncode != 0:
         raise RuntimeError((out.stderr or "could not commit the job's changes").strip()[:240])
     return True
@@ -149,7 +149,7 @@ def close_worktree(root: Path, path: Path, branch: str) -> None:
     """Undo an isolated checkout that never ran. Never raises: cleanup must not mask the real error."""
     for argv in (["worktree", "remove", "--force", str(path)], ["branch", "-D", branch]):
         try:
-            subprocess.run(["git", "-C", str(root), *argv], capture_output=True, text=True,
+            subprocess.run(["git", "-C", str(root), *argv], capture_output=True, text=True, encoding="utf-8", errors="replace",
                            timeout=120, stdin=subprocess.DEVNULL)
         except Exception:
             pass
@@ -208,7 +208,7 @@ def delegate(spec: dict, runner=None) -> dict:
     argv = ["claude", "-p", compose(task, context, may_edit), "--permission-mode", mode,
             "--output-format", "text"]
     wait = forge.within_deadline(TIMEOUT, root)
-    run = runner or (lambda: subprocess.run(argv, capture_output=True, text=True, cwd=str(workdir),
+    run = runner or (lambda: subprocess.run(argv, capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=str(workdir),
                                             timeout=wait, stdin=subprocess.DEVNULL,
                                             env=forge.safe_env(root)))
     try:
@@ -269,7 +269,7 @@ def delegate(spec: dict, runner=None) -> dict:
 
 
 def main() -> None:
-    raw = sys.stdin.read() if sys.argv[1:2] == ["-"] else Path(sys.argv[1]).read_text()
+    raw = sys.stdin.read() if sys.argv[1:2] == ["-"] else Path(sys.argv[1]).read_text(encoding="utf-8")
     print(json.dumps(delegate(json.loads(raw))))
 
 

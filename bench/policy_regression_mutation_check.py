@@ -123,10 +123,11 @@ MUTATIONS: list[tuple[str, str, str, str, str]] = [
     (
         "J3", "an exported template carries the originating Bot's policy again",
         "portable.py",
-        '        "soul_md": policy.strip_block((pdir / "SOUL.md").read_text(errors="ignore")).lstrip()'
-        ' if (pdir / "SOUL.md").exists() else "",',
-        '        "soul_md": (pdir / "SOUL.md").read_text(errors="ignore")'
-        ' if (pdir / "SOUL.md").exists() else "",',
+        '        "soul_md": policy.strip_block(\n'
+        '            (pdir / "SOUL.md").read_text(encoding="utf-8", errors="ignore")\n'
+        '        ).lstrip() if (pdir / "SOUL.md").exists() else "",',
+        '        "soul_md": (pdir / "SOUL.md").read_text(encoding="utf-8", errors="ignore")\n'
+        '        if (pdir / "SOUL.md").exists() else "",',
     ),
     (
         "J4", "a NUL byte in shared_policy_path is accepted again (write raises ValueError)",

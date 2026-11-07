@@ -344,7 +344,7 @@ class ShippedIntoEveryBot(unittest.TestCase):
         self.root = support.make_root(Path(self.tmp.name), profiles=())
         self.bot = self.root / "profiles" / "marlow"
         self.bot.mkdir(parents=True)
-        (self.bot / "config.yaml").write_text("{}")
+        (self.bot / "config.yaml").write_text("{}", encoding="utf-8")
 
     def test_a_bots_declared_approvals_become_its_policy(self):
         import companion
@@ -356,7 +356,7 @@ class ShippedIntoEveryBot(unittest.TestCase):
     def test_the_policy_is_switched_on_in_that_bots_config(self):
         import companion
         companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
-        cfg = support.yaml.safe_load((self.bot / "config.yaml").read_text())
+        cfg = support.yaml.safe_load((self.bot / "config.yaml").read_text(encoding="utf-8"))
         self.assertIn("bot-forge-sentinel", cfg["plugins"]["enabled"])
         self.assertTrue(core_get_config(cfg, "bot-forge-sentinel", "guard_defaults"))
 
@@ -372,7 +372,7 @@ class ShippedIntoEveryBot(unittest.TestCase):
         import companion
         companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
         cfg_path = self.bot / "config.yaml"
-        cfg = support.yaml.safe_load(cfg_path.read_text())
+        cfg = support.yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
         edited = companion.read_sentinel_policy(cfg)
         edited["refuse"] = ["delete_profile"]
         edited["mode"] = "ask"
@@ -381,7 +381,7 @@ class ShippedIntoEveryBot(unittest.TestCase):
 
         companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
 
-        after = support.yaml.safe_load(cfg_path.read_text())
+        after = support.yaml.safe_load(cfg_path.read_text(encoding="utf-8"))
         self.assertEqual(core_get_config(after, "bot-forge-sentinel", "refuse"), ["delete_profile"])
         self.assertEqual(core_get_config(after, "bot-forge-sentinel", "mode"), "ask")
 
@@ -394,7 +394,7 @@ class ShippedIntoEveryBot(unittest.TestCase):
         """
         import companion
         companion.install_sentinel(self.bot, support.forge.DEFAULT_APPROVALS)
-        cfg = support.yaml.safe_load((self.bot / "config.yaml").read_text())
+        cfg = support.yaml.safe_load((self.bot / "config.yaml").read_text(encoding="utf-8"))
         policy = {k: core_get_config(cfg, "bot-forge-sentinel", k)
                   for k in ("refuse", "ask", "allow", "mode", "guard_defaults", "limits")}
         self.assertEqual(guard.decide("send_email", policy)["action"], "approve")
@@ -449,7 +449,7 @@ class ThePolicyLandsWhereHermesLooks(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.pdir = Path(self.tmp.name)
-        (self.pdir / "config.yaml").write_text("model:\n  default: m\n")
+        (self.pdir / "config.yaml").write_text("model:\n  default: m\n", encoding="utf-8")
 
     def _write(self, policy):
         cfg = forge.load_yaml(self.pdir / "config.yaml")
@@ -497,7 +497,7 @@ class UpgradingFromTheBrokenLocation(unittest.TestCase):
         self.pdir = Path(self.tmp.name)
 
     def _install(self, cfg_text, approvals=None):
-        (self.pdir / "config.yaml").write_text(cfg_text)
+        (self.pdir / "config.yaml").write_text(cfg_text, encoding="utf-8")
         with mock.patch.object(companion, "install_plugin", return_value={"ok": True}):
             out = companion.install_sentinel(self.pdir, approvals)
         return out, forge.load_yaml(self.pdir / "config.yaml")

@@ -23,9 +23,9 @@ repo, home = map(Path, sys.argv[1:])
 
 # A believable Hermes home, so register() reads real files rather than the user's own.
 (home / "profiles" / "quill").mkdir(parents=True, exist_ok=True)
-(home / "config.yaml").write_text("plugins:\n  enabled: [bot-forge]\n")
-(home / "profiles" / "quill" / "config.yaml").write_text("model:\n  default: test\n")
-(home / "profiles" / "quill" / "SOUL.md").write_text("Synthetic Bot\n")
+(home / "config.yaml").write_text("plugins:\n  enabled: [bot-forge]\n", encoding="utf-8")
+(home / "profiles" / "quill" / "config.yaml").write_text("model:\n  default: test\n", encoding="utf-8")
+(home / "profiles" / "quill" / "SOUL.md").write_text("Synthetic Bot\n", encoding="utf-8")
 
 parent = types.ModuleType("hermes_plugins")
 parent.__path__ = []

@@ -15,11 +15,11 @@ root = root / 'synthetic-hermes'
 root.mkdir()
 bot = root / 'profiles' / 'quill'
 bot.mkdir(parents=True)
-(root / 'config.yaml').write_text('plugins:\n  enabled: [bot-forge]\n')
-(bot / 'config.yaml').write_text('model:\n  default: test\n')
-(bot / 'SOUL.md').write_text('Synthetic Bot\n')
+(root / 'config.yaml').write_text('plugins:\n  enabled: [bot-forge]\n', encoding="utf-8")
+(bot / 'config.yaml').write_text('model:\n  default: test\n', encoding="utf-8")
+(bot / 'SOUL.md').write_text('Synthetic Bot\n', encoding="utf-8")
 (root / '.env').write_text('EMAIL_SMTP_HOST=smtp.example.test\nEMAIL_ADDRESS=sender@example.test\n'
-                          'EMAIL_PASSWORD=synthetic-test-only\nEMAIL_HOME_ADDRESS=home@example.test\n')
+                          'EMAIL_PASSWORD=synthetic-test-only\nEMAIL_HOME_ADDRESS=home@example.test\n', encoding="utf-8")
 parent = types.ModuleType('hermes_plugins')
 parent.__path__ = []
 sys.modules['hermes_plugins'] = parent
@@ -117,7 +117,7 @@ payload = {'hermes_root': str(root), 'name': 'quill', 'action': 'add', 'status':
            'title': 'Standalone synthetic blocker', 'summary': 'Synthetic work needs input',
            'settings': {'notify_email': False}}
 proc = subprocess.run([sys.executable, '-B', str(repo / 'journal.py'), '-'],
-                      input=json.dumps(payload), capture_output=True, text=True, timeout=30)
+                      input=json.dumps(payload), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
 assert proc.returncode == 0, proc.stderr
 result = json.loads(proc.stdout)
 assert result['ok'] and result['notified']['sent'] is False, result

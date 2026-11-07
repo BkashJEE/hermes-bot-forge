@@ -246,7 +246,7 @@ def _head(path: Path) -> str:
 def _git_remote(d: Path) -> str:
     try:
         out = subprocess.run(["git", "-C", str(d), "config", "--get", "remote.origin.url"],
-                             capture_output=True, text=True, timeout=3)
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3)
         return out.stdout.strip() if out.returncode == 0 else ""
     except (OSError, subprocess.SubprocessError):
         return ""
@@ -290,7 +290,7 @@ def _describe(d: Path) -> dict:
     pkg = d / "package.json"
     if pkg.is_file():
         try:
-            data = json.loads(pkg.read_text(errors="ignore")[:HEAD_BYTES * 4])
+            data = json.loads(pkg.read_text(errors="ignore", encoding="utf-8")[:HEAD_BYTES * 4])
             blurb += f" {data.get('name', '')} {data.get('description', '')}"
             headline = headline or str(data.get("description") or "")
         except (OSError, ValueError):
@@ -354,7 +354,7 @@ def scan_hermes(root: Path) -> dict:
         # top of the file is read by nothing else in this codebase, and the starter block alone is
         # over 2000 chars -- so every Bot carrying a policy had its persona truncated away and the
         # duplicate-Bot guard compared against an empty one_job.
-        raw_soul = (pdir / "SOUL.md").read_text(errors="ignore") if (pdir / "SOUL.md").is_file() else ""
+        raw_soul = (pdir / "SOUL.md").read_text(errors="ignore", encoding="utf-8") if (pdir / "SOUL.md").is_file() else ""
         soul = policy.strip_block(raw_soul)[:2000]
         jobs = re.search(r"##\s*Your one job\s*\n(.{0,400})", soul, re.S | re.I)
         one_job = " ".join((jobs.group(1) if jobs else "").split())[:240]
@@ -362,7 +362,7 @@ def scan_hermes(root: Path) -> dict:
         jobs_file = pdir / "cron" / "jobs.json"
         if jobs_file.is_file():
             try:
-                data = json.loads(jobs_file.read_text(errors="ignore"))
+                data = json.loads(jobs_file.read_text(errors="ignore", encoding="utf-8"))
                 routines = [str(j.get("name") or j.get("schedule") or "")[:60]
                             for j in (data if isinstance(data, list) else data.get("jobs") or [])][:6]
             except (OSError, ValueError):
@@ -399,7 +399,7 @@ def load_index(root: Path, roots: list, now: float | None = None) -> dict | None
     if not f.is_file():
         return None
     try:
-        data = json.loads(f.read_text(errors="ignore"))
+        data = json.loads(f.read_text(errors="ignore", encoding="utf-8"))
     except (OSError, ValueError):
         return None
     if now - float(data.get("built") or 0) > INDEX_TTL:
@@ -416,7 +416,7 @@ def build_index(root: Path, roots: list, now: float | None = None) -> dict:
     f = index_file(root)
     try:
         f.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        f.write_text(json.dumps(data))
+        f.write_text(json.dumps(data), encoding="utf-8")
         os.chmod(f, 0o600)
     except OSError:
         pass  # an unwritable cache costs speed, never correctness
@@ -573,10 +573,10 @@ def attach(pdir: Path, result: dict) -> bool:
     mem = Path(pdir) / "memories" / "MEMORY.md"
     try:
         mem.parent.mkdir(exist_ok=True)
-        current = mem.read_text(errors="ignore") if mem.is_file() else ""
+        current = mem.read_text(errors="ignore", encoding="utf-8") if mem.is_file() else ""
         if WORKSPACE_MARKER in current:
             return False
-        mem.write_text((current.rstrip() + "\n§\n" if current.strip() else "") + block + "\n")
+        mem.write_text((current.rstrip() + "\n§\n" if current.strip() else "") + block + "\n", encoding="utf-8")
     except OSError:
         return False
     return True

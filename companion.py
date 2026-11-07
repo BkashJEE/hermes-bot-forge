@@ -382,7 +382,7 @@ def companion_running(plugin_dir: Path) -> bool:
     try:
         import yaml
 
-        data = yaml.safe_load((Path(plugin_dir).parent.parent / "config.yaml").read_text()) or {}
+        data = yaml.safe_load((Path(plugin_dir).parent.parent / "config.yaml").read_text(encoding="utf-8")) or {}
     except Exception:
         return True  # installed but the config cannot be read: never risk double-placing
     return MARKS_NAME in ((data.get("plugins") or {}).get("enabled") or [])

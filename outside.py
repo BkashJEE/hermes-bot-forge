@@ -100,8 +100,9 @@ def git(root, *argv, timeout: int = 300):
     cmd = ["git", "-C", str(root), *NO_HOOKS, *argv]
     if argv and argv[0] == "commit":
         cmd.append("--no-verify")
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
-                          stdin=subprocess.DEVNULL, env=forge.safe_env(forge.default_root()))
+    return subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8",
+                          errors="replace", timeout=timeout, stdin=subprocess.DEVNULL,
+                          env=forge.safe_env(forge.default_root()))
 
 
 def new_job_id() -> str:
@@ -218,9 +219,9 @@ def delegate(spec: dict, runner=None) -> dict:
     argv = ["claude", "-p", compose(task, context, may_edit), "--permission-mode", mode,
             "--output-format", "text"]
     wait = forge.within_deadline(TIMEOUT, root)
-    run = runner or (lambda: subprocess.run(argv, capture_output=True, text=True, cwd=str(workdir),
-                                            timeout=wait, stdin=subprocess.DEVNULL,
-                                            env=forge.safe_env(root)))
+    run = runner or (lambda: subprocess.run(argv, capture_output=True, text=True, encoding="utf-8",
+                                            errors="replace", cwd=str(workdir), timeout=wait,
+                                            stdin=subprocess.DEVNULL, env=forge.safe_env(root)))
     try:
         out = run()
     except subprocess.TimeoutExpired:
@@ -279,7 +280,8 @@ def delegate(spec: dict, runner=None) -> dict:
 
 
 def main() -> None:
-    raw = sys.stdin.read() if sys.argv[1:2] == ["-"] else Path(sys.argv[1]).read_text()
+    raw = (sys.stdin.read() if sys.argv[1:2] == ["-"]
+           else Path(sys.argv[1]).read_text(encoding="utf-8"))
     print(json.dumps(delegate(json.loads(raw))))
 
 

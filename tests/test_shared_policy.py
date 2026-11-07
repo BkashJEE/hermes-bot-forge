@@ -212,8 +212,8 @@ class SharedPolicyInteropTests(unittest.TestCase):
     def test_share_import_round_trip_keeps_the_role(self):
         with tempfile.TemporaryDirectory() as t:
             p = Path(t) / "SOUL.md"
-            p.write_text(policy.inject(policy.STARTER_POLICY, self._soul()))
-            self.assertEqual(forge.soul_role(p.read_text(errors="ignore")), "iOS developer")
+            p.write_text(policy.inject(policy.STARTER_POLICY, self._soul()), encoding="utf-8")
+            self.assertEqual(forge.soul_role(p.read_text(errors="ignore", encoding="utf-8")), "iOS developer")
 
 
 class SharedPolicyPathSafetyTests(unittest.TestCase):
@@ -235,7 +235,7 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
 
     def test_absolute_path_outside_root_is_refused(self):
         outside = Path(self.tmp.name) / "SECRET.txt"
-        outside.write_text("[REDACTED]")
+        outside.write_text("[REDACTED]", encoding="utf-8")
         with self.assertRaises(policy.PolicyPathError):
             policy.policy_path(self.root, str(outside))
 
@@ -251,15 +251,15 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
         which is common. Only lexical escapes are refused.
         """
         outside = Path(self.tmp.name) / "elsewhere.md"
-        outside.write_text("- ask first\n")
+        outside.write_text("- ask first\n", encoding="utf-8")
         (self.root / "shared" / "BOT-POLICY.md").symlink_to(outside)
         self.assertTrue(policy.policy_path(self.root, "shared/BOT-POLICY.md").exists())
 
     def test_comments_only_canonical_policy_is_rejected_not_inlined(self):
         """Regression: a comments-only file hashed the same as an empty policy."""
         canon = policy.policy_path(self.root)
-        canon.write_text("<!-- TODO: write the house policy -->\n")
-        self.assertEqual(policy.fingerprint(canon.read_text()), policy.fingerprint(""))
+        canon.write_text("<!-- TODO: write the house policy -->\n", encoding="utf-8")
+        self.assertEqual(policy.fingerprint(canon.read_text(encoding="utf-8")), policy.fingerprint(""))
 
     def test_forge_rejects_a_comments_only_policy(self):
         """The build path, not just the helper: Bots must not be built with no rules.
@@ -269,7 +269,7 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
         indistinguishable from no policy at all.
         """
         canon = policy.policy_path(self.root)
-        canon.write_text("<!-- TODO: write the house policy -->\n")
+        canon.write_text("<!-- TODO: write the house policy -->\n", encoding="utf-8")
         # The guard under test runs before anything is created. If it ever stops doing so, the
         # build would go on to `hermes profile create`; this test must never reach the real CLI
         # (it republishes launchers under HERMES_HOME), so the call fails loudly instead.
@@ -319,12 +319,12 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
             root = Path(t)
             canon = policy.policy_path(root)
             canon.parent.mkdir(parents=True)
-            canon.write_text("- ask first\n")
+            canon.write_text("- ask first\n", encoding="utf-8")
             (root / "profiles" / "locked").mkdir(parents=True)
             (root / "profiles" / "locked" / "SOUL.md").write_text(
-                policy.inject("- ask first", "# Locked"))
+                policy.inject("- ask first", "# Locked"), encoding="utf-8")
             (root / "profiles" / "bad").mkdir(parents=True)
-            (root / "profiles" / "bad" / "SOUL.md").write_text("# Bad")
+            (root / "profiles" / "bad" / "SOUL.md").write_text("# Bad", encoding="utf-8")
             orig = tools.hermes_root
             tools.hermes_root = lambda: root
             real_read = Path.read_text
@@ -514,12 +514,12 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
                              "precondition: the name IS pushed past the window")
 
             (pdir / "config.yaml").write_text(
-                "model:\n  default: x\ntools:\n  backend: ''\napprovals:\n  mode: ''\n")
-            (pdir / "routines.json").write_text("[]\n")
+                "model:\n  default: x\ntools:\n  backend: ''\napprovals:\n  mode: ''\n", encoding="utf-8")
+            (pdir / "routines.json").write_text("[]\n", encoding="utf-8")
             now = time.time()
 
             def name_flag(text: str) -> list:
-                (pdir / "SOUL.md").write_text(text)
+                (pdir / "SOUL.md").write_text(text, encoding="utf-8")
                 flags = health.check_bot(pdir, {}, now).get("flags", [])
                 return [f for f in flags if "own name" in f]
 
@@ -542,11 +542,11 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
             root = Path(t)
             canon = policy.policy_path(root)
             canon.parent.mkdir(parents=True)
-            canon.write_text("- ask first\n")
+            canon.write_text("- ask first\n", encoding="utf-8")
             pdir = root / "profiles" / "noperm"
             pdir.mkdir(parents=True)
             soul = pdir / "SOUL.md"
-            soul.write_text("# No\n")
+            soul.write_text("# No\n", encoding="utf-8")
             soul.chmod(0o000)
             orig = tools.hermes_root
             tools.hermes_root = lambda: root
@@ -578,9 +578,9 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
             root = Path(t)
             canon = policy.policy_path(root)
             canon.parent.mkdir(parents=True)
-            canon.write_text("- ask first\n")
+            canon.write_text("- ask first\n", encoding="utf-8")
             (root / "profiles").mkdir()
-            (root / "SOUL.md").write_text(policy.inject("- older rule", "# Default"))
+            (root / "SOUL.md").write_text(policy.inject("- older rule", "# Default"), encoding="utf-8")
             orig = tools.hermes_root
             tools.hermes_root = lambda: root
             try:
@@ -606,16 +606,16 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
             # a policy in the REAL home, whose content differs, to catch a cross-read
             canon_real = policy.policy_path(real_hermes)
             canon_real.parent.mkdir(parents=True)
-            canon_real.write_text("- rule from the real home\n")
+            canon_real.write_text("- rule from the real home\n", encoding="utf-8")
 
             root = home / "hr"
             pdir = root / "profiles" / "sol"
             pdir.mkdir(parents=True)
-            (pdir / "config.yaml").write_text(yaml.safe_dump({"name": "sol"}))
-            (pdir / "SOUL.md").write_text("# Sol\n\nYou are **Sol**.\n")
+            (pdir / "config.yaml").write_text(yaml.safe_dump({"name": "sol"}), encoding="utf-8")
+            (pdir / "SOUL.md").write_text("# Sol\n\nYou are **Sol**.\n", encoding="utf-8")
             canon = policy.policy_path(root)
             canon.parent.mkdir(parents=True)
-            canon.write_text("- ask before spending\n")
+            canon.write_text("- ask before spending\n", encoding="utf-8")
 
             # `hermes_root` deliberately points somewhere else, as a stale spec would.
             out = manage.op_update(
@@ -624,7 +624,7 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
                 root, {},
             )
             self.assertTrue(out["ok"], out)
-            text = (pdir / "SOUL.md").read_text()
+            text = (pdir / "SOUL.md").read_text(encoding="utf-8")
             self.assertIn("ask before spending", text)
             self.assertNotIn("rule from the real home", text,
                              "the policy was read from the wrong Hermes root")
@@ -671,10 +671,10 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
             root = Path(t) / "hr"
             pdir = root / "profiles" / "bare"
             pdir.mkdir(parents=True)
-            (pdir / "config.yaml").write_text(yaml.safe_dump({"name": "bare"}))
+            (pdir / "config.yaml").write_text(yaml.safe_dump({"name": "bare"}), encoding="utf-8")
             canon = policy.policy_path(root)
             canon.parent.mkdir(parents=True)
-            canon.write_text("- ask before spending\n")
+            canon.write_text("- ask before spending\n", encoding="utf-8")
             with self.assertRaises(ValueError) as ctx:
                 manage.op_update({"name": "bare", "refresh_shared_policy": True}, root, {})
             self.assertIn("no content of its own", str(ctx.exception))
@@ -691,17 +691,17 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
             root = Path(t) / "hr"
             pdir = root / "profiles" / "sol"
             pdir.mkdir(parents=True)
-            (pdir / "config.yaml").write_text(yaml.safe_dump({"name": "sol"}))
-            (pdir / "SOUL.md").write_text("# Sol\n\nYou are **Sol**.\n")
+            (pdir / "config.yaml").write_text(yaml.safe_dump({"name": "sol"}), encoding="utf-8")
+            (pdir / "SOUL.md").write_text("# Sol\n\nYou are **Sol**.\n", encoding="utf-8")
             canon = policy.policy_path(root)
             canon.parent.mkdir(parents=True)
-            canon.write_text("- ask before spending\n")
+            canon.write_text("- ask before spending\n", encoding="utf-8")
             out = manage.op_update({
                 "name": "sol", "refresh_shared_policy": True,
                 "soul_md": "# Sol\n\nYou are **Sol**.\n\nNew body.",
             }, root, {})
             self.assertTrue(out["ok"], out)
-            text = (pdir / "SOUL.md").read_text()
+            text = (pdir / "SOUL.md").read_text(encoding="utf-8")
             self.assertIn(policy.BEGIN, text, "the policy was dropped by the soul_md write")
             self.assertIn("New body.", text)
             self.assertNotIn("shared_policy (already current)", out.get("changed", []))
@@ -728,7 +728,7 @@ class SharedPolicyPathSafetyTests(unittest.TestCase):
             root = Path(t)
             canon = policy.policy_path(root)
             canon.parent.mkdir(parents=True)
-            canon.write_text("<!-- TODO -->\n")
+            canon.write_text("<!-- TODO -->\n", encoding="utf-8")
             orig = tools.hermes_root
             tools.hermes_root = lambda: root
             try:
@@ -744,7 +744,7 @@ class SharedPolicyCheckToolTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             root = Path(t)
             (root / "profiles" / "sable").mkdir(parents=True)
-            (root / "profiles" / "sable" / "SOUL.md").write_text("# Sable")
+            (root / "profiles" / "sable" / "SOUL.md").write_text("# Sable", encoding="utf-8")
             orig = tools.hermes_root
             tools.hermes_root = lambda: root
             try:
@@ -758,16 +758,16 @@ class SharedPolicyCheckToolTests(unittest.TestCase):
             root = Path(t)
             canon = root / "shared" / "BOT-POLICY.md"
             canon.parent.mkdir(parents=True)
-            canon.write_text("- ask first\n")
+            canon.write_text("- ask first\n", encoding="utf-8")
             # one current, one stale, one with no policy
             (root / "profiles" / "fresh").mkdir(parents=True)
             (root / "profiles" / "fresh" / "SOUL.md").write_text(
-                policy.inject("- ask first", "# Fresh"))
+                policy.inject("- ask first", "# Fresh"), encoding="utf-8")
             (root / "profiles" / "old").mkdir(parents=True)
             (root / "profiles" / "old" / "SOUL.md").write_text(
-                policy.inject("- something older", "# Old"))
+                policy.inject("- something older", "# Old"), encoding="utf-8")
             (root / "profiles" / "bare").mkdir(parents=True)
-            (root / "profiles" / "bare" / "SOUL.md").write_text("# Bare")
+            (root / "profiles" / "bare" / "SOUL.md").write_text("# Bare", encoding="utf-8")
             orig = tools.hermes_root
             tools.hermes_root = lambda: root
             try:
@@ -832,10 +832,10 @@ class RoundFourFollowupTests(unittest.TestCase):
                 prof = root / "profiles" / "alpha"
                 prof.mkdir(parents=True)
                 (prof / "SOUL.md").write_text(
-                    policy.BEGIN + block + policy.END + "\n\n" + persona)
+                    policy.BEGIN + block + policy.END + "\n\n" + persona, encoding="utf-8")
                 (prof / "profile.yaml").write_text(
-                    "name: alpha\nui_meta:\n  hermes-bots:\n    title: Alpha\n")
-                (prof / "config.yaml").write_text("name: alpha\n")
+                    "name: alpha\nui_meta:\n  hermes-bots:\n    title: Alpha\n", encoding="utf-8")
+                (prof / "config.yaml").write_text("name: alpha\n", encoding="utf-8")
                 found = survey.scan_hermes(root)
                 bots = found.get("bots", found) if isinstance(found, dict) else found
                 self.assertTrue(bots, "scan_hermes returned no bots")
@@ -846,10 +846,10 @@ class RoundFourFollowupTests(unittest.TestCase):
         prof.mkdir(parents=True)
         (prof / "SOUL.md").write_text(
             policy.BEGIN + policy.STARTER_POLICY + policy.END +
-            "\n\n# Solo\n\n## Your one job\n\nDo solo things.\n")
+            "\n\n# Solo\n\n## Your one job\n\nDo solo things.\n", encoding="utf-8")
         (prof / "profile.yaml").write_text(
-            "name: solo\nui_meta:\n  hermes-bots:\n    title: Solo\n")
-        (prof / "config.yaml").write_text("name: solo\n")
+            "name: solo\nui_meta:\n  hermes-bots:\n    title: Solo\n", encoding="utf-8")
+        (prof / "config.yaml").write_text("name: solo\n", encoding="utf-8")
         return prof
 
     def test_shared_template_does_not_carry_the_originating_bots_policy(self):

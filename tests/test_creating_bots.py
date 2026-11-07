@@ -47,7 +47,7 @@ class Names(unittest.TestCase):
             root = make_root(Path(t), profiles=["kairo"])
             (root / "profiles" / "quill").mkdir()  # leftover dir without config
             (root / "profiles" / ".deleted").mkdir()
-            (root / "profiles" / ".deleted" / "kairo").write_text("deleted")
+            (root / "profiles" / ".deleted" / "kairo").write_text("deleted", encoding="utf-8")
             names = forge.existing_bot_names(root)
             self.assertNotIn("quill", names)
             self.assertNotIn("kairo", names)
@@ -93,9 +93,9 @@ class BotMeta(unittest.TestCase):
     def test_write_bot_meta_matches_desktop_shape_and_bumps_revision(self):
         with tempfile.TemporaryDirectory() as t:
             pdir = Path(t)
-            (pdir / "profile.yaml").write_text(yaml.safe_dump({"description": "x", "_ui_meta_revisions": {"hermes-bots": 2}}))
+            (pdir / "profile.yaml").write_text(yaml.safe_dump({"description": "x", "_ui_meta_revisions": {"hermes-bots": 2}}), encoding="utf-8")
             forge.write_bot_meta(pdir, "Quill", "Writes posts", "sun")
-            data = yaml.safe_load((pdir / "profile.yaml").read_text())
+            data = yaml.safe_load((pdir / "profile.yaml").read_text(encoding="utf-8"))
             bots = data["ui_meta"]["hermes-bots"]
             self.assertEqual(bots["title"], "Quill")
             self.assertEqual(bots["imageKind"], "shape")
@@ -110,7 +110,7 @@ class Skills(unittest.TestCase):
             skills = Path(t)
             for cat, name in (("research", "arxiv"), ("email", "himalaya"), ("creative", "humanizer")):
                 (skills / cat / name).mkdir(parents=True)
-                (skills / cat / name / "SKILL.md").write_text(f"---\nname: {name}\n---\n")
+                (skills / cat / name / "SKILL.md").write_text(f"---\nname: {name}\n---\n", encoding="utf-8")
             self.assertEqual(forge.disabled_skills(skills, {"research", "creative"}), {"himalaya"})
 
 
@@ -163,10 +163,10 @@ class ConfigWrites(unittest.TestCase):
     def test_dump_yaml_keeps_file_mode(self):
         with tempfile.TemporaryDirectory() as t:
             path = Path(t) / "config.yaml"
-            path.write_text("model: {}\n")
+            path.write_text("model: {}\n", encoding="utf-8")
             os.chmod(path, 0o600)
             forge.dump_yaml(path, {"model": {"default": "m"}})
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-            self.assertEqual(yaml.safe_load(path.read_text())["model"]["default"], "m")
+            self.assertEqual(yaml.safe_load(path.read_text(encoding="utf-8"))["model"]["default"], "m")
 
 

@@ -179,8 +179,8 @@ class GatewayTopology(unittest.TestCase):
         self.assert_no_service_changes()
 
     def test_stale_state_file_is_not_liveness(self):
-        (self.root / "gateway_state.json").write_text(json.dumps(self.record(self.root, ["default", "quill"])))
-        (self.profile / "gateway.pid").write_text("42")
+        (self.root / "gateway_state.json").write_text(json.dumps(self.record(self.root, ["default", "quill"])), encoding="utf-8")
+        (self.profile / "gateway.pid").write_text("42", encoding="utf-8")
         self.assertTrue(self.provision().startswith("pending:"))
         self.assert_no_service_changes()
 
@@ -443,7 +443,7 @@ class SubprocessConstruction(unittest.TestCase):
         bindir = Path(self.tmp.name) / "bin"
         bindir.mkdir()
         cli = bindir / "hermes"
-        cli.write_text(f"#!{sys.executable}\n" + FAKE_HERMES)
+        cli.write_text(f"#!{sys.executable}\n" + FAKE_HERMES, encoding="utf-8")
         cli.chmod(0o700)
         env = patch.dict(os.environ, {"PATH": str(bindir) + os.pathsep + os.environ.get("PATH", "")})
         env.start()
@@ -490,7 +490,7 @@ if args[:2] == ["profile", "create"]:
     profile.mkdir(parents=True)
     shutil.copyfile(root / "config.yaml", profile / "config.yaml")
 elif len(args) >= 3 and args[0] == "-p" and args[2] == "chat":
-    cfg = yaml.safe_load((root / "profiles" / args[1] / "config.yaml").read_text())
+    cfg = yaml.safe_load((root / "profiles" / args[1] / "config.yaml").read_text(encoding="utf-8"))
     print(json.dumps(cfg["model"]))
 else:
     raise SystemExit("Unexpected fixture command: " + repr(args))
@@ -507,7 +507,7 @@ class AdvisoryGuidance(unittest.TestCase):
             self.assertNotIn("do not ask the user questions first", text)
 
     def test_skill_has_no_forced_creation_or_fixed_team_headcount(self):
-        text = (ROOT / "skills" / "bot-forge" / "SKILL.md").read_text()
+        text = (ROOT / "skills" / "bot-forge" / "SKILL.md").read_text(encoding="utf-8")
         self.assertNotIn("**Zero questions.**", text)
         self.assertNotIn("plus 2-4 specialists", text)
         self.assertIn("Only justified, authorized NEW profiles", text)

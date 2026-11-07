@@ -43,8 +43,8 @@ def _tell_lead(root: Path, lead_id: str, team: str, roster: list):
     lines = [f"- @{m['name']} ({m['display_name']}): {m['description']}" for m in roster]
     entry = (f"I lead the {team} team. My team and what each one does:\n" + "\n".join(lines)
              + "\nI delegate to them by name instead of doing their work myself.")
-    existing = mem.read_text().rstrip() if mem.exists() else ""
-    mem.write_text((existing + "\n§\n" if existing else "") + entry + "\n")
+    existing = mem.read_text(encoding="utf-8").rstrip() if mem.exists() else ""
+    mem.write_text((existing + "\n§\n" if existing else "") + entry + "\n", encoding="utf-8")
 
 
 def build_team(s: dict) -> dict:
@@ -98,7 +98,7 @@ def build_team(s: dict) -> dict:
 
 
 def main():
-    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text()
+    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text(encoding="utf-8")
     result = build_team(json.loads(raw))
     print(json.dumps(result, indent=2))
     sys.exit(0 if result.get("ok") else 1)

@@ -135,7 +135,7 @@ def request(spec: dict, runner=None) -> dict:
 
 
 def main() -> None:
-    raw = sys.stdin.read() if sys.argv[1:2] == ["-"] else Path(sys.argv[1]).read_text()
+    raw = sys.stdin.read() if sys.argv[1:2] == ["-"] else Path(sys.argv[1]).read_text(encoding="utf-8")
     print(json.dumps(request(json.loads(raw))))
 
 

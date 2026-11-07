@@ -93,7 +93,7 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
 
     # persona
     soul_path = pdir / "SOUL.md"
-    soul = soul_path.read_text() if soul_path.exists() else ""
+    soul = soul_path.read_text(encoding="utf-8") if soul_path.exists() else ""
 
     # shared policy refresh. This is the documented fix for a stale Bot, and it has to exist
     # as a real operation: create_agent refuses a name that is already taken, so telling
@@ -113,7 +113,7 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
         if not pol.exists():
             raise ValueError(f"no shared policy at {pol}")
         try:
-            text = pol.read_text(errors="replace")
+            text = pol.read_text(errors="replace", encoding="utf-8")
         except OSError as exc:
             raise ValueError(f"could not read shared policy {pol}: {exc}") from exc
         if not policy_mod.policy_body(text):
@@ -133,7 +133,7 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
             changed.append("shared_policy (already current)")
         else:
             backups["SOUL.md"] = _backup(pdir, "SOUL.md")
-            soul_path.write_text(refreshed)
+            soul_path.write_text(refreshed, encoding="utf-8")
             soul = refreshed
             changed.append("shared_policy")
 
@@ -151,7 +151,7 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
         if refresh_policy and pol_text:
             soul = policy_mod.inject(pol_text, soul)
             changed = [c for c in changed if c != "shared_policy"]
-        soul_path.write_text(forge.ensure_identity(soul, title, s.get("role") or "Bot", name))
+        soul_path.write_text(forge.ensure_identity(soul, title, s.get("role") or "Bot", name), encoding="utf-8")
         changed.append("soul")
 
     # roster identity
@@ -166,8 +166,8 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
         changed.append("identity")
         if meta_changes.get("title") and soul_path.exists():
             backups.setdefault("SOUL.md", _backup(pdir, "SOUL.md"))
-            soul_path.write_text(forge.ensure_identity(soul_path.read_text(), meta_changes["title"],
-                                                       s.get("role") or "Bot", name))
+            soul_path.write_text(forge.ensure_identity(soul_path.read_text(encoding="utf-8"), meta_changes["title"],
+                                                       s.get("role") or "Bot", name), encoding="utf-8")
 
     # acknowledgements
     if s.get("ack_reactions"):
@@ -213,8 +213,8 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
         mem = pdir / "memories" / "MEMORY.md"
         mem.parent.mkdir(exist_ok=True)
         backups["MEMORY.md"] = _backup(pdir, "memories/MEMORY.md")
-        existing = mem.read_text().rstrip() if mem.exists() else ""
-        mem.write_text((existing + "\n§\n" if existing else "") + "\n§\n".join(s["memory"]) + "\n")
+        existing = mem.read_text(encoding="utf-8").rstrip() if mem.exists() else ""
+        mem.write_text((existing + "\n§\n" if existing else "") + "\n§\n".join(s["memory"]) + "\n", encoding="utf-8")
         changed.append("memory")
 
     # config: tools, skills, model
@@ -284,8 +284,8 @@ def op_copy(s: dict, root: Path, settings: dict) -> dict:
         # are the mechanism for preserving a Bot's journal.
         shutil.rmtree(pdir / "journal", ignore_errors=True)
         forge.write_bot_meta(pdir, display, description, s.get("avatar_kind") or "")
-        soul = (pdir / "SOUL.md").read_text() if (pdir / "SOUL.md").exists() else ""
-        (pdir / "SOUL.md").write_text(forge.ensure_identity(soul, display, s.get("role") or "Bot", new_id))
+        soul = (pdir / "SOUL.md").read_text(encoding="utf-8") if (pdir / "SOUL.md").exists() else ""
+        (pdir / "SOUL.md").write_text(forge.ensure_identity(soul, display, s.get("role") or "Bot", new_id), encoding="utf-8")
         if settings.get("journal_enabled", True):
             if __package__:
                 from . import journal
@@ -358,7 +358,7 @@ def op_export(s: dict, root: Path, settings: dict) -> dict:
     if err:
         return {"ok": False, "name": pdir.name, "error": err}
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(text + "\n")
+    out.write_text(text + "\n", encoding="utf-8")
     published = None
     if s.get("publish"):
         if __package__:
@@ -524,7 +524,7 @@ def op_teach(s: dict, root: Path, settings: dict) -> dict:
     existing = (dest / "SKILL.md").exists()
     if existing:
         _backup(pdir, f"skills/taught/{skill}/SKILL.md")
-    (dest / "SKILL.md").write_text(front + doc.strip() + "\n")
+    (dest / "SKILL.md").write_text(front + doc.strip() + "\n", encoding="utf-8")
 
     # a taught skill is useless if the category sits in the disabled list
     cfg_path = pdir / "config.yaml"
@@ -558,7 +558,7 @@ def manage(s: dict) -> dict:
 
 
 def main():
-    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text()
+    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text(encoding="utf-8")
     result = manage(json.loads(raw))
     print(json.dumps(result, indent=2))
     sys.exit(0 if result.get("ok") else 1)

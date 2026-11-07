@@ -37,7 +37,7 @@ def gh_ready() -> tuple:
         return False, ("publishing a link needs the GitHub CLI, which is not installed. Install `gh` "
                        "and run `gh auth login`, or share the template as a file instead.")
     try:
-        out = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, timeout=30)
+        out = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
     except (OSError, subprocess.SubprocessError) as exc:
         return False, f"could not run `gh auth status`: {exc}"
     if out.returncode != 0:
@@ -52,7 +52,7 @@ def publish(text: str, filename: str, description: str, runner=None) -> dict:
     if not ready:
         return {"ok": False, "error": reason}
     run = runner or (lambda cmd, payload: subprocess.run(
-        cmd, input=payload, capture_output=True, text=True, timeout=120))
+        cmd, input=payload, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120))
     try:
         out = run(["gh", "gist", "create", "--filename", filename, "--desc", description[:240], "-"], text)
     except (OSError, subprocess.SubprocessError) as exc:
@@ -79,7 +79,7 @@ def fetch(url: str, opener=None) -> dict:
     if m and shutil.which("gh"):
         try:
             out = subprocess.run(["gh", "gist", "view", m.group(1), "--raw"],
-                                 capture_output=True, text=True, timeout=FETCH_TIMEOUT)
+                                 capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=FETCH_TIMEOUT)
             if out.returncode == 0 and out.stdout.strip():
                 return {"ok": True, "text": out.stdout[:MAX_FETCH_BYTES], "source": url}
         except (OSError, subprocess.SubprocessError):

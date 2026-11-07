@@ -30,7 +30,7 @@ EXPENSIVE_RUNS_PER_DAY = 24
 
 def _jobs(pdir: Path) -> list:
     try:
-        data = json.loads((pdir / "cron" / "jobs.json").read_text())
+        data = json.loads((pdir / "cron" / "jobs.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
     jobs = data.get("jobs", []) if isinstance(data, dict) else data
@@ -96,7 +96,7 @@ def _journal_status(pdir: Path) -> dict:
     entries = 0
     for path in files:
         try:
-            entries += path.read_text(errors="ignore").count("\n## ")
+            entries += path.read_text(errors="ignore", encoding="utf-8").count("\n## ")
         except OSError:
             continue
     return {"enabled": journal.journaling_enabled(pdir), "entries": entries,
@@ -117,7 +117,7 @@ def check_bot(pdir: Path, gateways: dict, now: float, bundled: set | None = None
     bots = (meta.get("ui_meta") or {}).get("hermes-bots") or {}
     title = (bots.get("title") if isinstance(bots, dict) else None) or meta.get("display_name") or name
     cfg = forge.load_yaml(pdir / "config.yaml")
-    soul = (pdir / "SOUL.md").read_text(errors="ignore") if (pdir / "SOUL.md").exists() else ""
+    soul = (pdir / "SOUL.md").read_text(errors="ignore", encoding="utf-8") if (pdir / "SOUL.md").exists() else ""
     flags, routines, total_runs = [], [], 0.0
 
     for job in _jobs(pdir):
@@ -229,7 +229,7 @@ def check(s: dict) -> dict:
 
 
 def main():
-    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text()
+    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text(encoding="utf-8")
     print(json.dumps(check(json.loads(raw or "{}")), indent=2))
 
 

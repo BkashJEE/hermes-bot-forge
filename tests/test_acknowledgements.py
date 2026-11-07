@@ -201,7 +201,7 @@ class BotChatSource(unittest.TestCase):
         self.assertTrue(forge.bot_mode_install(self._root(bot_mode=True)))
         self.assertFalse(forge.bot_mode_install(self._root(bot_mode=False)))
 
-    def test_new_chat_on_a_bot_mode_install_is_stamped_desktop_then_titled(self):
+    def test_new_chat_on_a_bot_mode_install_is_created_as_gui_then_titled(self):
         root = self._root(bot_mode=True)
         calls = []
 
@@ -215,7 +215,10 @@ class BotChatSource(unittest.TestCase):
             ok, _ = forge.bot_chat(root, "quill", "hi")
         self.assertTrue(ok)
         self.assertIn("--source", calls[0])
-        self.assertEqual(calls[0][calls[0].index("--source") + 1], "desktop")
+        # `gui`, not `desktop`: SURFACES maps creation labels to stored ones, so `desktop` is
+        # the value and the gateway refuses it as a label (#84). This assertion used to require
+        # the broken call, which is why the suite was green while every Bot-Mode intro turn failed.
+        self.assertEqual(calls[0][calls[0].index("--source") + 1], "gui")
         self.assertNotIn("--create-if-missing", calls[0])  # that path hardcodes source="cli" upstream
         self.assertEqual(calls[1][:3], ("-p", "quill", "sessions"))
         self.assertEqual(calls[1][3:], ("rename", "s1", "Bot Chat"))

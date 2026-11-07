@@ -685,7 +685,12 @@ def bot_chat(root, profile_id, message, source: str = "", max_turns: int = 3, ti
     (`tui_gateway/server.py::_gui_surface_toolsets`): a chat stamped `cli` never gets the desktop
     toolset, so a Bot whose canonical chat we created could not react to a message in Desktop. On a
     Bot-Mode install this chat belongs to the Desktop roster, so stamp it the way Desktop would."""
-    source = source or ("desktop" if bot_mode_install(Path(root)) else "cli")
+    # `gui`, not `desktop`. SURFACES maps creation labels to stored ones
+    # (gateway/session_policy.py: {'gui': 'desktop', ...}), so `desktop` is the *value* and is
+    # refused as a creation label with invalid_params — the intro turn then fails on every
+    # Bot-Mode install, before the model is reached (#84). Passing `gui` is stored as
+    # `desktop`, which is the surface we wanted all along.
+    source = source or ("gui" if bot_mode_install(Path(root)) else "cli")
     existing = has_bot_chat(root, profile_id)
     if existing or source == "cli":
         p = run(root, "-p", profile_id, "chat", "-c", BOT_CHAT_TITLE, "--create-if-missing", "-Q",

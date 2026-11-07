@@ -87,6 +87,23 @@ def compose(task: str, context: str, may_edit: bool) -> str:
     return "\n".join(lines)
 
 
+# Git runs the repository's own hooks, and a job may be editing a repo the user did not write.
+# A pre-commit hook would then execute with whatever environment we hand it, at the moment we
+# commit the job's work. So every git call here gets the same scrubbed environment the agent gets,
+# and hooks are switched off: an unreachable hooksPath (portable — /dev/null is not a directory on
+# Windows) plus --no-verify on the one command that would run them anyway.
+NO_HOOKS = ("-c", "core.hooksPath=bot-forge-no-hooks-does-not-exist")
+
+
+def git(root, *argv, timeout: int = 300):
+    """One git call: no inherited environment, no repository hooks."""
+    cmd = ["git", "-C", str(root), *NO_HOOKS, *argv]
+    if argv and argv[0] == "commit":
+        cmd.append("--no-verify")
+    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout,
+                          stdin=subprocess.DEVNULL, env=forge.safe_env(forge.default_root()))
+
+
 def new_job_id() -> str:
     return "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
@@ -94,8 +111,7 @@ def new_job_id() -> str:
 def repo_root(where: Path) -> Path | None:
     """The git repository `where` sits in, or None when it is not in one."""
     try:
-        out = subprocess.run(["git", "-C", str(where), "rev-parse", "--show-toplevel"],
-                             capture_output=True, text=True, timeout=60, stdin=subprocess.DEVNULL)
+        out = git(where, "rev-parse", "--show-toplevel", timeout=60)
     except (OSError, subprocess.SubprocessError):
         return None
     top = (out.stdout or "").strip()
@@ -111,8 +127,7 @@ def open_worktree(root: Path, job: str) -> tuple[Path, str]:
     """
     branch = f"bot-forge/{job}"
     path = root.parent / f"{root.name}--{job}"
-    out = subprocess.run(["git", "-C", str(root), "worktree", "add", "-b", branch, str(path), "HEAD"],
-                         capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
+    out = git(root, "worktree", "add", "-b", branch, str(path), "HEAD")
     if out.returncode != 0:
         raise RuntimeError((out.stderr or out.stdout or "could not create a worktree").strip()[:300])
     return path, branch
@@ -125,21 +140,17 @@ def commit_worktree(path: Path, message: str) -> bool:
     `merge branch` is a no-op, and removing the worktree throws the work away. Returns False when
     the job changed nothing, which is worth telling the user rather than implying a diff exists.
     """
-    add = subprocess.run(["git", "-C", str(path), "add", "-A"], capture_output=True, text=True,
-                         timeout=300, stdin=subprocess.DEVNULL)
+    add = git(path, "add", "-A")
     if add.returncode != 0:
         raise RuntimeError((add.stderr or "could not stage the job's changes").strip()[:240])
-    if not subprocess.run(["git", "-C", str(path), "status", "--porcelain"], capture_output=True,
-                          text=True, timeout=120).stdout.strip():
+    if not git(path, "status", "--porcelain", timeout=120).stdout.strip():
         return False
     # The repository's own identity when it has one; a neutral fallback when it does not, so a
     # machine with no global git config still produces a reviewable commit.
-    out = subprocess.run(["git", "-C", str(path), "commit", "-m", message],
-                         capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
+    out = git(path, "commit", "-m", message)
     if out.returncode != 0:
-        out = subprocess.run(["git", "-C", str(path), "-c", "user.name=bot-forge",
-                              "-c", "user.email=bot-forge@localhost", "commit", "-m", message],
-                             capture_output=True, text=True, timeout=300, stdin=subprocess.DEVNULL)
+        out = git(path, "-c", "user.name=bot-forge", "-c", "user.email=bot-forge@localhost",
+                  "commit", "-m", message)
     if out.returncode != 0:
         raise RuntimeError((out.stderr or "could not commit the job's changes").strip()[:240])
     return True
@@ -149,8 +160,7 @@ def close_worktree(root: Path, path: Path, branch: str) -> None:
     """Undo an isolated checkout that never ran. Never raises: cleanup must not mask the real error."""
     for argv in (["worktree", "remove", "--force", str(path)], ["branch", "-D", branch]):
         try:
-            subprocess.run(["git", "-C", str(root), *argv], capture_output=True, text=True,
-                           timeout=120, stdin=subprocess.DEVNULL)
+            git(root, *argv, timeout=120)
         except Exception:
             pass
 

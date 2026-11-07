@@ -311,3 +311,45 @@ class TheWorkIsCommittedSoItCanBeReviewed(unittest.TestCase):
         out = self._run_with(lambda d: (d / "app.py").write_text("one\nthree\n"))
         self.assertTrue(out["ok"], out)
         self.assertTrue(out["changed_anything"])
+
+
+class GitRunsWithoutTheUsersEnvironmentOrTheRepositorysHooks(unittest.TestCase):
+    """A job may be editing a repository the user did not write.
+
+    Git runs that repository's own hooks, so a pre-commit hook would execute at the moment we
+    commit the job's work — with whatever environment we hand it. Raised by Nous in catalog
+    review of v0.23.0.
+    """
+
+    def _argv_and_kw(self, *argv):
+        seen = {}
+
+        def fake(cmd, **kw):
+            seen["cmd"], seen["kw"] = cmd, kw
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+
+        with mock.patch.object(outside.subprocess, "run", fake):
+            outside.git(Path("/tmp"), *argv)
+        return seen
+
+    def test_hooks_are_switched_off(self):
+        cmd = self._argv_and_kw("status", "--porcelain")["cmd"]
+        self.assertIn("core.hooksPath=bot-forge-no-hooks-does-not-exist", cmd)
+
+    def test_commit_also_passes_no_verify(self):
+        """--no-verify covers the one command that runs hooks even with hooksPath set."""
+        self.assertIn("--no-verify", self._argv_and_kw("commit", "-m", "x")["cmd"])
+
+    def test_a_non_commit_call_is_not_given_no_verify(self):
+        self.assertNotIn("--no-verify", self._argv_and_kw("status")["cmd"])
+
+    def test_the_users_environment_does_not_reach_git(self):
+        env = self._argv_and_kw("status")["kw"]["env"]
+        self.assertIsInstance(env, dict)
+        for secret in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GH_TOKEN", "AWS_SECRET_ACCESS_KEY"):
+            self.assertNotIn(secret, env, secret)
+
+    def test_every_git_call_in_this_module_goes_through_the_helper(self):
+        """A raw subprocess.run(['git', ...]) would reintroduce both problems silently."""
+        source = Path(outside.__file__).read_text(encoding="utf-8")
+        self.assertNotIn('subprocess.run(["git"', source)

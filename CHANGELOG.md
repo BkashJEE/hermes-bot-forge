@@ -3,6 +3,16 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **A shared Bot could point this machine at someone else's endpoint** (raised by Nous in catalog review). A template fetched from a URL went straight to `forge.forge`, which copied its `model` block — `base_url` included — and created routines with the template's own `--deliver` target. A crafted import could therefore route every one of the new Bot's turns, or a routine's output, to an endpoint the sharer chose. URL imports now drop `model` and any `deliver` that is not the new Bot's own chat, and the result says what was dropped rather than quietly rewriting what someone shared. A local file is left alone: that is how a `share_agent --mode backup` is restored, and there keeping the model is the point.
+- **Git ran the edited repository's hooks with the full environment** (raised by Nous in catalog review). An editing job may be working in a repository the user did not write, and git runs that repository's hooks — so a `pre-commit` hook would execute at the moment Bot Forge committed the job's work, with whatever environment it inherited. Every git call in `outside.py` now goes through one helper that passes `forge.safe_env` and switches hooks off (an unreachable `core.hooksPath`, portable where `/dev/null` is not, plus `--no-verify` on commit). A test fails if a raw `subprocess.run(["git", ...])` reappears.
+- **`create_agent`'s intro turn used a surface label the gateway refuses** (#84). `forge.bot_chat` stamped new Bot-Mode chats `--source desktop`, but `SURFACES` maps creation labels to stored ones, so `desktop` is the value and `gui` is the label. The gateway refused it before any model call and the intro turn failed on every Bot-Mode install, on macOS as well as Windows.
+
+### Changed
+- **The Sentinel docs show the key Hermes actually reads.** `sentinel/README.md` and `docs/sentinel.md` still showed a top-level `bot-forge-sentinel:` block, which `ctx.get_config` never reads — the defect fixed in #86. Both now show `plugins.entries.bot-forge-sentinel.settings`, the key `companion.install_sentinel` writes.
+
 ## [0.23.0] - 2026-11-03
 
 ### Fixed

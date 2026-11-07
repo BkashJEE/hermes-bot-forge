@@ -27,15 +27,15 @@ class Manifest(unittest.TestCase):
 
     def test_manifest_declares_exactly_the_registered_tools(self):
         import schemas
-        manifest = yaml.safe_load(Path(ROOT / "plugin.yaml").read_text())
+        manifest = yaml.safe_load(Path(ROOT / "plugin.yaml").read_text(encoding="utf-8"))
         registered = {v["name"] for v in vars(schemas).values()
                       if isinstance(v, dict) and "name" in v and "parameters" in v}
         self.assertEqual(set(manifest["provides_tools"]), registered)
 
     def test_versions_agree(self):
-        manifest = yaml.safe_load(Path(ROOT / "plugin.yaml").read_text())
-        skill = (ROOT / "skills" / "bot-forge" / "SKILL.md").read_text()
-        changelog = (ROOT / "CHANGELOG.md").read_text()
+        manifest = yaml.safe_load(Path(ROOT / "plugin.yaml").read_text(encoding="utf-8"))
+        skill = (ROOT / "skills" / "bot-forge" / "SKILL.md").read_text(encoding="utf-8")
+        changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
         self.assertIn(f"version: {manifest['version']}", skill)
         self.assertIn(f"## [{manifest['version']}]", changelog)
 
@@ -54,30 +54,30 @@ class ReviewFollowUps(unittest.TestCase):
         import extras.share_login as share_login
         with tempfile.TemporaryDirectory() as t:
             root = Path(t)
-            (root / "auth.json").write_text('{"token": "abc"}')
+            (root / "auth.json").write_text('{"token": "abc"}', encoding="utf-8")
             bot = root / "profiles" / "quill"
             bot.mkdir(parents=True)
-            (bot / "config.yaml").write_text("model: {}\n")
+            (bot / "config.yaml").write_text("model: {}\n", encoding="utf-8")
             out = share_login.link(root, "quill")
             dest = bot / "auth.json"
             self.assertTrue(dest.is_file())
             self.assertFalse(dest.is_symlink(), "must never be a live link to another profile")
-            self.assertEqual(dest.read_text(), '{"token": "abc"}')
+            self.assertEqual(dest.read_text(encoding="utf-8"), '{"token": "abc"}')
             self.assertEqual(oct(dest.stat().st_mode)[-3:], "600")
             self.assertIn("copied", out)
             # the source is untouched by anything done to the copy
-            dest.write_text('{"token": "replaced"}')
-            self.assertEqual((root / "auth.json").read_text(), '{"token": "abc"}')
+            dest.write_text('{"token": "replaced"}', encoding="utf-8")
+            self.assertEqual((root / "auth.json").read_text(encoding="utf-8"), '{"token": "abc"}')
 
     @unittest.skipUnless(os.name == "posix", "credential-copy helper is POSIX only")
     def test_an_older_symlink_is_replaced_by_a_copy(self):
         import extras.share_login as share_login
         with tempfile.TemporaryDirectory() as t:
             root = Path(t)
-            (root / "auth.json").write_text('{"token": "abc"}')
+            (root / "auth.json").write_text('{"token": "abc"}', encoding="utf-8")
             bot = root / "profiles" / "quill"
             bot.mkdir(parents=True)
-            (bot / "config.yaml").write_text("model: {}\n")
+            (bot / "config.yaml").write_text("model: {}\n", encoding="utf-8")
             (bot / "auth.json").symlink_to(root / "auth.json")   # left by an older version
             share_login.link(root, "quill")
             self.assertFalse((bot / "auth.json").is_symlink())

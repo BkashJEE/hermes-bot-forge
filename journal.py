@@ -68,7 +68,7 @@ def ensure_journal(pdir: Path) -> Path:
     folder = _safe_journal_dir(pdir)
     readme = folder / "README.md"
     if not readme.exists():
-        readme.write_text(README)
+        readme.write_text(README, encoding="utf-8")
         try:
             os.chmod(readme, 0o600)
         except OSError:
@@ -78,7 +78,7 @@ def ensure_journal(pdir: Path) -> Path:
 
 def journaling_enabled(pdir: Path) -> bool:
     soul = pdir / "SOUL.md"
-    return soul.exists() and JOURNAL_MARKER in soul.read_text(errors="ignore")
+    return soul.exists() and JOURNAL_MARKER in soul.read_text(errors="ignore", encoding="utf-8")
 
 
 def _drop_orphan_policy(text: str) -> str:
@@ -105,7 +105,7 @@ def enable_journal(pdir: Path) -> dict:
     """Enable journal guidance without replacing the Bot's existing persona."""
     folder = ensure_journal(pdir)
     soul = pdir / "SOUL.md"
-    text = soul.read_text(errors="ignore") if soul.exists() else ""
+    text = soul.read_text(errors="ignore", encoding="utf-8") if soul.exists() else ""
     changed = JOURNAL_MARKER not in text
     backup = ""
     if changed:
@@ -116,7 +116,7 @@ def enable_journal(pdir: Path) -> dict:
 
         backup = manage._backup(pdir, "SOUL.md")
         text = _drop_orphan_policy(text)
-        soul.write_text((text.rstrip() + "\n\n" if text.strip() else "") + JOURNAL_POLICY.rstrip() + "\n")
+        soul.write_text((text.rstrip() + "\n\n" if text.strip() else "") + JOURNAL_POLICY.rstrip() + "\n", encoding="utf-8")
     return {"enabled": True, "changed": changed, "path": str(folder), "backup": backup or None}
 
 
@@ -206,7 +206,7 @@ def read_entries(pdir: Path, spec: dict) -> dict:
     for path in paths:
         if not path.is_file() or path.is_symlink():
             continue
-        text = path.read_text(errors="ignore")
+        text = path.read_text(errors="ignore", encoding="utf-8")
         for block in reversed(re.split(r"\n---\n", text)):
             block = block.strip()
             if not block or block.startswith("# Work journal —") and "\n## " not in block:
@@ -265,7 +265,7 @@ def operate(spec: dict) -> dict:
 
 
 def main() -> None:
-    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text()
+    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text(encoding="utf-8")
     result = operate(json.loads(raw))
     print(json.dumps(result, indent=2))
     raise SystemExit(0 if result.get("ok") else 1)

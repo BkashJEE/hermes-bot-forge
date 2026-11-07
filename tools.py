@@ -89,7 +89,7 @@ def create_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
             "hermes_root": str(root), "settings": settings or {}}
     try:
         p = subprocess.run([sys.executable, str(PLUGIN_DIR / "forge.py"), "-"], input=json.dumps(spec),
-                           capture_output=True, text=True, timeout=900)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": "create_agent timed out after 15 min"})
     out = p.stdout.strip()
@@ -104,7 +104,7 @@ def _manage(op: str, args: dict, settings: dict | None = None) -> str:
     spec = {**args, "op": op, "hermes_root": str(root), "settings": settings or {}}
     try:
         p = subprocess.run([sys.executable, str(PLUGIN_DIR / "manage.py"), "-"], input=json.dumps(spec),
-                           capture_output=True, text=True, timeout=900)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=900)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": f"{op} timed out after 15 min"})
     out = p.stdout.strip()
@@ -127,7 +127,7 @@ def create_team(args: dict, settings: dict | None = None, **kwargs) -> str:
             "hermes_root": str(root), "settings": settings or {}}
     try:
         p = subprocess.run([sys.executable, str(PLUGIN_DIR / "team.py"), "-"], input=json.dumps(spec),
-                           capture_output=True, text=True, timeout=3600)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=3600)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": "create_team timed out after 60 min"})
     out = p.stdout.strip()
@@ -139,8 +139,10 @@ def create_team(args: dict, settings: dict | None = None, **kwargs) -> str:
 
 def check_install(args: dict, settings: dict | None = None, **kwargs) -> str:
     try:
-        p = subprocess.run([sys.executable, str(PLUGIN_DIR / "doctor.py"), "--json", "--settings-stdin"],
-                           input=json.dumps(settings or {}), capture_output=True, text=True, timeout=300)
+        p = subprocess.run([sys.executable, str(PLUGIN_DIR / "doctor.py"), "--json",
+                            "--settings-stdin"],
+                           input=json.dumps(settings or {}), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=300)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": "check_install timed out"})
     out = p.stdout.strip()
@@ -155,7 +157,7 @@ def check_agents(args: dict, **kwargs) -> str:
     try:
         p = subprocess.run([sys.executable, str(PLUGIN_DIR / "health.py"), "-"],
                            input=json.dumps({**args, "hermes_root": str(root)}),
-                           capture_output=True, text=True, timeout=300)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": "check_agents timed out"})
     out = p.stdout.strip()
@@ -173,7 +175,7 @@ def _read_text_safe(path) -> str | None:
     apostrophe into a raised exception out of a read-only tool.
     """
     try:
-        return path.read_text(errors="replace")
+        return path.read_text(errors="replace", encoding="utf-8")
     except (OSError, ValueError):
         return None
 
@@ -215,7 +217,7 @@ def check_policies(args: dict, **kwargs) -> str:
         name = prof.name
         soul = prof / "SOUL.md"
         try:
-            text = soul.read_text(errors="replace")
+            text = soul.read_text(errors="replace", encoding="utf-8")
         except OSError as exc:
             bots.append({"profile": name, "error": str(exc)[:120], "current": False,
                          "has_shared_policy": False, "reason": "unreadable",
@@ -253,7 +255,7 @@ def agent_journal(args: dict, settings: dict | None = None, **kwargs) -> str:
             "hermes_root": str(root), "settings": settings or {}}
     try:
         p = subprocess.run([sys.executable, str(PLUGIN_DIR / "journal.py"), "-"], input=json.dumps(spec),
-                           capture_output=True, text=True, timeout=60)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": "agent_journal timed out"})
     out = p.stdout.strip()
@@ -300,7 +302,7 @@ def request_takeover(args: dict, settings: dict | None = None, **kwargs) -> str:
             "hermes_root": str(root), "settings": settings or {}}
     try:
         p = subprocess.run([sys.executable, str(PLUGIN_DIR / "takeover.py"), "-"],
-                           input=json.dumps(spec), capture_output=True, text=True, timeout=120)
+                           input=json.dumps(spec), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=120)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": "request_takeover timed out"})
     out = p.stdout.strip()
@@ -317,7 +319,7 @@ def handoff_agent(args: dict, settings: dict | None = None, **kwargs) -> str:
             "hermes_root": str(root), "settings": settings or {}}
     try:
         p = subprocess.run([sys.executable, str(PLUGIN_DIR / "handoff.py"), "-"], input=json.dumps(spec),
-                           capture_output=True, text=True, timeout=960)
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=960)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": "handoff_agent timed out after 16 min"})
     out = p.stdout.strip()
@@ -332,7 +334,7 @@ def _profile_info(name, home):
     cfg, meta = {}, {}
     for fname, target in (("config.yaml", cfg), ("profile.yaml", meta)):
         try:
-            target.update(yaml.safe_load((home / fname).read_text()) or {})
+            target.update(yaml.safe_load((home / fname).read_text(encoding="utf-8")) or {})
         except Exception:
             pass
     bots = (meta.get("ui_meta") or {}).get("hermes-bots") or {}
@@ -343,7 +345,7 @@ def _profile_info(name, home):
     if bots.get("hidden"):
         info["hidden"] = True
     try:
-        jobs = json.loads((home / "cron" / "jobs.json").read_text())
+        jobs = json.loads((home / "cron" / "jobs.json").read_text(encoding="utf-8"))
         count = len(jobs.get("jobs", jobs) if isinstance(jobs, dict) else jobs)
         if count:
             info["routines"] = count
@@ -387,8 +389,10 @@ def ask_agent(args: dict, **kwargs) -> str:
     try:
         limit = forge.reading_only_args(args.get("reading_only"))
         wait = forge.within_deadline(900, root)
-        p = subprocess.run(["hermes", "-p", name, "chat", "-Q", "--max-turns", "30", *limit, "-q", message],
-                           capture_output=True, text=True, stdin=subprocess.DEVNULL, timeout=wait, env=env)
+        p = subprocess.run(["hermes", "-p", name, "chat", "-Q", "--max-turns", "30",
+                            *limit, "-q", message],
+                           capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", stdin=subprocess.DEVNULL, timeout=wait, env=env)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": f"{name} did not answer within {wait}s. "
                                                  + forge.deadline_hint(root)})

@@ -358,7 +358,7 @@ def open_handoffs(root: Path, now: datetime | None = None) -> dict:
 
 
 def main():
-    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text()
+    raw = sys.stdin.read() if len(sys.argv) < 2 or sys.argv[1] == "-" else Path(sys.argv[1]).read_text(encoding="utf-8")
     result = handoff(json.loads(raw))
     print(json.dumps(result, indent=2))  # ASCII-safe: tools.py reads this through a text pipe on any locale
     sys.exit(0 if result.get("ok") else 1)

@@ -18,9 +18,9 @@ class CompanionInstall(unittest.TestCase):
     def _bot(self, root, name="marlow", title="Marlow", meta=True):
         d = root / "profiles" / name
         d.mkdir(parents=True, exist_ok=True)
-        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m", "provider": "p"}}))
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m", "provider": "p"}}), encoding="utf-8")
         if meta:
-            (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}))
+            (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}), encoding="utf-8")
         return d
 
     def test_it_installs_the_hook_and_switches_it_on(self):
@@ -39,7 +39,7 @@ class CompanionInstall(unittest.TestCase):
     def test_the_companion_grants_no_tools(self):
         """A Bot must not gain create_agent/delete_agent just to be able to react."""
         import companion
-        manifest = yaml.safe_load((companion.SOURCE / "plugin.yaml").read_text())
+        manifest = yaml.safe_load((companion.SOURCE / "plugin.yaml").read_text(encoding="utf-8"))
         self.assertEqual(manifest.get("manifest_version", 1), 1)
         self.assertFalse(manifest.get("provides_tools"))
         self.assertEqual(sorted(manifest["provides_hooks"]), ["post_llm_call", "pre_llm_call"])
@@ -53,7 +53,7 @@ class CompanionInstall(unittest.TestCase):
             again = companion.install_marks(d)
             self.assertTrue(again["ok"])
             self.assertFalse(again["copied"])
-            enabled = yaml.safe_load((d / "config.yaml").read_text())["plugins"]["enabled"]
+            enabled = yaml.safe_load((d / "config.yaml").read_text(encoding="utf-8"))["plugins"]["enabled"]
             self.assertEqual(enabled.count(companion.MARKS_NAME), 1)
 
     def test_an_older_copy_is_replaced(self):
@@ -63,8 +63,8 @@ class CompanionInstall(unittest.TestCase):
             d = self._bot(root)
             companion.install_marks(d)
             manifest = companion.installed_dir(d) / "plugin.yaml"
-            manifest.write_text(manifest.read_text().replace(
-                f"version: {companion.marks_version()}", "version: 0.0.1"))
+            manifest.write_text(manifest.read_text(encoding="utf-8").replace(
+                f"version: {companion.marks_version()}", "version: 0.0.1"), encoding="utf-8")
             self.assertEqual(companion.installed_version(d), "0.0.1")
             self.assertFalse(companion.marks_ready(d))
             out = companion.install_marks(d)
@@ -78,9 +78,9 @@ class CompanionInstall(unittest.TestCase):
             root = make_root(Path(t))
             d = self._bot(root)
             (d / "config.yaml").write_text(yaml.safe_dump(
-                {"model": {"default": "m"}, "plugins": {"enabled": ["hermes-rss", "githermes"]}}))
+                {"model": {"default": "m"}, "plugins": {"enabled": ["hermes-rss", "githermes"]}}), encoding="utf-8")
             companion.install_marks(d)
-            enabled = yaml.safe_load((d / "config.yaml").read_text())["plugins"]["enabled"]
+            enabled = yaml.safe_load((d / "config.yaml").read_text(encoding="utf-8"))["plugins"]["enabled"]
             self.assertIn("hermes-rss", enabled)
             self.assertIn("githermes", enabled)
             self.assertIn(companion.MARKS_NAME, enabled)
@@ -197,9 +197,9 @@ class CompanionInstall(unittest.TestCase):
             root = make_root(Path(t))
             d = self._bot(root, "nova", "Nova")
             companion.install_marks(d)
-            cfg = yaml.safe_load((d / "config.yaml").read_text())
+            cfg = yaml.safe_load((d / "config.yaml").read_text(encoding="utf-8"))
             cfg["plugins"]["enabled"] = []
-            (d / "config.yaml").write_text(yaml.safe_dump(cfg))
+            (d / "config.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
             self.assertEqual(companion.bots_without_marks(root)[0]["reason"], "not enabled")
 
 
@@ -212,23 +212,23 @@ class InheritedPlugins(unittest.TestCase):
         (root / "config.yaml").write_text(yaml.safe_dump({
             "model": {"default": "root-model", "provider": "p"},
             "plugins": {"enabled": ["style", "bot-forge", "bot-forge-marks", "bundled-thing"],
-                        "disabled": ["orchestrator"]}}))
+                        "disabled": ["orchestrator"]}}), encoding="utf-8")
         for name, manifest in (("style", "style"), ("orchestrator", "orchestrator"),
                                ("forge-checkout", "bot-forge"), ("bot-forge-marks", "bot-forge-marks")):
             d = root / "plugins" / name
             d.mkdir(parents=True)
-            (d / "plugin.yaml").write_text(f"name: {manifest}\nversion: 1.2.3\n")
-            (d / "__init__.py").write_text("# code\n")
+            (d / "plugin.yaml").write_text(f"name: {manifest}\nversion: 1.2.3\n", encoding="utf-8")
+            (d / "__init__.py").write_text("# code\n", encoding="utf-8")
         style = root / "plugins" / "style"
-        (style / ".env").write_text("STYLE_API_KEY=sk-live-do-not-copy\n")
-        (style / "service.pem").write_text("-----BEGIN PRIVATE KEY-----\n")
-        (style / "credentials.json").write_text("{}")
+        (style / ".env").write_text("STYLE_API_KEY=sk-live-do-not-copy\n", encoding="utf-8")
+        (style / "service.pem").write_text("-----BEGIN PRIVATE KEY-----\n", encoding="utf-8")
+        (style / "credentials.json").write_text("{}", encoding="utf-8")
         (style / ".git").mkdir()
-        (style / ".git" / "HEAD").write_text("ref: refs/heads/main\n")
+        (style / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
         (style / "__pycache__").mkdir()
         (style / "__pycache__" / "x.pyc").write_bytes(b"\x00")
         (style / "skills" / "tone").mkdir(parents=True)
-        (style / "skills" / "tone" / "SKILL.md").write_text("# tone\n")
+        (style / "skills" / "tone" / "SKILL.md").write_text("# tone\n", encoding="utf-8")
         return root
 
     def _bot(self, root, name="marlow", enabled=None):
@@ -237,8 +237,8 @@ class InheritedPlugins(unittest.TestCase):
         cfg = {"model": {"default": "m", "provider": "p"}}
         if enabled is not None:
             cfg["plugins"] = {"enabled": enabled, "disabled": ["style"]}
-        (d / "config.yaml").write_text(yaml.safe_dump(cfg))
-        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": name.title()}}}))
+        (d / "config.yaml").write_text(yaml.safe_dump(cfg), encoding="utf-8")
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": name.title()}}}), encoding="utf-8")
         return d
 
     def test_true_means_every_enabled_root_plugin_but_never_bot_forge(self):
@@ -287,7 +287,7 @@ class InheritedPlugins(unittest.TestCase):
             self.assertTrue((target / "skills" / "tone" / "SKILL.md").exists())
             for gone in (".env", "service.pem", "credentials.json", ".git", "__pycache__"):
                 self.assertFalse((target / gone).exists(), gone)
-            plugins = yaml.safe_load((d / "config.yaml").read_text())["plugins"]
+            plugins = yaml.safe_load((d / "config.yaml").read_text(encoding="utf-8"))["plugins"]
             self.assertEqual(plugins["enabled"], ["bot-forge", "style"])
             self.assertNotIn("style", plugins["disabled"])  # a cloned disabled entry would keep it off
 
@@ -297,10 +297,10 @@ class InheritedPlugins(unittest.TestCase):
             root = self._root(t)
             d = self._bot(root)
             companion.inherit_plugins(root, d, ["style"])
-            (d / "plugins" / "style" / "stale.py").write_text("old\n")
+            (d / "plugins" / "style" / "stale.py").write_text("old\n", encoding="utf-8")
             companion.inherit_plugins(root, d, ["style"])
             self.assertFalse((d / "plugins" / "style" / "stale.py").exists())
-            self.assertEqual(yaml.safe_load((d / "config.yaml").read_text())["plugins"]["enabled"].count("style"), 1)
+            self.assertEqual(yaml.safe_load((d / "config.yaml").read_text(encoding="utf-8"))["plugins"]["enabled"].count("style"), 1)
 
     def test_the_companion_is_installed_once_at_its_own_version(self):
         import companion
@@ -312,7 +312,7 @@ class InheritedPlugins(unittest.TestCase):
             self.assertTrue(out["ok"])
             self.assertEqual(companion.installed_version(d), companion.marks_version())  # not the root's 1.2.3
             self.assertTrue(companion.marks_ready(d))
-            self.assertEqual(yaml.safe_load((d / "config.yaml").read_text())["plugins"]["enabled"].count(
+            self.assertEqual(yaml.safe_load((d / "config.yaml").read_text(encoding="utf-8"))["plugins"]["enabled"].count(
                 companion.MARKS_NAME), 1)
 
     def test_inert_plugins_never_name_a_bundled_or_unknown_one(self):
@@ -334,7 +334,7 @@ class InheritedPlugins(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             root = self._root(t)
             d = self._bot(root, enabled=["style"])
-            (d / "SOUL.md").write_text("# Marlow\n\nYou are **Marlow**.\n\n## Ask first\n- x\n")
+            (d / "SOUL.md").write_text("# Marlow\n\nYou are **Marlow**.\n\n## Ask first\n- x\n", encoding="utf-8")
             with mock.patch.object(health, "_gateways", return_value={}):
                 out = health.check({"hermes_root": str(root)})
             bot = out["report"][0]
@@ -351,7 +351,7 @@ class InheritedPlugins(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             root = self._root(t)
             d = self._bot(root)
-            (d / "SOUL.md").write_text("# Marlow\n\nYou are **Marlow**.\n")
+            (d / "SOUL.md").write_text("# Marlow\n\nYou are **Marlow**.\n", encoding="utf-8")
             out = manage.manage({"op": "update", "hermes_root": str(root), "name": "marlow",
                                  "inherit_plugins": ["style", "nope"]})
             self.assertTrue(out["ok"], out)
@@ -367,7 +367,8 @@ class InheritedPlugins(unittest.TestCase):
             if args[:2] == ("profile", "create"):
                 d = root / "profiles" / args[2]
                 d.mkdir(parents=True)
-                (d / "config.yaml").write_text((root / "config.yaml").read_text())  # a clone carries the list
+                (d / "config.yaml").write_text((root / "config.yaml").read_text(encoding="utf-8"),
+                    encoding="utf-8")  # a clone carries the list
             if args[:2] == ("profile", "delete"):
                 import shutil
                 shutil.rmtree(root / "profiles" / args[3], ignore_errors=True)
@@ -411,7 +412,7 @@ class InheritedPlugins(unittest.TestCase):
             self.assertTrue((pdir / "plugins" / "style" / "plugin.yaml").exists())
             self.assertFalse((pdir / "plugins" / "style" / ".env").exists())
             self.assertFalse((pdir / "plugins" / "forge-checkout").exists())
-            enabled = yaml.safe_load((pdir / "config.yaml").read_text())["plugins"]["enabled"]
+            enabled = yaml.safe_load((pdir / "config.yaml").read_text(encoding="utf-8"))["plugins"]["enabled"]
             self.assertEqual(enabled.count("style"), 1)
             self.assertEqual(enabled.count("bot-forge-marks"), 1)
         with tempfile.TemporaryDirectory() as t:  # the call's own argument wins over the setting
@@ -450,12 +451,12 @@ class BlanketInheritanceStopsAtCredentials(unittest.TestCase):
         root = Path(tmp)
         (root / "profiles").mkdir()
         (root / "config.yaml").write_text(yaml.safe_dump(
-            {"plugins": {"enabled": [n for n, _ in plugins]}}))
+            {"plugins": {"enabled": [n for n, _ in plugins]}}), encoding="utf-8")
         for name, env in plugins:
             d = root / "plugins" / name
             d.mkdir(parents=True)
             (d / "plugin.yaml").write_text(yaml.safe_dump(
-                {"name": name, "version": "1.0", "requires_env": env}))
+                {"name": name, "version": "1.0", "requires_env": env}), encoding="utf-8")
         return root
 
     def test_all_skips_a_plugin_that_needs_credentials(self):
@@ -488,7 +489,7 @@ class BlanketInheritanceStopsAtCredentials(unittest.TestCase):
         import companion
         with tempfile.TemporaryDirectory() as tmp:
             root = self._root(tmp, [("broken", [])])
-            (root / "plugins" / "broken" / "plugin.yaml").write_text("{{ not yaml")
+            (root / "plugins" / "broken" / "plugin.yaml").write_text("{{ not yaml", encoding="utf-8")
             self.assertEqual(companion.needs_credentials(root / "plugins" / "broken"), [])
 
 

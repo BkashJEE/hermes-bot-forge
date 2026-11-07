@@ -41,7 +41,7 @@ genuinely would, never as a status signal.)
 
 def acks_enabled(pdir: Path) -> bool:
     soul = pdir / "SOUL.md"
-    return soul.exists() and ACK_MARKER in soul.read_text(errors="ignore")
+    return soul.exists() and ACK_MARKER in soul.read_text(errors="ignore", encoding="utf-8")
 
 
 def _strip_legacy(soul: str) -> str:
@@ -79,7 +79,7 @@ def apply_policy(soul: str) -> str:
 def enable_acks(pdir: Path) -> dict:
     """Turn acknowledgements on for an existing Bot without replacing its persona."""
     soul = pdir / "SOUL.md"
-    text = soul.read_text(errors="ignore") if soul.exists() else ""
+    text = soul.read_text(errors="ignore", encoding="utf-8") if soul.exists() else ""
     if ACK_MARKER in text:
         return {"enabled": True, "changed": False, "backup": None}
     upgraded = any(m in text for m in LEGACY_MARKERS)
@@ -89,5 +89,5 @@ def enable_acks(pdir: Path) -> dict:
         import manage
 
     backup = manage._backup(pdir, "SOUL.md")
-    soul.write_text(apply_policy(text))
+    soul.write_text(apply_policy(text), encoding="utf-8")
     return {"enabled": True, "changed": True, "upgraded": upgraded, "backup": backup or None}

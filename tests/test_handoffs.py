@@ -20,9 +20,9 @@ import health  # noqa: E402
 def _bot(root, name, title, journaling=True):
     d = root / "profiles" / name
     d.mkdir(parents=True, exist_ok=True)
-    (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}))
-    (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}))
-    (d / "SOUL.md").write_text(f"# {title} — Bot\n\nYou are **{title}**.\n")
+    (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}), encoding="utf-8")
+    (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}), encoding="utf-8")
+    (d / "SOUL.md").write_text(f"# {title} — Bot\n\nYou are **{title}**.\n", encoding="utf-8")
     if journaling:
         journal.enable_journal(d)
     return d
@@ -65,7 +65,7 @@ class Handoff(unittest.TestCase):
             self.assertIn("indie devs", message)
             self.assertIn(f"handoff:{out['id']}", message)
             # the record lives with the Bot that owns the work
-            record = json.loads((nova / "handoffs" / f"{out['id']}.json").read_text())
+            record = json.loads((nova / "handoffs" / f"{out['id']}.json").read_text(encoding="utf-8"))
             self.assertEqual(record["status"], "completed")
             self.assertEqual(record["from"], "marshal")
             self.assertIn("Drafted three posts", record["reply"])
@@ -172,7 +172,7 @@ class Handoff(unittest.TestCase):
                 out = handoff.handoff(self._spec(root))
             self.assertFalse(out["ok"])
             self.assertIn("did not answer", out["error"])
-            record = json.loads((nova / "handoffs" / f"{out['id']}.json").read_text())
+            record = json.loads((nova / "handoffs" / f"{out['id']}.json").read_text(encoding="utf-8"))
             self.assertEqual(record["status"], "failed")
             # a failed handoff is still in flight: the user should see it went nowhere
             self.assertEqual(handoff.open_handoffs(root)["count"], 1)

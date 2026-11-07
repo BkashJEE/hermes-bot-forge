@@ -41,13 +41,13 @@ class Portable(unittest.TestCase):
             root = make_root(Path(t))
             d = root / "profiles" / "quill"
             (d / "memories").mkdir(parents=True)
-            (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web"]}}))
-            (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**.")
-            (d / "memories" / "MEMORY.md").write_text("My name is Quill.\n§\nDrafts go out Fridays.")
-            (d / "memories" / "USER.md").write_text("User lives in Pune.")
-            (d / "state.db").write_text("chat history")
+            (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web"]}}), encoding="utf-8")
+            (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**.", encoding="utf-8")
+            (d / "memories" / "MEMORY.md").write_text("My name is Quill.\n§\nDrafts go out Fridays.", encoding="utf-8")
+            (d / "memories" / "USER.md").write_text("User lives in Pune.", encoding="utf-8")
+            (d / "state.db").write_text("chat history", encoding="utf-8")
             (d / "journal").mkdir()
-            (d / "journal" / "2026-09-20.md").write_text("secret work journal entry")
+            (d / "journal" / "2026-09-20.md").write_text("secret work journal entry", encoding="utf-8")
             tpl = portable.build_template(d, root)
             blob = str(tpl)
             self.assertNotIn("Pune", blob)
@@ -66,19 +66,19 @@ class WorkspaceSurvey(unittest.TestCase):
         (ws / "x-content" / ".git").mkdir(parents=True)
         (ws / "x-content" / "README.md").write_text(
             "<p align=\"center\"><img src=\"b.png\"></p>\n\n# X Content Studio\n\n"
-            "Drafts, threads and the posting calendar for x.com.\n")
+            "Drafts, threads and the posting calendar for x.com.\n", encoding="utf-8")
         (ws / "billing-api").mkdir(parents=True)
-        (ws / "billing-api" / "README.md").write_text("# Billing API\n\nStripe invoices and refunds.\n")
+        (ws / "billing-api" / "README.md").write_text("# Billing API\n\nStripe invoices and refunds.\n", encoding="utf-8")
         (ws / "billing-api" / "node_modules" / "junk").mkdir(parents=True)
-        (ws / "billing-api" / "node_modules" / "junk" / "README.md").write_text("# threads x.com social\n")
+        (ws / "billing-api" / "node_modules" / "junk" / "README.md").write_text("# threads x.com social\n", encoding="utf-8")
         return ws
 
     def _bot(self, root, name, title, one_job):
         d = root / "profiles" / name
         d.mkdir(parents=True, exist_ok=True)
-        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}))
-        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}))
-        (d / "SOUL.md").write_text(f"# {title}\n\n## Your one job\n{one_job}\n")
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}), encoding="utf-8")
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}), encoding="utf-8")
+        (d / "SOUL.md").write_text(f"# {title}\n\n## Your one job\n{one_job}\n", encoding="utf-8")
         return d
 
     def test_it_finds_the_place_that_matches_the_job(self):
@@ -146,17 +146,17 @@ class WorkspaceSurvey(unittest.TestCase):
             root, ws = make_root(tmp), self._workspace(tmp)
             d = root / "profiles" / "quill"
             (d / "memories").mkdir(parents=True)
-            (d / "memories" / "MEMORY.md").write_text("My name is Quill.\n")
+            (d / "memories" / "MEMORY.md").write_text("My name is Quill.\n", encoding="utf-8")
             found = survey.survey(root, {"role": "social media manager",
                                          "one_job": "write x.com posts and threads"},
                                   {"workspace_roots": [str(ws)]})
             self.assertTrue(survey.attach(d, found))
-            once = (d / "memories" / "MEMORY.md").read_text()
+            once = (d / "memories" / "MEMORY.md").read_text(encoding="utf-8")
             self.assertIn("My name is Quill.", once)
             self.assertIn(survey.WORKSPACE_MARKER, once)
             self.assertIn("x-content", once)
             self.assertFalse(survey.attach(d, found))
-            self.assertEqual((d / "memories" / "MEMORY.md").read_text(), once)
+            self.assertEqual((d / "memories" / "MEMORY.md").read_text(encoding="utf-8"), once)
 
     def test_a_path_that_looks_like_a_credential_never_reaches_memory(self):
         import survey

@@ -18,9 +18,9 @@ class Health(unittest.TestCase):
     def _bot(self, root, name, title, soul):
         d = root / "profiles" / name
         (d / "cron").mkdir(parents=True)
-        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}))
-        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}))
-        (d / "SOUL.md").write_text(soul)
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}), encoding="utf-8")
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}), encoding="utf-8")
+        (d / "SOUL.md").write_text(soul, encoding="utf-8")
         return d
 
     def test_single_bot_filter_returns_only_that_bot(self):
@@ -40,7 +40,7 @@ class Health(unittest.TestCase):
             root = make_root(Path(t))
             d = self._bot(root, "alpha", "Alpha", "# Alpha\n\nYou are **Alpha**.\n\n## Ask first\n- x")
             (d / "cron" / "jobs.json").write_text(_json.dumps({"jobs": [
-                {"id": "j1", "name": "poll", "schedule": {"kind": "interval", "minutes": 10}, "enabled": True}]}))
+                {"id": "j1", "name": "poll", "schedule": {"kind": "interval", "minutes": 10}, "enabled": True}]}), encoding="utf-8")
             bot = health.check_bot(d, {}, 0)
             self.assertEqual(bot["routines"][0]["runs_per_day"], 144.0)
             self.assertTrue(any("144" in f for f in bot["flags"]))
@@ -94,9 +94,9 @@ class HealthSandbox(unittest.TestCase):
         import yaml as y
         d = root / "profiles" / "alpha"
         (d / "cron").mkdir(parents=True)
-        (d / "config.yaml").write_text(y.safe_dump(cfg))
-        (d / "profile.yaml").write_text(y.safe_dump({"ui_meta": {"hermes-bots": {"title": "Alpha"}}}))
-        (d / "SOUL.md").write_text("# Alpha\n\nYou are **Alpha**.\n\n## Ask first\n- x")
+        (d / "config.yaml").write_text(y.safe_dump(cfg), encoding="utf-8")
+        (d / "profile.yaml").write_text(y.safe_dump({"ui_meta": {"hermes-bots": {"title": "Alpha"}}}), encoding="utf-8")
+        (d / "SOUL.md").write_text("# Alpha\n\nYou are **Alpha**.\n\n## Ask first\n- x", encoding="utf-8")
         return d
 
     def test_shell_bot_without_a_sandbox_is_flagged(self):
@@ -133,7 +133,7 @@ class Doctor(unittest.TestCase):
         cfg = {"model": {"default": "m", "provider": "custom"}}
         if enabled:
             cfg["plugins"] = {"enabled": ["bot-forge"]}
-        (root / "config.yaml").write_text(y.safe_dump(cfg))
+        (root / "config.yaml").write_text(y.safe_dump(cfg), encoding="utf-8")
         return root
 
     def test_not_enabled_anywhere_fails_with_the_enable_command(self):
@@ -288,7 +288,7 @@ class CredentialReach(unittest.TestCase):
         pdir = root / "profiles" / "quill"
         if mode is not None:
             cred = pdir / "auth.json"
-            cred.write_text('{"synthetic":"test-only"}')
+            cred.write_text('{"synthetic":"test-only"}', encoding="utf-8")
             cred.chmod(mode)
         return root, pdir
 
@@ -338,7 +338,7 @@ class GatewayStartTime(unittest.TestCase):
         import yaml as y
         root = make_root(Path(tempfile.mkdtemp()))
         (root / "config.yaml").write_text(y.safe_dump(
-            {"model": {"default": "m", "provider": "custom"}, "plugins": {"enabled": ["bot-forge"]}}))
+            {"model": {"default": "m", "provider": "custom"}, "plugins": {"enabled": ["bot-forge"]}}), encoding="utf-8")
         return root
 
     def _gateway_check(self, started):
@@ -455,7 +455,7 @@ class WeStopBeforeCoreGivesUp(unittest.TestCase):
         cfg = {"model": {"default": "m", "provider": "custom"}}
         if timeouts is not None:
             cfg["timeouts"] = timeouts
-        (root / "config.yaml").write_text(y.safe_dump(cfg))
+        (root / "config.yaml").write_text(y.safe_dump(cfg), encoding="utf-8")
         return root
 
     def test_the_default_deadline_is_cores(self):

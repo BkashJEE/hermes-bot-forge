@@ -17,9 +17,9 @@ class Journal(unittest.TestCase):
     def _bot(self, root, name="quill"):
         d = root / "profiles" / name
         d.mkdir(exist_ok=True)
-        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}))
-        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}))
-        (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**, a writer.\n")
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}), encoding="utf-8")
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}), encoding="utf-8")
+        (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**, a writer.\n", encoding="utf-8")
         return d
 
     def test_enable_is_idempotent_and_preserves_persona(self):
@@ -31,7 +31,7 @@ class Journal(unittest.TestCase):
             self.assertTrue(first["ok"], first)
             self.assertTrue(first["changed"])
             self.assertFalse(second["changed"])
-            soul = (pdir / "SOUL.md").read_text()
+            soul = (pdir / "SOUL.md").read_text(encoding="utf-8")
             self.assertEqual(soul.count(journal.JOURNAL_MARKER), 1)
             self.assertIn("You are **Quill**", soul)
             self.assertTrue((pdir / "journal" / "README.md").exists())
@@ -90,10 +90,10 @@ class JournalPrivacy(unittest.TestCase):
         import journal
         d = root / "profiles" / "quill"
         (d / "memories").mkdir(parents=True)
-        (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web"]}}))
-        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}))
-        (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**.\n")
-        (d / "memories" / "MEMORY.md").write_text("Drafts go out Fridays.")
+        (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web"]}}), encoding="utf-8")
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}), encoding="utf-8")
+        (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**.\n", encoding="utf-8")
+        (d / "memories" / "MEMORY.md").write_text("Drafts go out Fridays.", encoding="utf-8")
         journal.enable_journal(d)
         journal.add_entry(d, {"title": "Wrote the Q3 launch thread", "status": "completed",
                               "summary": "Drafted eight posts about the internal pricing change.",
@@ -144,13 +144,13 @@ class WaitingQueueTests(unittest.TestCase):
         import journal
         d = root / "profiles" / name
         d.mkdir(parents=True, exist_ok=True)
-        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m", "provider": "p"}}))
-        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}))
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m", "provider": "p"}}), encoding="utf-8")
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}), encoding="utf-8")
         journal.ensure_journal(d)
         for day, stamp, status, title_, body in entries:
             f = d / "journal" / f"{day}.md"
-            f.write_text((f.read_text() if f.exists() else "")
-                         + f"\n## {stamp} · {status} · {title_}\n{body}\n")
+            f.write_text((f.read_text(encoding="utf-8") if f.exists() else "")
+                         + f"\n## {stamp} · {status} · {title_}\n{body}\n", encoding="utf-8")
         return d
 
     def test_blocked_bots_surface_with_bot_name_age_and_detail(self):
@@ -230,14 +230,14 @@ class OutboundMail(unittest.TestCase):
         root = make_root(Path(tmp))
         lines = {"EMAIL_SMTP_HOST": "smtp.example.com", "EMAIL_ADDRESS": "me@example.com",
                  "EMAIL_PASSWORD": "hunter2", **env}
-        (root / ".env").write_text("\n".join(f"{k}={v}" for k, v in lines.items() if v) + "\n")
+        (root / ".env").write_text("\n".join(f"{k}={v}" for k, v in lines.items() if v) + "\n", encoding="utf-8")
         return root
 
     def _bot(self, root, name="marlow", title="Marlow"):
         d = root / "profiles" / name
         d.mkdir(parents=True, exist_ok=True)
-        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}))
-        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}))
+        (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}), encoding="utf-8")
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title}}}), encoding="utf-8")
         return d
 
     class Outbox:
@@ -431,10 +431,10 @@ class ScheduledDigest(unittest.TestCase):
             root = make_root(Path(tmp))
             d = root / "profiles" / "nova"
             (d / "journal").mkdir(parents=True)
-            (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}))
-            (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Nova"}}}))
+            (d / "config.yaml").write_text(yaml.safe_dump({"model": {"default": "m"}}), encoding="utf-8")
+            (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Nova"}}}), encoding="utf-8")
             (d / "journal" / "2026-09-20.md").write_text(
-                "\n## 2026-09-20T09:00:00Z \u00b7 blocked \u00b7 Draft could not publish\nneeds approval\n")
+                "\n## 2026-09-20T09:00:00Z \u00b7 blocked \u00b7 Draft could not publish\nneeds approval\n", encoding="utf-8")
             text = notify.digest_text(root)
             self.assertIn("Nova: Draft could not publish", text)
             self.assertIn("Answer any of them in Hermes.", text)
@@ -449,8 +449,8 @@ class ScheduledDigest(unittest.TestCase):
             self.assertEqual(notify.scripts_dir(root, ""), root / "scripts")
             path = notify.install_launcher(root, Path("/plug"), "ceo")
             self.assertEqual(path.parent, root / "profiles" / "ceo" / "scripts")
-            self.assertIn("/plug/notify.py", path.read_text())
-            self.assertIn("--stdout", path.read_text())
+            self.assertIn("/plug/notify.py", path.read_text(encoding="utf-8"))
+            self.assertIn("--stdout", path.read_text(encoding="utf-8"))
 
     def test_the_active_profile_is_read_from_the_diamond(self):
         import notify

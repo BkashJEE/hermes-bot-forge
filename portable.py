@@ -50,7 +50,7 @@ def _memory_entries(pdir: Path) -> list:
     mem = pdir / "memories" / "MEMORY.md"
     if not mem.exists():
         return []
-    return [e.strip() for e in mem.read_text(errors="ignore").split("§") if e.strip()]
+    return [e.strip() for e in mem.read_text(errors="ignore", encoding="utf-8").split("§") if e.strip()]
 
 
 def build_template(pdir: Path, root: Path) -> dict:
@@ -63,10 +63,10 @@ def build_template(pdir: Path, root: Path) -> dict:
     taught_dir = pdir / "skills" / "taught"
     if taught_dir.is_dir():
         for skill_md in sorted(taught_dir.glob("*/SKILL.md")):
-            taught[skill_md.parent.name] = skill_md.read_text(errors="ignore")
+            taught[skill_md.parent.name] = skill_md.read_text(errors="ignore", encoding="utf-8")
     routines = []
     try:
-        data = json.loads((pdir / "cron" / "jobs.json").read_text())
+        data = json.loads((pdir / "cron" / "jobs.json").read_text(encoding="utf-8"))
         for job in (data.get("jobs", []) if isinstance(data, dict) else data):
             sched = job.get("schedule")
             if isinstance(sched, dict):
@@ -81,7 +81,7 @@ def build_template(pdir: Path, root: Path) -> dict:
     return {
         "format": FORMAT, "version": VERSION,
         "display_name": title,
-        "role": forge.soul_role((pdir / "SOUL.md").read_text(errors="ignore")) if (pdir / "SOUL.md").exists() else title,
+        "role": forge.soul_role((pdir / "SOUL.md").read_text(errors="ignore", encoding="utf-8")) if (pdir / "SOUL.md").exists() else title,
         "description": meta.get("description") or bots.get("description") or "",
         "one_job": meta.get("description") or "",
         # Strip the inlined shared policy from an exported template. A template carries no
@@ -90,7 +90,9 @@ def build_template(pdir: Path, root: Path) -> dict:
         # copy current. That silently overrides the importing user's own policy choice with
         # rules the original owner wrote. The importer re-injects from the local canonical
         # file, so dropping it here loses nothing.
-        "soul_md": policy.strip_block((pdir / "SOUL.md").read_text(errors="ignore")).lstrip() if (pdir / "SOUL.md").exists() else "",
+        "soul_md": policy.strip_block(
+            (pdir / "SOUL.md").read_text(encoding="utf-8", errors="ignore")
+        ).lstrip() if (pdir / "SOUL.md").exists() else "",
         # the Bot's own starter facts; drop the auto-written identity line, the importer writes a fresh one
         "memory": [e for e in _memory_entries(pdir) if not e.startswith("My name is ")],
         "toolsets": [t for t in ((cfg.get("platform_toolsets") or {}).get("cli") or []) if t in forge.ALL_TOOLSETS],
@@ -104,7 +106,7 @@ def build_template(pdir: Path, root: Path) -> dict:
 def load_template(path: Path) -> dict:
     if path.stat().st_size > MAX_TEMPLATE_BYTES:
         raise ValueError(f"template is larger than {MAX_TEMPLATE_BYTES // 1000} KB")
-    data = json.loads(path.read_text())
+    data = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, dict) or data.get("format") != FORMAT:
         raise ValueError("not a bot-forge template (missing format: bot-forge/template)")
     if int(data.get("version", 0)) > VERSION:

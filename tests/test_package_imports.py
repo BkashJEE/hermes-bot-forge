@@ -32,7 +32,7 @@ else:
             env = {"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(ROOT.parent),
                    "HOME": os.environ.get("HOME", ""), "SYSTEMROOT": os.environ.get("SYSTEMROOT", "")}
             proc = subprocess.run([sys.executable, "-B", "-c", code], cwd=tmp, env=env,
-                                  capture_output=True, text=True, timeout=30)
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         self.assertEqual(proc.returncode, 0, proc.stderr)
 
     def test_internal_imports_outside_repository(self):
@@ -57,5 +57,5 @@ else:
             env = {"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(ROOT.parent),
                    "HOME": os.environ.get("HOME", ""), "SYSTEMROOT": os.environ.get("SYSTEMROOT", "")}
             proc = subprocess.run([sys.executable, "-B", "-c", code], cwd=tmp, env=env,
-                                  capture_output=True, text=True, timeout=30)
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         self.assertEqual(proc.returncode, 0, proc.stderr)

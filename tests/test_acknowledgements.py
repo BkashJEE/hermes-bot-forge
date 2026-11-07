@@ -48,11 +48,11 @@ class Acknowledgements(unittest.TestCase):
             d.mkdir(parents=True)
             (d / "SOUL.md").write_text("# Quill\n\nYou are **Quill**.\n\n" +
                                        journal.JOURNAL_POLICY.replace(journal.JOURNAL_MARKER + "\n", "") +
-                                       f"\n{acks.ACK_MARKER}\n## Say where\n- x\n")
+                                       f"\n{acks.ACK_MARKER}\n## Say where\n- x\n", encoding="utf-8")
             self.assertFalse(journal.journaling_enabled(d))
             out = journal.enable_journal(d)
             self.assertTrue(out["changed"])
-            soul = (d / "SOUL.md").read_text()
+            soul = (d / "SOUL.md").read_text(encoding="utf-8")
             self.assertEqual(soul.count("## Work journal"), 1)
             self.assertEqual(soul.count(journal.JOURNAL_MARKER), 1)
             self.assertIn("You are **Quill**", soul)
@@ -82,12 +82,12 @@ class Acknowledgements(unittest.TestCase):
             root = make_root(Path(t))
             d = root / "profiles" / "quill"
             d.mkdir(parents=True)
-            (d / "SOUL.md").write_text("# Quill\n\nYou are **Quill**.\n")
+            (d / "SOUL.md").write_text("# Quill\n\nYou are **Quill**.\n", encoding="utf-8")
             journal.enable_journal(d)
             (d / "SOUL.md").write_text(
-                (d / "SOUL.md").read_text().replace(acks.ACK_MARKER, acks.LEGACY_MARKERS[0])
-                if acks.ACK_MARKER in (d / "SOUL.md").read_text() else
-                (d / "SOUL.md").read_text() + f"\n{acks.LEGACY_MARKERS[0]}\n## Acknowledge\n- x\n")
+                (d / "SOUL.md").read_text(encoding="utf-8").replace(acks.ACK_MARKER, acks.LEGACY_MARKERS[0])
+                if acks.ACK_MARKER in (d / "SOUL.md").read_text(encoding="utf-8") else
+                (d / "SOUL.md").read_text(encoding="utf-8") + f"\n{acks.LEGACY_MARKERS[0]}\n## Acknowledge\n- x\n", encoding="utf-8")
             self.assertTrue(journal.journaling_enabled(d))
             acks.enable_acks(d)
             self.assertTrue(journal.journaling_enabled(d), "upgrading acks disabled journaling")
@@ -98,7 +98,8 @@ class Acknowledgements(unittest.TestCase):
             root = make_root(Path(t))
             d = root / "profiles" / "quill"
             d.mkdir(parents=True)
-            (d / "SOUL.md").write_text(f"# Quill\n\nYou are **Quill**.\n\n{acks.LEGACY_MARKERS[0]}\n## Acknowledge\n- x\n")
+            (d / "SOUL.md").write_text(f"# Quill\n\nYou are **Quill**.\n\n{acks.LEGACY_MARKERS[0]}\n## Acknowledge\n- x\n",
+                encoding="utf-8")
             out = acks.enable_acks(d)
             self.assertTrue(out["changed"])
             self.assertTrue(out["upgraded"])
@@ -119,14 +120,14 @@ class Acknowledgements(unittest.TestCase):
             root = make_root(Path(t))
             d = root / "profiles" / "quill"
             d.mkdir(parents=True)
-            (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**.\n")
+            (d / "SOUL.md").write_text("# Quill — Writer\n\nYou are **Quill**.\n", encoding="utf-8")
             first = acks.enable_acks(d)
             self.assertTrue(first["changed"])
             self.assertTrue(Path(first["backup"]).exists())
             self.assertTrue(acks.acks_enabled(d))
             second = acks.enable_acks(d)
             self.assertFalse(second["changed"])
-            self.assertEqual((d / "SOUL.md").read_text().count(acks.ACK_MARKER), 1)
+            self.assertEqual((d / "SOUL.md").read_text(encoding="utf-8").count(acks.ACK_MARKER), 1)
 
     def test_new_bots_acknowledge_unless_asked_not_to(self):
         import acks
@@ -149,10 +150,10 @@ class AckVisibility(unittest.TestCase):
         import acks
         d = root / "profiles" / name
         (d / "cron").mkdir(parents=True)
-        (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web"]}}))
-        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": name.title()}}}))
+        (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web"]}}), encoding="utf-8")
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": name.title()}}}), encoding="utf-8")
         soul = f"# {name.title()}\n\nYou are **{name.title()}**.\n\n## Ask first\n- x"
-        (d / "SOUL.md").write_text(acks.apply_policy(soul) if acking else soul)
+        (d / "SOUL.md").write_text(acks.apply_policy(soul) if acking else soul, encoding="utf-8")
         return d
 
     def test_health_lists_bots_that_do_not_acknowledge(self):
@@ -173,7 +174,7 @@ class AckVisibility(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             root = make_root(Path(t))
             (root / "config.yaml").write_text(yaml.safe_dump(
-                {"model": {"default": "m", "provider": "custom"}, "plugins": {"enabled": ["bot-forge"]}}))
+                {"model": {"default": "m", "provider": "custom"}, "plugins": {"enabled": ["bot-forge"]}}), encoding="utf-8")
             self._bot(root, "newbie", acking=True)
             self._bot(root, "oldtimer", acking=False)
             with mock.patch.object(doctor, "_gateway_pids", return_value={}), \
@@ -194,7 +195,7 @@ class BotChatSource(unittest.TestCase):
         root = make_root(Path(t), profiles=["quill"])
         if bot_mode:
             (root / "profiles" / "quill" / "profile.yaml").write_text(
-                yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}))
+                yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}), encoding="utf-8")
         return root
 
     def test_bot_mode_install_is_detected_from_the_marker(self):
@@ -340,13 +341,13 @@ class TapbackHooks(unittest.TestCase):
             self.assertFalse(plugin.companion_running(forge_dir), "no companion installed")
 
             marks_dir.mkdir(parents=True)
-            (marks_dir / "plugin.yaml").write_text("name: bot-forge-marks\n")
+            (marks_dir / "plugin.yaml").write_text("name: bot-forge-marks\n", encoding="utf-8")
             (profile / "config.yaml").write_text(yaml.safe_dump(
-                {"plugins": {"enabled": ["bot-forge", "bot-forge-marks"]}}))
+                {"plugins": {"enabled": ["bot-forge", "bot-forge-marks"]}}), encoding="utf-8")
             self.assertTrue(plugin.companion_running(forge_dir), "installed and enabled")
 
             (profile / "config.yaml").write_text(yaml.safe_dump(
-                {"plugins": {"enabled": ["bot-forge"]}}))
+                {"plugins": {"enabled": ["bot-forge"]}}), encoding="utf-8")
             self.assertFalse(plugin.companion_running(forge_dir),
                              "installed but switched off — this plugin must cover the reaction")
 

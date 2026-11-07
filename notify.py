@@ -52,7 +52,7 @@ def _env(root: Path, key: str) -> str:
     if value:
         return value.strip()
     try:
-        text = (Path(root) / ".env").read_text(errors="ignore")
+        text = (Path(root) / ".env").read_text(errors="ignore", encoding="utf-8")
     except OSError:
         return ""
     m = re.search(rf"^\s*(?:export\s+)?{re.escape(key)}\s*=\s*(.+?)\s*$", text, re.M)
@@ -90,7 +90,7 @@ def _state_file(root: Path) -> Path:
 
 def _load_state(root: Path) -> dict:
     try:
-        return json.loads(_state_file(root).read_text(errors="ignore"))
+        return json.loads(_state_file(root).read_text(errors="ignore", encoding="utf-8"))
     except (OSError, ValueError):
         return {}
 
@@ -106,7 +106,7 @@ def _record(root: Path, bot: str, now: float) -> None:
     f = _state_file(root)
     try:
         f.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
-        f.write_text(json.dumps(state))
+        f.write_text(json.dumps(state), encoding="utf-8")
         os.chmod(f, 0o600)
     except OSError:
         pass
@@ -324,7 +324,7 @@ def install_launcher(root: Path, plugin_dir: Path | None = None, profile: str = 
     folder = scripts_dir(root, profile)
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / SCRIPT_NAME
-    path.write_text(LAUNCHER.format(plugin=str(plugin)))
+    path.write_text(LAUNCHER.format(plugin=str(plugin)), encoding="utf-8")
     try:
         os.chmod(path, 0o700)
     except OSError:
@@ -377,7 +377,7 @@ def main() -> None:
     elif arg == "-":
         spec = json.loads(sys.stdin.read() or "{}")
     else:
-        spec = json.loads(Path(arg).read_text())
+        spec = json.loads(Path(arg).read_text(encoding="utf-8"))
     result = operate(spec)
     print(json.dumps(result, indent=2))
     raise SystemExit(0 if result.get("ok") else 1)

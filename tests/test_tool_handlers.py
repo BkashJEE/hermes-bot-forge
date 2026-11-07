@@ -59,12 +59,12 @@ class ProfileInfo(unittest.TestCase):
     def _profile(self, tmp, name="quill", config="model:\n  default: m\n", meta=None, jobs=None):
         home = Path(tmp) / name
         home.mkdir(parents=True)
-        (home / "config.yaml").write_text(config)
+        (home / "config.yaml").write_text(config, encoding="utf-8")
         if meta is not None:
-            (home / "profile.yaml").write_text(meta)
+            (home / "profile.yaml").write_text(meta, encoding="utf-8")
         if jobs is not None:
             (home / "cron").mkdir()
-            (home / "cron" / "jobs.json").write_text(jobs)
+            (home / "cron" / "jobs.json").write_text(jobs, encoding="utf-8")
         return home
 
     def test_a_config_that_will_not_parse_still_yields_a_usable_entry(self):
@@ -128,7 +128,7 @@ class ListAgents(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp) / ".hermes"
             root.mkdir()
-            (root / "config.yaml").write_text("{}")
+            (root / "config.yaml").write_text("{}", encoding="utf-8")
             with mock.patch.object(tools, "hermes_root", return_value=root):
                 agents = json.loads(tools.list_agents({}))["agents"]
             self.assertEqual([a["name"] for a in agents], ["default"])

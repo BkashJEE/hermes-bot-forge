@@ -76,10 +76,10 @@ class Manage(unittest.TestCase):
     def _bot(self, root, name="quill", title="Quill"):
         d = root / "profiles" / name
         (d / "memories").mkdir(parents=True, exist_ok=True)
-        (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web", "file"]}}))
+        (d / "config.yaml").write_text(yaml.safe_dump({"platform_toolsets": {"cli": ["web", "file"]}}), encoding="utf-8")
         (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": title,
-                                                                                    "shape": "blobatar:abc:sun"}}}))
-        (d / "SOUL.md").write_text(f"# {title} — Writer\n\nYou are **{title}**, a writer.\n")
+                                                                                    "shape": "blobatar:abc:sun"}}}), encoding="utf-8")
+        (d / "SOUL.md").write_text(f"# {title} — Writer\n\nYou are **{title}**, a writer.\n", encoding="utf-8")
         return d
 
     def test_unknown_op_is_reported(self):
@@ -101,7 +101,7 @@ class Manage(unittest.TestCase):
                                  "soul_append": "## Voice\nterse."})
             self.assertTrue(out["ok"], out)
             self.assertIn("soul", out["changed"])
-            self.assertIn("terse.", (pdir / "SOUL.md").read_text())
+            self.assertIn("terse.", (pdir / "SOUL.md").read_text(encoding="utf-8"))
             self.assertTrue(out["backups"]["SOUL.md"])
 
     def test_update_toolsets_keeps_base_and_adds(self):
@@ -111,7 +111,7 @@ class Manage(unittest.TestCase):
             out = manage.manage({"op": "update", "hermes_root": str(root), "name": "quill",
                                  "add_toolsets": ["image_gen"], "remove_toolsets": ["web"]})
             self.assertTrue(out["ok"], out)
-            tools_now = yaml.safe_load((pdir / "config.yaml").read_text())["platform_toolsets"]["cli"]
+            tools_now = yaml.safe_load((pdir / "config.yaml").read_text(encoding="utf-8"))["platform_toolsets"]["cli"]
             self.assertIn("image_gen", tools_now)
             self.assertIn("web", tools_now)  # base toolsets can't be removed
 
@@ -126,11 +126,11 @@ class Manage(unittest.TestCase):
             root = make_root(Path(t))
             pdir = self._bot(root)
             manage.manage({"op": "hide", "hermes_root": str(root), "name": "quill"})
-            meta = yaml.safe_load((pdir / "profile.yaml").read_text())
+            meta = yaml.safe_load((pdir / "profile.yaml").read_text(encoding="utf-8"))
             self.assertTrue(meta["ui_meta"]["hermes-bots"]["hidden"])
             self.assertEqual(meta["_ui_meta_revisions"]["hermes-bots"], 1)
             manage.manage({"op": "show", "hermes_root": str(root), "name": "quill"})
-            self.assertFalse(yaml.safe_load((pdir / "profile.yaml").read_text())["ui_meta"]["hermes-bots"]["hidden"])
+            self.assertFalse(yaml.safe_load((pdir / "profile.yaml").read_text(encoding="utf-8"))["ui_meta"]["hermes-bots"]["hidden"])
 
     def test_delete_is_off_by_default_and_needs_exact_confirm(self):
         with tempfile.TemporaryDirectory() as t:
@@ -180,7 +180,7 @@ class Manage(unittest.TestCase):
         with tempfile.TemporaryDirectory() as t:
             root = make_root(Path(t))
             d = self._bot(root)
-            (d / "SOUL.md").write_text(f"# Quill — Writer\n\nYou are **Quill**. Use {fake} for the API.\n")
+            (d / "SOUL.md").write_text(f"# Quill — Writer\n\nYou are **Quill**. Use {fake} for the API.\n", encoding="utf-8")
             spec = {"op": "export", "hermes_root": str(root), "name": "quill", "allow_secrets": True}
             out = manage.manage(spec)
             self.assertFalse(out["ok"])
@@ -198,7 +198,7 @@ class Manage(unittest.TestCase):
                     self.assertNotIn("allow_secrets", call.args[1])
             # importing a BLOCK template: the model argument is ignored, the setting is honoured
             tpl = Path(t) / "leaky.botforge.json"
-            tpl.write_text(f'{{"format": "bot-forge/template", "version": 1, "role": "writer", "soul_md": "use {fake}"}}')
+            tpl.write_text(f'{{"format": "bot-forge/template", "version": 1, "role": "writer", "soul_md": "use {fake}"}}', encoding="utf-8")
             out = manage.manage({"op": "import", "hermes_root": str(root), "path": str(tpl), "allow_secrets": True,
                                  "display_name": "Writer"})
             self.assertIn("credential", out["error"])
@@ -215,7 +215,7 @@ class Manage(unittest.TestCase):
                 out = manage.manage({**base, "path": bad})
                 self.assertFalse(out["ok"], bad)
                 self.assertIn("profile-exports", out["error"])
-            self.assertIn("root-model", (root / "config.yaml").read_text())
+            self.assertIn("root-model", (root / "config.yaml").read_text(encoding="utf-8"))
             out = manage.manage({**base, "path": "quill-copy.json"})
             self.assertTrue(out["ok"])
             self.assertEqual(Path(out["path"]).parent, (root / "profile-exports").resolve())
@@ -240,9 +240,9 @@ class Teach(unittest.TestCase):
     def _bot(self, root):
         d = root / "profiles" / "quill"
         (d / "memories").mkdir(parents=True, exist_ok=True)
-        (d / "config.yaml").write_text(yaml.safe_dump({"skills": {"disabled": ["weekly-report", "other"]}}))
-        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}))
-        (d / "SOUL.md").write_text("# Quill\n\nYou are **Quill**, a writer.\n")
+        (d / "config.yaml").write_text(yaml.safe_dump({"skills": {"disabled": ["weekly-report", "other"]}}), encoding="utf-8")
+        (d / "profile.yaml").write_text(yaml.safe_dump({"ui_meta": {"hermes-bots": {"title": "Quill"}}}), encoding="utf-8")
+        (d / "SOUL.md").write_text("# Quill\n\nYou are **Quill**, a writer.\n", encoding="utf-8")
         return d
 
     def test_teach_writes_skill_and_enables_it(self):
@@ -253,10 +253,10 @@ class Teach(unittest.TestCase):
                                  "skill": "weekly-report", "description": "How we write the weekly report.",
                                  "steps": ["Collect the week's commits", "Draft three bullets"]})
             self.assertTrue(out["ok"], out)
-            doc = (pdir / "skills" / "taught" / "weekly-report" / "SKILL.md").read_text()
+            doc = (pdir / "skills" / "taught" / "weekly-report" / "SKILL.md").read_text(encoding="utf-8")
             self.assertIn("name: weekly-report", doc)
             self.assertIn("1. Collect the week's commits", doc)
-            self.assertNotIn("weekly-report", yaml.safe_load((pdir / "config.yaml").read_text())["skills"]["disabled"])
+            self.assertNotIn("weekly-report", yaml.safe_load((pdir / "config.yaml").read_text(encoding="utf-8"))["skills"]["disabled"])
 
     def test_teach_needs_steps_or_body(self):
         with tempfile.TemporaryDirectory() as t:
@@ -289,7 +289,7 @@ class Team(unittest.TestCase):
             (root / "profiles" / "ceo" / "memories").mkdir(parents=True)
             team._tell_lead(root, "ceo", "Content", [{"name": "quill", "display_name": "Quill",
                                                       "description": "writes posts"}])
-            mem = (root / "profiles" / "ceo" / "memories" / "MEMORY.md").read_text()
+            mem = (root / "profiles" / "ceo" / "memories" / "MEMORY.md").read_text(encoding="utf-8")
             self.assertIn("@quill", mem)
             self.assertIn("Content team", mem)
 

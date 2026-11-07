@@ -65,13 +65,20 @@ debugged and running across every Bot on this machine.
 
 ### Policy lives in the Bot's own config
 
+Under the key Hermes reads — `plugins.entries.bot-forge-sentinel.settings`, the same key
+`companion.install_sentinel` writes. A top-level `bot-forge-sentinel:` key is **not** read by
+`ctx.get_config`; writing there was the defect in #86, where every rule silently did nothing.
+
 ```yaml
-bot_forge:
-  sentinel:
-    ask:    [send_email, post_message, browser_submit]   # -> action: approve
-    refuse: [delete_profile, transfer_funds]             # -> action: block
-    allow:  [read_file, web_search]                      # explicit, for a locked-down Bot
-    mode: ask            # ask | refuse  — what happens to a tool in none of the lists
+plugins:
+  enabled: [bot-forge-sentinel]
+  entries:
+    bot-forge-sentinel:
+      settings:
+        ask:    [send_email, post_message, browser_submit]   # -> action: approve
+        refuse: [delete_profile, transfer_funds]             # -> action: block
+        allow:  [read_file, web_search]                      # explicit, for a locked-down Bot
+        mode: ask          # ask | allow — what happens to a tool in none of the lists
 ```
 
 `approvals` on `create_agent` keeps its current wording and additionally **compiles** to this.

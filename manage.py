@@ -382,6 +382,41 @@ def op_export(s: dict, root: Path, settings: dict) -> dict:
                     + (" (review the WARN findings first)" if scan["verdict"] == "WARN" else "")}
 
 
+def strip_outside_routes(spec: dict) -> tuple[dict, list]:
+    """Drop the fields in a shared Bot that could point this machine at someone else's endpoint.
+
+    A template fetched from a URL is a stranger's text. Two of its fields are routes rather than
+    description: `model` carries a `base_url`, so a crafted import would send every one of the new
+    Bot's turns to an endpoint the sharer chose, and a routine's `deliver` names where its output
+    goes. Neither is something an import should set silently.
+
+    The model block is dropped, so the new Bot inherits the launching profile's model the way one
+    made from scratch does. A `deliver` that is not this Bot's own chat is dropped and falls back to
+    `bot-chat:<bot>`. Returns the cleaned spec and what was removed, so the caller can say so
+    rather than quietly rewriting what the sharer wrote.
+
+    A local file is left alone: that is how `share_agent --mode backup` is restored, and there
+    keeping the model is the point.
+    """
+    spec = dict(spec)
+    dropped = []
+    if spec.pop("model", None) is not None:
+        dropped.append("model (a shared template cannot choose this Bot's provider or base_url)")
+    routines = spec.get("routines")
+    if isinstance(routines, list):
+        cleaned = []
+        for r in routines:
+            if isinstance(r, dict) and r.get("deliver") is not None:
+                target = str(r.get("deliver"))
+                if not target.startswith("bot-chat:"):
+                    name = str(r.get("name") or "routine")
+                    r = {k: v for k, v in r.items() if k != "deliver"}
+                    dropped.append(f"deliver {target!r} on routine {name!r}")
+            cleaned.append(r)
+        spec["routines"] = cleaned
+    return spec, dropped
+
+
 def op_import(s: dict, root: Path, settings: dict) -> dict:
     """Import a Bot: a .botforge.json template (built fresh, like create_agent) or a .tar.gz backup (restored)."""
     if __package__:
@@ -398,11 +433,19 @@ def op_import(s: dict, root: Path, settings: dict) -> dict:
             return {"ok": False, "scan": shared["scan"], "source": shared["source"],
                     "error": "that shared Bot contains what looks like a credential — refusing to "
                              "import it. Ask whoever shared it to remove it and republish."}
-        spec = {**shared["spec"], "display_name": s.get("display_name") or shared["spec"].get("display_name"),
+        safe, dropped = strip_outside_routes(shared["spec"])
+        spec = {**safe, "display_name": s.get("display_name") or shared["spec"].get("display_name"),
                 "hermes_root": str(root), "settings": settings,
                 "launch_profile": s.get("launch_profile") or "default"}
         result = forge.forge(spec)
-        return {**result, "source": shared["source"], "scan": shared["scan"]} if result.get("ok") else result
+        if not result.get("ok"):
+            return result
+        out = {**result, "source": shared["source"], "scan": shared["scan"]}
+        if dropped:
+            out["dropped_from_share"] = dropped
+            out["note"] = ("Say what was dropped: a shared Bot does not get to choose where this "
+                           "machine sends inference or routine output. " + (result.get("note") or ""))
+        return out
 
     path = Path(where).expanduser()
     if not path.is_file():

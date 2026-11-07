@@ -140,7 +140,8 @@ def create_team(args: dict, settings: dict | None = None, **kwargs) -> str:
 def check_install(args: dict, settings: dict | None = None, **kwargs) -> str:
     try:
         p = subprocess.run([sys.executable, str(PLUGIN_DIR / "doctor.py"), "--json", "--settings-stdin"],
-                           input=json.dumps(settings or {}), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=300)
+                           input=json.dumps(settings or {}), capture_output=True, text=True, 
+                               encoding="utf-8", errors="replace", timeout=300)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": "check_install timed out"})
     out = p.stdout.strip()
@@ -388,7 +389,8 @@ def ask_agent(args: dict, **kwargs) -> str:
         limit = forge.reading_only_args(args.get("reading_only"))
         wait = forge.within_deadline(900, root)
         p = subprocess.run(["hermes", "-p", name, "chat", "-Q", "--max-turns", "30", *limit, "-q", message],
-                           capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL, timeout=wait, env=env)
+                           capture_output=True, text=True, 
+                               encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL, timeout=wait, env=env)
     except subprocess.TimeoutExpired:
         return json.dumps({"ok": False, "error": f"{name} did not answer within {wait}s. "
                                                  + forge.deadline_hint(root)})

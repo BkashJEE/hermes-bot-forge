@@ -93,7 +93,8 @@ class BotMeta(unittest.TestCase):
     def test_write_bot_meta_matches_desktop_shape_and_bumps_revision(self):
         with tempfile.TemporaryDirectory() as t:
             pdir = Path(t)
-            (pdir / "profile.yaml").write_text(yaml.safe_dump({"description": "x", "_ui_meta_revisions": {"hermes-bots": 2}}), encoding="utf-8")
+            (pdir / "profile.yaml").write_text(yaml.safe_dump({"description": "x", "_ui_meta_revisions": {"hermes-bots": 2}}),
+                encoding="utf-8")
             forge.write_bot_meta(pdir, "Quill", "Writes posts", "sun")
             data = yaml.safe_load((pdir / "profile.yaml").read_text(encoding="utf-8"))
             bots = data["ui_meta"]["hermes-bots"]

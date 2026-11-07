@@ -367,7 +367,8 @@ class InheritedPlugins(unittest.TestCase):
             if args[:2] == ("profile", "create"):
                 d = root / "profiles" / args[2]
                 d.mkdir(parents=True)
-                (d / "config.yaml").write_text((root / "config.yaml").read_text(encoding="utf-8"), encoding="utf-8")  # a clone carries the list
+                (d / "config.yaml").write_text((root / "config.yaml").read_text(encoding="utf-8"),
+                    encoding="utf-8")  # a clone carries the list
             if args[:2] == ("profile", "delete"):
                 import shutil
                 shutil.rmtree(root / "profiles" / args[3], ignore_errors=True)

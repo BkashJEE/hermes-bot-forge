@@ -34,8 +34,8 @@ MUTATIONS = [
      "    if False:"),
 
     ("F4", TOOLS, "check_policies reads without errors=replace",
-     "            text = soul.read_text(errors=\"replace\")",
-     "            text = soul.read_text()"),
+     "            text = soul.read_text(errors=\"replace\", encoding=\"utf-8\")",
+     "            text = soul.read_text(encoding=\"utf-8\")"),
 
     ("F5", TOOLS, "current counted by subtraction again",
      "        \"current\": sum(1 for b in bots if b.get(\"current\")),",

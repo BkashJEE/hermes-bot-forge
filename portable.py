@@ -90,7 +90,8 @@ def build_template(pdir: Path, root: Path) -> dict:
         # copy current. That silently overrides the importing user's own policy choice with
         # rules the original owner wrote. The importer re-injects from the local canonical
         # file, so dropping it here loses nothing.
-        "soul_md": policy.strip_block((pdir / "SOUL.md").read_text(errors="ignore", encoding="utf-8")).lstrip() if (pdir / "SOUL.md").exists() else "",
+        "soul_md": policy.strip_block((pdir / "SOUL.md").read_text(errors="ignore",
+            encoding="utf-8")).lstrip() if (pdir / "SOUL.md").exists() else "",
         # the Bot's own starter facts; drop the auto-written identity line, the importer writes a fresh one
         "memory": [e for e in _memory_entries(pdir) if not e.startswith("My name is ")],
         "toolsets": [t for t in ((cfg.get("platform_toolsets") or {}).get("cli") or []) if t in forge.ALL_TOOLSETS],

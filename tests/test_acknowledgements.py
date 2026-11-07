@@ -98,7 +98,8 @@ class Acknowledgements(unittest.TestCase):
             root = make_root(Path(t))
             d = root / "profiles" / "quill"
             d.mkdir(parents=True)
-            (d / "SOUL.md").write_text(f"# Quill\n\nYou are **Quill**.\n\n{acks.LEGACY_MARKERS[0]}\n## Acknowledge\n- x\n", encoding="utf-8")
+            (d / "SOUL.md").write_text(f"# Quill\n\nYou are **Quill**.\n\n{acks.LEGACY_MARKERS[0]}\n## Acknowledge\n- x\n",
+                encoding="utf-8")
             out = acks.enable_acks(d)
             self.assertTrue(out["changed"])
             self.assertTrue(out["upgraded"])

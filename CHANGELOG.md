@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.25.0] - 2026-11-08
 
 ### Changed
 - **A delegated job cannot be pointed at Hermes' own files.** `delegate_outside` now refuses a `directory` that is, is inside, or contains `HERMES_HOME` or your home directory. A job runs with real file access, so one loose in `HERMES_HOME` could edit profiles, policies and auth files, and one in the home directory contains that and everything else. A job in a parent is refused for the same reason: it can reach what it contains.

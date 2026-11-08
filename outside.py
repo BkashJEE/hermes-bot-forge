@@ -105,6 +105,42 @@ def git(root, *argv, timeout: int = 300):
                           env=forge.safe_env(forge.default_root()))
 
 
+def _protected_roots(root: Path) -> list:
+    """Places a job must never be pointed at: Hermes' own home, and the user's."""
+    out = []
+    for candidate in (root, Path.home()):
+        try:
+            out.append(Path(candidate).expanduser().resolve())
+        except Exception:
+            pass
+    return out
+
+
+def refuse_directory(where: Path, root: Path) -> str:
+    """Why this directory is off limits, or "" when it is fine.
+
+    An agent let loose in HERMES_HOME could edit profiles, policies and auth files; one let loose
+    in the home directory contains that and everything else. Both are refused whether the job
+    points *at* them or at a parent that *contains* them — a job in the home directory is a job
+    that can reach ~/.hermes.
+    """
+    try:
+        target = Path(where).expanduser().resolve()
+    except Exception:
+        return ""
+    for guarded in _protected_roots(root):
+        if target == guarded:
+            return (f"{target} is {'Hermes' if guarded != Path.home().resolve() else 'your'} own "
+                    f"home directory. Point the job at the project it is meant to work on.")
+        if guarded in target.parents:
+            return (f"{target} is inside {guarded}. A job runs with real file access, so it does "
+                    f"not get to work inside Hermes' own files or your home directory.")
+        if target in guarded.parents:
+            return (f"{target} contains {guarded}, so a job there could reach Hermes' own profiles, "
+                    f"policies and credentials. Point it at the project it is meant to work on.")
+    return ""
+
+
 def new_job_id() -> str:
     return "".join(random.choices(string.ascii_lowercase + string.digits, k=8))
 
@@ -186,6 +222,9 @@ def delegate(spec: dict, runner=None) -> dict:
                                       "this Bot happens to be"}
     if not where.is_dir() or where.is_symlink():
         return {"ok": False, "error": f"no such directory to work in: {where}"}
+    guarded = refuse_directory(where, root)
+    if guarded:
+        return {"ok": False, "error": guarded}
 
     # Words leaving Hermes entirely, so the same rule as a handoff: never a credential.
     scan = portable.scan_text(f"{task}\n{context}")

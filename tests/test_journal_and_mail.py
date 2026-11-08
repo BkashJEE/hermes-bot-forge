@@ -3,6 +3,7 @@
 Split out of tests/test_forge.py, which had grown past 2,300 lines; the shared helpers
 and the sys.path setup Hermes-style imports need live in tests/support.py.
 """
+import os
 import json
 import tempfile
 import unittest
@@ -491,3 +492,37 @@ class ScheduledDigest(unittest.TestCase):
                                   runner=lambda a: subprocess.CompletedProcess(a, 1, "", "no such profile"))
         self.assertFalse(out["ok"])
         self.assertIn("no such profile", out["error"])
+
+
+class EmailSettingsComeFromHermesResolver(unittest.TestCase):
+    """`agent.secret_scope.get_secret` is the only reader that honours the active profile scope.
+
+    Reading `os.environ` ourselves meant that on a multiplexing install a miss could fall through
+    to another profile's value. Recommended by Nous in catalog review.
+    """
+
+    def test_the_scope_wins_when_hermes_is_present(self):
+        import notify
+        with mock.patch.object(notify, "_scoped", return_value="scoped@example.com"):
+            with mock.patch.dict(os.environ, {"EMAIL_ADDRESS": "env@example.com"}, clear=False):
+                self.assertEqual(notify._env(Path("/tmp"), "EMAIL_ADDRESS"), "scoped@example.com")
+
+    def test_an_empty_scope_value_is_not_overridden_by_the_environment(self):
+        """Configured-and-blank must not silently fall back to another source."""
+        import notify
+        with mock.patch.object(notify, "_scoped", return_value=""):
+            with mock.patch.dict(os.environ, {"EMAIL_ADDRESS": "env@example.com"}, clear=False):
+                self.assertEqual(notify._env(Path("/tmp"), "EMAIL_ADDRESS"), "")
+
+    def test_outside_hermes_it_still_falls_back(self):
+        """A plain `python notify.py` or a cron shell-out has no scope to ask."""
+        import notify
+        with mock.patch.object(notify, "_scoped", return_value=None):
+            with mock.patch.dict(os.environ, {"EMAIL_ADDRESS": "env@example.com"}, clear=False):
+                self.assertEqual(notify._env(Path("/tmp"), "EMAIL_ADDRESS"), "env@example.com")
+
+    def test_a_raising_scope_reads_as_not_configured(self):
+        """get_secret fails closed under active multiplexing; a notification path must not crash."""
+        import notify
+        with mock.patch.dict("sys.modules", {}, clear=False):
+            self.assertIn(notify._scoped("EMAIL_ADDRESS"), (None, ""))

@@ -3,8 +3,6 @@
 Split out of tests/test_forge.py, which had grown past 2,300 lines; the shared helpers
 and the sys.path setup Hermes-style imports need live in tests/support.py.
 """
-import os
-import tempfile
 import unittest
 from pathlib import Path
 

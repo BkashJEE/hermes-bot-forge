@@ -236,15 +236,14 @@ A new Bot is a clone of your main profile's config, and that config lists the pl
 
 A copied plugin is enabled in the Bot's config and gets its own `plugin-data`. Bot Forge itself is never copied into a Bot (a Bot must not be able to create or delete Bots), the reaction companion is installed on its own path, and no `.env`, key or credential file travels with a plugin — a plugin that needs a secret needs you to set it in that Bot, once.
 
-### Optional: share one login across Bots
+### Sharing one login across Bots
 
-The plugin itself never touches credentials. If you want OAuth models to work in new Bots with no per-Bot sign-in, there is an **unsupported** helper you run yourself:
+Bot Forge never touches credentials, and there is no helper here that copies them.
 
-```bash
-python extras/share_login.py <bot-name>
-```
-
-It copies the root profile's `auth.json` into an independent file with permissions `0600`. It never copies or links `auth.lock`, and removes a destination lock symlink left by the older helper. Existing destination credential links are replaced without writing through them; linked profile directories are refused. Each selected Bot receives every provider login in the copied file. OAuth refresh tokens can still compete at the provider, so signing each Bot in independently is recommended. POSIX only. Remove the copied `<profile>/auth.json` to discard that Bot's copy.
+An earlier version shipped `extras/share_login.py`, which copied the root profile's `auth.json`
+into each Bot. It is gone: duplicating a credential file leaves copies nobody tracks, OAuth
+refresh tokens compete at the provider, and a plugin that advertises a credential-copying script
+is asking to be trusted with something it should not hold. Sign each Bot in on its own.
 
 ---
 

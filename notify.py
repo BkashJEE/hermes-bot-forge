@@ -42,12 +42,34 @@ ENV_KEYS = ("EMAIL_ADDRESS", "EMAIL_PASSWORD", "EMAIL_SMTP_HOST", "EMAIL_SMTP_PO
             "EMAIL_HOME_ADDRESS")
 
 
-def _env(root: Path, key: str) -> str:
-    """Hermes' own email settings: the live environment first, then its `.env` on disk.
+def _scoped(key: str):
+    """Hermes' own resolver for a credential, or None when Hermes is not importable.
 
-    A plugin running inside the gateway inherits the environment; one shelled out from a tool or a
-    cron job may not, and the answer is sitting in the same file Hermes reads.
+    `agent.secret_scope.get_secret` is the only reader that honours the active profile scope: on a
+    multiplexing install a miss returns the default rather than falling through to another
+    profile's `os.environ` value, which is exactly what reading the environment ourselves risked.
+    It raises when multiplexing is active and no scope is installed — fail closed — and that
+    reads here as "not configured" rather than an exception out of a notification path.
     """
+    try:
+        from agent.secret_scope import get_secret_str
+    except Exception:
+        return None
+    try:
+        return (get_secret_str(key, "") or "").strip()
+    except Exception:
+        return ""
+
+
+def _env(root: Path, key: str) -> str:
+    """Hermes' own email settings, through Hermes' own resolver where there is one.
+
+    Outside Hermes — a plain `python notify.py`, or a cron shell-out that did not inherit the
+    environment — fall back to the environment and the `.env` Hermes reads.
+    """
+    scoped = _scoped(key)
+    if scoped is not None:
+        return scoped
     value = os.environ.get(key)
     if value:
         return value.strip()

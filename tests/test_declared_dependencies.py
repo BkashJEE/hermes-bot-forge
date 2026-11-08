@@ -26,7 +26,11 @@ ROOT = Path(__file__).resolve().parents[1]
 # `hermes_cli` / `hermes_constants` / `gateway` ship with Hermes, and `tools` is Hermes' own
 # package (the plugin's top-level `tools.py` is reached package-relative as
 # `bot_forge.tools`, so a bare `tools` import is always the host's).
-HOST_PROVIDED = {"hermes_cli", "hermes_constants", "tools", "gateway"}
+# Hermes' own packages. These must never reach python_dependencies: Hermes would try to
+# install them from PyPI, and names like `agent` and `tools` are taken there by unrelated
+# projects — declaring one would have Hermes install a stranger's code into the environment
+# the plugin runs in.
+HOST_PROVIDED = {"hermes_cli", "hermes_constants", "tools", "gateway", "agent"}
 
 # Import name -> distribution name, for the imports where the two differ.
 IMPORT_TO_DISTRIBUTION = {"yaml": "pyyaml"}

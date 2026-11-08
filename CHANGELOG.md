@@ -3,6 +3,15 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- **A delegated job cannot be pointed at Hermes' own files.** `delegate_outside` now refuses a `directory` that is, is inside, or contains `HERMES_HOME` or your home directory. A job runs with real file access, so one loose in `HERMES_HOME` could edit profiles, policies and auth files, and one in the home directory contains that and everything else. A job in a parent is refused for the same reason: it can reach what it contains.
+- **Email settings are read through Hermes' own resolver.** `notify.py` asked `os.environ` and then parsed `.env` itself. On a multiplexing install a miss could fall through to another profile's value. It now uses `agent.secret_scope.get_secret_str`, which honours the active profile scope, and falls back to the environment only when Hermes is not importable — a plain `python notify.py` or a cron shell-out. A raising scope (multiplexing active with none installed, which fails closed) reads as *not configured* rather than an exception out of a notification path.
+
+### Removed
+- **`extras/share_login.py`.** It copied the root profile's `auth.json` into each Bot. Duplicating a credential file leaves copies nobody tracks, OAuth refresh tokens compete at the provider, and a plugin that ships a credential-copying helper is asking to be trusted with something it should not hold. Sign each Bot in on its own. Its tests went with it rather than being left to assert a missing file.
+
 ## [0.24.0] - 2026-11-07
 
 ### Fixed

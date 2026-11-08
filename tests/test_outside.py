@@ -353,3 +353,45 @@ class GitRunsWithoutTheUsersEnvironmentOrTheRepositorysHooks(unittest.TestCase):
         """A raw subprocess.run(['git', ...]) would reintroduce both problems silently."""
         source = Path(outside.__file__).read_text(encoding="utf-8")
         self.assertNotIn('subprocess.run(["git"', source)
+
+
+class SomeDirectoriesAreOffLimits(unittest.TestCase):
+    """A job runs with real file access, so it does not get to work inside Hermes' own files.
+
+    An agent loose in HERMES_HOME could edit profiles, policies and auth files; one loose in the
+    home directory contains that and everything else. Recommended by Nous in catalog review.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name) / "hermes"
+        (self.root / "profiles").mkdir(parents=True)
+
+    def test_hermes_home_itself_is_refused(self):
+        self.assertIn("home directory", outside.refuse_directory(self.root, self.root))
+
+    def test_a_directory_inside_hermes_home_is_refused(self):
+        why = outside.refuse_directory(self.root / "profiles", self.root)
+        self.assertIn("inside", why)
+
+    def test_a_parent_that_contains_hermes_home_is_refused(self):
+        """A job in the parent is a job that can reach HERMES_HOME."""
+        why = outside.refuse_directory(self.root.parent, self.root)
+        self.assertIn("contains", why)
+
+    def test_the_users_home_is_refused(self):
+        self.assertTrue(outside.refuse_directory(Path.home(), self.root))
+
+    def test_an_ordinary_project_is_allowed(self):
+        project = Path(self.tmp.name) / "project"
+        project.mkdir()
+        self.assertEqual(outside.refuse_directory(project, self.root), "")
+
+    def test_delegate_refuses_before_spawning_anything(self):
+        spec = {"hermes_root": str(self.root), "from": "marlow", "task": "do it",
+                "directory": str(self.root)}
+        with mock.patch.object(outside, "ready", return_value=(True, "")):
+            out = outside.delegate(spec, runner=lambda: _proc())
+        self.assertFalse(out["ok"])
+        self.assertIn("home directory", out["error"])

@@ -3,7 +3,7 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.26.0] - 2026-11-09
 
 ### Fixed
 - **A delegated job refused every project under your home directory.** v0.25.0 refused a `directory` that was *inside* the home directory, not just one that was it or contained it. `~/projects` is where most people keep their code, and on Windows every path under the user profile — including the temp directory — is inside the home directory, so it refused nearly everything. HERMES_HOME is still refused along with anything inside it; the home directory is refused as a target and so is any parent of it, but a project inside it is ordinary and allowed.

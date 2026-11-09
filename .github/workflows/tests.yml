@@ -28,7 +28,9 @@ jobs:
       - name: Run unit tests
         run: python -m unittest discover -s tests -v
       - name: Check the plugin manifest parses
-        run: python -c "import yaml,sys; m=yaml.safe_load(open('plugin.yaml')); sys.exit(0 if m['name']=='bot-forge' and m['provides_tools'] else 1)"
+        # encoding is explicit: the manifest carries emoji, and on a non-UTF-8 Windows locale
+        # open() picks the locale codec and raises before parsing (#92, #87)
+        run: python -c "import yaml,sys; m=yaml.safe_load(open('plugin.yaml', encoding='utf-8')); sys.exit(0 if m['name']=='bot-forge' and m['provides_tools'] else 1)"
 
   # A passing suite proves nothing if the guard under test is inert. Each of these reverts one
   # load-bearing shared-policy decision (or one fix for a defect found in review) and requires

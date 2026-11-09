@@ -304,6 +304,9 @@ class CredentialReach(unittest.TestCase):
             with mock.patch.object(health, "_gateways", return_value={}):
                 self.assertFalse([f for f in self._flags(root) if "auth.json" in f])
 
+    @unittest.skipIf(os.name == "nt",
+                     "sets 0o600 and expects it back; Windows reports 0o666 whatever chmod is "
+                     "given, which is why health no longer reads those bits there (#87)")
     def test_a_private_login_is_reported_as_reach_not_as_a_fault(self):
         import health
         with tempfile.TemporaryDirectory() as tmp:
@@ -314,6 +317,9 @@ class CredentialReach(unittest.TestCase):
             self.assertIn("worth knowing about", flagged[0])
             self.assertNotIn("chmod", flagged[0])
 
+    @unittest.skipIf(os.name == "nt",
+                     "health no longer reads POSIX bits on Windows, so this branch cannot be "
+                     "reached there — that is the fix, not a gap (#87)")
     def test_a_login_other_users_can_read_says_how_to_fix_it(self):
         import health
         with tempfile.TemporaryDirectory() as tmp:
@@ -385,6 +391,9 @@ class ProcessStartTime(unittest.TestCase):
         for text in ("", "   ", "garbage", "1:2:3:4", "--", "x-01:00"):
             self.assertIsNone(doctor._etime_seconds(text), text)
 
+    @unittest.skipIf(os.name == "nt",
+                     "Windows has neither /proc nor ps, so this fallback cannot run there; "
+                     "_proc_start returns None and the caller reports the check as skipped (#87)")
     def test_a_host_without_proc_falls_back_to_ps(self):
         """macOS and the BSDs have no /proc. `ps -o etime=` is POSIX and locale-independent."""
         import doctor

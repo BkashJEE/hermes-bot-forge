@@ -11,6 +11,7 @@ name or approval checkpoints, plugins enabled in config but not installed in the
 Across Bots: what is waiting on the user, and which handoffs between Bots are still in flight.
 Suggestions only; it never changes anything.
 """
+import os
 import contextlib
 import json
 import re
@@ -160,6 +161,12 @@ def check_bot(pdir: Path, gateways: dict, now: float, bundled: set | None = None
         try:
             mode = credential.stat().st_mode & 0o777
         except OSError:
+            mode = None
+        # Windows does not carry POSIX permission bits: stat() reports 0o666 whatever the file's
+        # real ACL is, so reading them there produced "readable by other users — chmod 600" for
+        # every Bot, with a command that does nothing on that platform. Report the reach, not a
+        # permission verdict we cannot make (#87).
+        if os.name == "nt":
             mode = None
         detail = f" (mode {mode:o})" if mode is not None else ""
         if mode is not None and mode & 0o077:

@@ -105,39 +105,51 @@ def git(root, *argv, timeout: int = 300):
                           env=forge.safe_env(forge.default_root()))
 
 
-def _protected_roots(root: Path) -> list:
-    """Places a job must never be pointed at: Hermes' own home, and the user's."""
-    out = []
-    for candidate in (root, Path.home()):
+def _protected_roots(root: Path) -> tuple:
+    """(HERMES_HOME, home directory), resolved. They carry different rules; see refuse_directory."""
+    def settle(p):
         try:
-            out.append(Path(candidate).expanduser().resolve())
+            return Path(p).expanduser().resolve()
         except Exception:
-            pass
-    return out
+            return Path(p)
+    return settle(root), settle(Path.home())
 
 
 def refuse_directory(where: Path, root: Path) -> str:
     """Why this directory is off limits, or "" when it is fine.
 
-    An agent let loose in HERMES_HOME could edit profiles, policies and auth files; one let loose
-    in the home directory contains that and everything else. Both are refused whether the job
-    points *at* them or at a parent that *contains* them — a job in the home directory is a job
-    that can reach ~/.hermes.
+    Two separate rules, because they are not the same risk:
+
+    * HERMES_HOME is refused, and so is anything *inside* it. Profiles, policies and auth files
+      all live there and none of it is a project.
+    * The home directory is refused *as a target*, and so is any parent that contains it — a job
+      pointed at `/` or `/home` can reach everything. But a project *inside* the home directory
+      is ordinary and allowed: `~/projects/thing` is where most people keep their code, and on
+      Windows every path under the user profile is inside the home directory, including the
+      temp directory. Refusing those refused nearly everything (#87).
     """
     try:
         target = Path(where).expanduser().resolve()
     except Exception:
         return ""
-    for guarded in _protected_roots(root):
-        if target == guarded:
-            return (f"{target} is {'Hermes' if guarded != Path.home().resolve() else 'your'} own "
-                    f"home directory. Point the job at the project it is meant to work on.")
-        if guarded in target.parents:
-            return (f"{target} is inside {guarded}. A job runs with real file access, so it does "
-                    f"not get to work inside Hermes' own files or your home directory.")
-        if target in guarded.parents:
-            return (f"{target} contains {guarded}, so a job there could reach Hermes' own profiles, "
-                    f"policies and credentials. Point it at the project it is meant to work on.")
+    hermes_home, home = _protected_roots(root)
+
+    if target == hermes_home:
+        return (f"{target} is Hermes' own home directory. Point the job at the project it is "
+                f"meant to work on.")
+    if hermes_home in target.parents:
+        return (f"{target} is inside {hermes_home}, which holds Hermes' profiles, policies and "
+                f"credentials. Point the job at the project it is meant to work on.")
+    if target in hermes_home.parents:
+        return (f"{target} contains {hermes_home}, so a job there could reach Hermes' own "
+                f"profiles, policies and credentials. Point it at one project.")
+
+    if target == home:
+        return (f"{target} is your home directory, so a job there could reach {hermes_home} and "
+                f"everything else. Point it at one project.")
+    if target in home.parents:
+        return (f"{target} contains your home directory, so a job there could reach {hermes_home} "
+                f"and everything else. Point it at one project.")
     return ""
 
 

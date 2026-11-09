@@ -119,9 +119,14 @@ class JournalPrivacy(unittest.TestCase):
             written = list((d / "journal").glob("????-??-??.md"))
             self.assertTrue(written)
             for f in written:
+                # containment is the point of this test and holds everywhere
                 self.assertTrue(f.resolve().is_relative_to(d.resolve()))
-                self.assertEqual(f.stat().st_mode & 0o777, 0o600)
-            self.assertEqual((d / "journal").stat().st_mode & 0o777, 0o700)
+                if os.name != "nt":
+                    self.assertEqual(f.stat().st_mode & 0o777, 0o600)
+            if os.name != "nt":
+                # Windows reports 0o666/0o777 whatever chmod is given; the POSIX bits this
+                # asserts do not exist there, and containment above already ran (#87)
+                self.assertEqual((d / "journal").stat().st_mode & 0o777, 0o700)
             self.assertTrue(journal.journaling_enabled(d))
 
     def test_a_symlinked_journal_directory_is_refused(self):
@@ -450,7 +455,10 @@ class ScheduledDigest(unittest.TestCase):
             self.assertEqual(notify.scripts_dir(root, ""), root / "scripts")
             path = notify.install_launcher(root, Path("/plug"), "ceo")
             self.assertEqual(path.parent, root / "profiles" / "ceo" / "scripts")
-            self.assertIn("/plug/notify.py", path.read_text(encoding="utf-8"))
+            # the generated script embeds the path as a Python literal (the template uses !r),
+            # which is what makes it valid on Windows where a bare \p would be an escape. So
+            # compare against the literal, not the raw path.
+            self.assertIn(repr(str(Path("/plug") / "notify.py")), path.read_text(encoding="utf-8"))
             self.assertIn("--stdout", path.read_text(encoding="utf-8"))
 
     def test_the_active_profile_is_read_from_the_diamond(self):

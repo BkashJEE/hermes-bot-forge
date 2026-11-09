@@ -380,8 +380,17 @@ class SomeDirectoriesAreOffLimits(unittest.TestCase):
         why = outside.refuse_directory(self.root.parent, self.root)
         self.assertIn("contains", why)
 
-    def test_the_users_home_is_refused(self):
+    def test_the_users_home_is_refused_as_a_target(self):
         self.assertTrue(outside.refuse_directory(Path.home(), self.root))
+
+    def test_a_project_inside_the_home_directory_is_allowed(self):
+        """Where most people keep their code — and on Windows every path, including the temp
+        directory, is under the user profile. Refusing these refused nearly everything (#87)."""
+        project = Path.home() / "projects" / "whatever"
+        self.assertEqual(outside.refuse_directory(project, self.root), "")
+
+    def test_a_parent_of_the_home_directory_is_refused(self):
+        self.assertTrue(outside.refuse_directory(Path(Path.home().anchor), self.root))
 
     def test_an_ordinary_project_is_allowed(self):
         project = Path(self.tmp.name) / "project"

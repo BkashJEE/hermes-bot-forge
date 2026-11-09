@@ -29,13 +29,14 @@ else:
     raise AssertionError('package import silently used top-level decoy')
 """
         with tempfile.TemporaryDirectory() as tmp:
-            # Mirror forge.SAFE_ENV_KEYS: Path.home() on Windows resolves USERPROFILE, then
-            # HOMEDRIVE + HOMEPATH, and never HOME — the same omission that broke every
-            # ask_agent there (#82). Without them the child cannot start at all.
-            passthrough = ("PATH", "HOME", "SYSTEMROOT", "USERPROFILE", "HOMEDRIVE", "HOMEPATH",
-                           "TEMP", "TMP", "PATHEXT", "LOCALAPPDATA", "APPDATA")
-            env = {k: os.environ[k] for k in passthrough if os.environ.get(k)}
+            # What this proves is that the imports do not need the repository on sys.path, so
+            # the child gets the real environment with PYTHONPATH pointed at the parent
+            # directory. An earlier version built a tiny allowlist instead, which is a POSIX
+            # habit: on Windows it dropped USERPROFILE and LOCALAPPDATA, Path.home() raised,
+            # and the child died before importing anything (#87).
+            env = dict(os.environ)
             env["PYTHONPATH"] = str(ROOT.parent)
+            env.pop("HERMES_HOME", None)
             proc = subprocess.run([sys.executable, "-B", "-c", code], cwd=tmp, env=env,
                                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         self.assertEqual(proc.returncode, 0, proc.stderr)

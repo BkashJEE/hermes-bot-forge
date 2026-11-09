@@ -161,6 +161,9 @@ class Guardrails(unittest.TestCase):
 
 
 class ConfigWrites(unittest.TestCase):
+    @unittest.skipIf(os.name == "nt",
+                     "POSIX permission bits: Windows reports 0o666 whatever chmod is given, so the "
+                     "mode this preserves does not exist there (#87)")
     def test_dump_yaml_keeps_file_mode(self):
         with tempfile.TemporaryDirectory() as t:
             path = Path(t) / "config.yaml"

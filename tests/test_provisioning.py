@@ -84,6 +84,11 @@ class ModelToolBoundary(unittest.TestCase):
             self.assertNotIn("model", spec["members"][1])
 
 
+@unittest.skipIf(os.name == "nt",
+                 "Bot Forge skips gateway setup on Windows by design (forge.py: "
+                 "`if not settings['install_gateway'] or os.name == 'nt': return 'skipped'`), so "
+                 "these assert an outcome that cannot occur there. Skipped rather than loosened, "
+                 "so they keep their teeth on Linux and macOS (#87).")
 class GatewayTopology(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
@@ -385,6 +390,10 @@ class ForgeModelIntegration(unittest.TestCase):
         self.assertIn("sign-in", out["warning"])
         self.assertNotIn("already introduced", out["note"])
 
+    @unittest.skipIf(os.name == "nt",
+                     "asserts a `pending:` gateway outcome; on Windows forge returns 'skipped' "
+                     "before any topology is read (forge.py:208), so there is no topology to "
+                     "be unknown about (#87)")
     def test_unknown_gateway_topology_never_requests_a_per_profile_service(self):
         self.settings["install_gateway"] = True
         with patch.dict(sys.modules, {"gateway": None, "gateway.control_socket": None}):

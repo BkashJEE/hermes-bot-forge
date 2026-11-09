@@ -29,8 +29,13 @@ else:
     raise AssertionError('package import silently used top-level decoy')
 """
         with tempfile.TemporaryDirectory() as tmp:
-            env = {"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(ROOT.parent),
-                   "HOME": os.environ.get("HOME", ""), "SYSTEMROOT": os.environ.get("SYSTEMROOT", "")}
+            # Mirror forge.SAFE_ENV_KEYS: Path.home() on Windows resolves USERPROFILE, then
+            # HOMEDRIVE + HOMEPATH, and never HOME — the same omission that broke every
+            # ask_agent there (#82). Without them the child cannot start at all.
+            passthrough = ("PATH", "HOME", "SYSTEMROOT", "USERPROFILE", "HOMEDRIVE", "HOMEPATH",
+                           "TEMP", "TMP", "PATHEXT")
+            env = {k: os.environ[k] for k in passthrough if os.environ.get(k)}
+            env["PYTHONPATH"] = str(ROOT.parent)
             proc = subprocess.run([sys.executable, "-B", "-c", code], cwd=tmp, env=env,
                                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         self.assertEqual(proc.returncode, 0, proc.stderr)

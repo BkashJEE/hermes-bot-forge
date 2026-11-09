@@ -317,6 +317,9 @@ class CredentialReach(unittest.TestCase):
             self.assertIn("worth knowing about", flagged[0])
             self.assertNotIn("chmod", flagged[0])
 
+    @unittest.skipIf(os.name == "nt",
+                     "health no longer reads POSIX bits on Windows, so this branch cannot be "
+                     "reached there — that is the fix, not a gap (#87)")
     def test_a_login_other_users_can_read_says_how_to_fix_it(self):
         import health
         with tempfile.TemporaryDirectory() as tmp:

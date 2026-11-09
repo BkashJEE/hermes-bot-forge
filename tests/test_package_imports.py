@@ -33,7 +33,7 @@ else:
             # HOMEDRIVE + HOMEPATH, and never HOME — the same omission that broke every
             # ask_agent there (#82). Without them the child cannot start at all.
             passthrough = ("PATH", "HOME", "SYSTEMROOT", "USERPROFILE", "HOMEDRIVE", "HOMEPATH",
-                           "TEMP", "TMP", "PATHEXT")
+                           "TEMP", "TMP", "PATHEXT", "LOCALAPPDATA", "APPDATA")
             env = {k: os.environ[k] for k in passthrough if os.environ.get(k)}
             env["PYTHONPATH"] = str(ROOT.parent)
             proc = subprocess.run([sys.executable, "-B", "-c", code], cwd=tmp, env=env,

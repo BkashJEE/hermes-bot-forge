@@ -455,9 +455,10 @@ class ScheduledDigest(unittest.TestCase):
             self.assertEqual(notify.scripts_dir(root, ""), root / "scripts")
             path = notify.install_launcher(root, Path("/plug"), "ceo")
             self.assertEqual(path.parent, root / "profiles" / "ceo" / "scripts")
-            # the launcher writes a platform path, so compare against one rather than a
-            # POSIX literal (on Windows this is \plug\notify.py)
-            self.assertIn(str(Path("/plug") / "notify.py"), path.read_text(encoding="utf-8"))
+            # the generated script embeds the path as a Python literal (the template uses !r),
+            # which is what makes it valid on Windows where a bare \p would be an escape. So
+            # compare against the literal, not the raw path.
+            self.assertIn(repr(str(Path("/plug") / "notify.py")), path.read_text(encoding="utf-8"))
             self.assertIn("--stdout", path.read_text(encoding="utf-8"))
 
     def test_the_active_profile_is_read_from_the_diamond(self):

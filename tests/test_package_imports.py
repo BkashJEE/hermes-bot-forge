@@ -60,8 +60,14 @@ else:
             "assert r['ok'] is False and 'template' in r['error']"
         )
         with tempfile.TemporaryDirectory() as tmp:
-            env = {"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(ROOT.parent),
-                   "HOME": os.environ.get("HOME", ""), "SYSTEMROOT": os.environ.get("SYSTEMROOT", "")}
+            # The real environment with PYTHONPATH pointed at the parent directory. A tiny
+            # allowlist here is a POSIX habit: on Windows it drops USERPROFILE, Path.home()
+            # raises "Could not determine home directory" — the same message as #82 — and the
+            # child dies before importing anything (#87). What this proves is that the imports
+            # do not need the repository on sys.path, which only needs PYTHONPATH.
+            env = dict(os.environ)
+            env["PYTHONPATH"] = str(ROOT.parent)
+            env.pop("HERMES_HOME", None)
             proc = subprocess.run([sys.executable, "-B", "-c", code], cwd=tmp, env=env,
                                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         self.assertEqual(proc.returncode, 0, proc.stderr)

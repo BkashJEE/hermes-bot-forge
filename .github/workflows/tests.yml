@@ -11,8 +11,6 @@ jobs:
   # means adding it here, which means actually running the suite there.
   unittest:
     runs-on: ${{ matrix.os }}
-    # windows is being brought up (#87); it reports but does not block until it is green
-    continue-on-error: ${{ matrix.os == 'windows-latest' }}
     strategy:
       fail-fast: false
       matrix:

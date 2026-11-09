@@ -66,12 +66,16 @@ The same decision applies to each proposed team member.
 
 - Hermes Agent **0.21+** with the `hermes` CLI on your `PATH`
 - Hermes Desktop for Bot Mode (the CLI works too — Bots are profiles)
-- **Linux and macOS are tested. Windows is not supported.** Nobody runs the suite on Windows and
-  no release has been tried there. The reports that do come from Windows have been real breakage —
-  a manifest the doctor could not read ([#41](https://github.com/BkashJEE/hermes-bot-forge/pull/41)),
-  a plugin that would not load on a clean install ([#38](https://github.com/BkashJEE/hermes-bot-forge/pull/38)).
-  Gateway services, sandboxes and Bot Screen are skipped there by design. Creating a Bot from the
-  CLI may well work — it is simply not a claim this project can make yet. Fixes are welcome
+- **Linux, macOS and Windows are tested.** CI runs the suite on all three, and the skill's
+  `platforms` is derived from that matrix rather than typed by hand. Windows came last: the
+  reports that arrived from there were real breakage — a manifest the doctor could not read
+  ([#41](https://github.com/BkashJEE/hermes-bot-forge/pull/41)), a plugin that would not load
+  on a clean install ([#38](https://github.com/BkashJEE/hermes-bot-forge/pull/38)), every
+  inter-Bot call failing for want of `USERPROFILE`
+  ([#82](https://github.com/BkashJEE/hermes-bot-forge/issues/82)), and a non-UTF-8 locale
+  crashing the plugin outright ([#92](https://github.com/BkashJEE/hermes-bot-forge/pull/92)).
+  Gateway services, sandboxes and Bot Screen are still skipped there by design, so the tests
+  covering them do not run on Windows — 33 of 482 are skipped, and the rest pass
 
 PyYAML is installed for you: `plugin.yaml` declares it under `python_dependencies`, and
 `hermes plugins install` puts it in the environment the plugin runs in, re-applying it after

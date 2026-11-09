@@ -3,6 +3,15 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **A delegated job refused every project under your home directory.** v0.25.0 refused a `directory` that was *inside* the home directory, not just one that was it or contained it. `~/projects` is where most people keep their code, and on Windows every path under the user profile — including the temp directory — is inside the home directory, so it refused nearly everything. HERMES_HOME is still refused along with anything inside it; the home directory is refused as a target and so is any parent of it, but a project inside it is ordinary and allowed.
+- **`check_agents` told every Windows user their credential was world-readable.** `stat().st_mode` reports `0o666` on Windows whatever the file's real ACL is, so the check reported *"readable by other users on this machine — `chmod 600`"* for every Bot, with a command that does nothing there. The same shape as the macOS `/proc` bug in #64. It now reports the reach without a permission verdict it cannot make.
+
+### Changed
+- **Windows is tested.** CI runs the suite on `windows-latest` alongside Linux and macOS, and the skill's `platforms` is derived from that matrix. Getting there took the two fixes above plus repairing tests that encoded POSIX assumptions: a child process built with `HOME` but no `USERPROFILE` (the same omission as #82), a launcher path compared as a raw string when the generated script embeds it as a Python literal, and a workflow step opening `plugin.yaml` without an encoding. Gateway topology, POSIX permission bits and the `ps` fallback cannot occur on Windows, so those 33 tests are skipped there with the reason recorded — skipped rather than loosened, so they keep their teeth on Linux and macOS.
+
 ## [0.25.0] - 2026-11-08
 
 ### Changed

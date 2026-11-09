@@ -4,7 +4,7 @@ description: "Design a new Hermes Bot from one sentence and spawn it with the cr
 version: 0.25.0
 author: Bikash Joshi
 license: MIT
-platforms: [linux, macos]
+platforms: [linux, macos, windows]
 metadata:
   hermes:
     tags: [bots, bot-mode, profiles, spawn, create-agent]

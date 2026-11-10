@@ -550,6 +550,20 @@ The existing general `check_agents`/`check_install` diagnostics are outside this
 | An edit didn't take | Changes apply on the Bot's next turn; send it a message. Previous files are in `<profile>/backups/bot-forge/` |
 | `delete_agent` refuses | By design: set `allow_delete: true`, or run `hermes profile delete <name>` yourself |
 
+### Bot Chat stops after three iterations
+
+Older versions launched the introduction with `--max-turns 3` in the permanent Bot Chat.
+On Hermes versions that persist launch overrides, that cap also applies to later turns,
+even when the profile's `agent.max_turns` is higher. New chats now inherit the profile's
+budget unless a caller explicitly supplies a session limit.
+
+Updating Bot Forge does not remove an override already saved on an existing chat.
+Raising the profile limit or restarting the gateway does not clear it; on affected
+Hermes versions, `/reset` also inherits the policy. Preserve the old transcript and
+create a genuinely fresh canonical Bot Chat without the flag, using the session
+management supported by your installed Hermes version. Do not edit a live state
+database directly. Replacing the chat does not require deleting the entire Bot profile.
+
 ## Uninstall
 
 ```bash

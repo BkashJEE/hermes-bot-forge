@@ -677,9 +677,12 @@ def newest_session(root, profile_id: str) -> str:
         return ""
 
 
-def bot_chat(root, profile_id, message, source: str = "", max_turns: int = 3, timeout: int = CHAT_TIMEOUT,
+def bot_chat(root, profile_id, message, source: str = "", max_turns: int | None = None, timeout: int = CHAT_TIMEOUT,
              env: dict | None = None, reading_only: bool = False):
     """Send a message in the Bot's canonical Bot Chat (created on first use).
+
+    Inherit the profile's iteration budget by default. An explicit max_turns is a durable
+    session launch override, not a limit on just this message or the introduction.
 
     The source stamped here is permanent, and Hermes decides a session's client surface from it
     (`tui_gateway/server.py::_gui_surface_toolsets`): a chat stamped `cli` never gets the desktop
@@ -692,16 +695,17 @@ def bot_chat(root, profile_id, message, source: str = "", max_turns: int = 3, ti
     # `desktop`, which is the surface we wanted all along.
     source = source or ("gui" if bot_mode_install(Path(root)) else "cli")
     existing = has_bot_chat(root, profile_id)
+    budget_args = [] if max_turns is None else ["--max-turns", str(max_turns)]
     if existing or source == "cli":
         p = run(root, "-p", profile_id, "chat", "-c", BOT_CHAT_TITLE, "--create-if-missing", "-Q",
-                "--max-turns", str(max_turns), *reading_only_args(reading_only), "-q", message,
+                *budget_args, *reading_only_args(reading_only), "-q", message,
                 timeout=timeout, check=False, env=env)
     else:
         # `chat -c <title> --create-if-missing` hardcodes source="cli" (hermes_cli/main.py), and a session's
         # stored source is what decides its client surface — a cli-stamped chat never gets the desktop
         # toolset, so the Bot cannot react to a message in Desktop. Start it with the right source, then
         # give it the canonical title.
-        p = run(root, "-p", profile_id, "chat", "--source", source, "-Q", "--max-turns", str(max_turns),
+        p = run(root, "-p", profile_id, "chat", "--source", source, "-Q", *budget_args,
                 *reading_only_args(reading_only), "-q", message, timeout=timeout, check=False, env=env)
         session_id = newest_session(root, profile_id)  # -Q hides the session_id line, so read it back
         if session_id:

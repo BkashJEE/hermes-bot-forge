@@ -3,6 +3,13 @@
 All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.27.0] - 2026-11-12
+
+### Fixed
+- **A new Bot stopped after three steps, for good.** The introduction was sent in the Bot's permanent canonical Bot Chat and launched with `--max-turns 3`. Hermes writes a launch budget onto the session itself (`create_session(model_config={"max_iterations": ...})`), so that three became the Bot's budget for every later turn, whatever the profile allowed — a few skill-loading and tool-discovery rounds could exhaust it before the real task began. The introduction now inherits the profile's budget, and an explicit caller budget, like the handoff path's, is unchanged. Reported, diagnosed and fixed by [@clintam123](https://github.com/clintam123) in #102.
+
+  Updating does not lift a cap already written onto an existing chat, and neither raising the profile limit nor restarting the gateway clears it. The README says what to do about an affected Bot.
+
 ## [0.26.0] - 2026-11-09
 
 ### Fixed

@@ -227,6 +227,9 @@ plugins:
 | `allow_delete` | `false` | Let `delete_agent` work at all. Off by default — an agent should not be able to destroy a Bot on its own. |
 | `backup_before_delete` | `true` | Export the Bot to a `.tar.gz` before deleting it, so it can be restored. If the backup fails, the delete is refused. |
 | `allow_secrets` | `false` | Let `share_agent` write / `import_agent` accept a template the secret scanner marked BLOCK. Operator-only; the model cannot pass it as an argument. |
+| `allow_delegate_outside` | `true` | Let `delegate_outside` start Claude Code. `false` refuses every such job. Operator-only. |
+| `allow_url_import` | `true` | Let `import_agent` fetch a Bot from an https link. `false` refuses links before anything is fetched; a file still imports. Operator-only. |
+| `allow_publish` | `true` | Let `share_agent` post a template as an unlisted gist. `false` refuses `publish` before anything is written or uploaded. Operator-only. |
 | `suggest_connectors` | `true` | After building a Bot, suggest matching servers from Hermes' MCP catalog. Suggestion only — connecting an account always needs you. |
 | `inherit_plugins` | `[]` | Plugins from your main profile to copy into every new Bot, by name, or `["all"]` for every plugin enabled there. Off by default — see *Plugins in a Bot*. |
 

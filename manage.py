@@ -347,6 +347,11 @@ def op_export(s: dict, root: Path, settings: dict) -> dict:
                 "note": "full backup INCLUDING chat history and facts about the user — keep it private; "
                         "use the default template mode to share a Bot with someone"}
 
+    if s.get("publish") and settings.get("allow_publish") is False:
+        return {"ok": False, "name": pdir.name,
+                "error": "publishing a Bot as a link is switched off on this machine "
+                         "(plugins.entries.bot-forge.settings.allow_publish). Nothing was written or "
+                         "uploaded. Share it as a file instead: call share_agent without publish."}
     tpl = portable.build_template(pdir, root)
     text = json.dumps(tpl, indent=2, ensure_ascii=False)
     scan = portable.scan_text(text)
@@ -382,8 +387,14 @@ def op_export(s: dict, root: Path, settings: dict) -> dict:
                     + (" (review the WARN findings first)" if scan["verdict"] == "WARN" else "")}
 
 
+# What `share_agent` writes into a template (portable.build_template). A test builds an export
+# and requires every key of it to be here, so the two cannot drift apart.
+SHARED_KEYS = frozenset({"format", "version", "display_name", "role", "description", "one_job", "soul_md",
+                         "memory", "toolsets", "disabled_skills", "taught_skills", "routines", "avatar_kind"})
+
+
 def strip_outside_routes(spec: dict) -> tuple[dict, list]:
-    """Drop the fields in a shared Bot that could point this machine at someone else's endpoint.
+    """Reduce a shared Bot to a description of itself: no routes, no local settings, no extra tools.
 
     A template fetched from a URL is a stranger's text. Two of its fields are routes rather than
     description: `model` carries a `base_url`, so a crafted import would send every one of the new
@@ -395,6 +406,12 @@ def strip_outside_routes(spec: dict) -> tuple[dict, list]:
     `bot-chat:<bot>`. Returns the cleaned spec and what was removed, so the caller can say so
     rather than quietly rewriting what the sharer wrote.
 
+    The same template could also carry keys `share_agent` never writes but `forge.forge` obeys:
+    `enforce_approvals: false` leaves the new Bot without the policy layer, `inherit_plugins`
+    copies the root profile's plugins into it, `template` loads a file from this machine. Only
+    the keys an export carries are kept. And `toolsets` is cut back to the ones every Bot starts
+    with: a terminal or a scheduler is the user's to grant, after reading what the Bot does.
+
     A local file is left alone: that is how `share_agent --mode backup` is restored, and there
     keeping the model is the point.
     """
@@ -402,6 +419,16 @@ def strip_outside_routes(spec: dict) -> tuple[dict, list]:
     dropped = []
     if spec.pop("model", None) is not None:
         dropped.append("model (a shared template cannot choose this Bot's provider or base_url)")
+    for key in sorted(set(spec) - SHARED_KEYS):
+        del spec[key]
+        dropped.append(f"{key} (not part of a shared template; set it yourself after the import)")
+    if "toolsets" in spec:
+        asked = spec["toolsets"] if isinstance(spec["toolsets"], list) else []
+        extra = [str(t) for t in asked if t not in forge.BASE_TOOLSETS]
+        spec["toolsets"] = [t for t in asked if t in forge.BASE_TOOLSETS]
+        if extra:
+            dropped.append(f"toolsets {', '.join(extra)} (a shared template cannot grant tools beyond the "
+                           f"ones every Bot starts with; add them with update_agent add_toolsets)")
     routines = spec.get("routines")
     if isinstance(routines, list):
         cleaned = []
@@ -426,6 +453,10 @@ def op_import(s: dict, root: Path, settings: dict) -> dict:
 
     where = str(s.get("path") or "").strip()
     if publish_mod.is_url(where):
+        if settings.get("allow_url_import") is False:
+            return {"ok": False, "error": "importing a Bot from a link is switched off on this machine "
+                                          "(plugins.entries.bot-forge.settings.allow_url_import). Nothing was "
+                                          "fetched. A template saved as a file can still be imported."}
         shared = publish_mod.read_shared(where)
         if not shared.get("ok"):
             return {"ok": False, "error": shared["error"]}
@@ -443,8 +474,8 @@ def op_import(s: dict, root: Path, settings: dict) -> dict:
         out = {**result, "source": shared["source"], "scan": shared["scan"]}
         if dropped:
             out["dropped_from_share"] = dropped
-            out["note"] = ("Say what was dropped: a shared Bot does not get to choose where this "
-                           "machine sends inference or routine output. " + (result.get("note") or ""))
+            out["note"] = ("Say what was dropped: a shared Bot describes itself, it does not get to choose "
+                           "this machine's routes, policy or tools. " + (result.get("note") or ""))
         return out
 
     path = Path(where).expanduser()

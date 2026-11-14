@@ -62,6 +62,25 @@ config_schema:
     type: bool
     default: false
     description: Let share_agent write, and import_agent accept, a template the secret scanner marked BLOCK. Operator-only — the model cannot pass it.
+  allow_delegate_outside:
+    type: bool
+    default: true
+    description: >-
+      Let delegate_outside start Claude Code. Set false to refuse every such job on this machine.
+      Operator-only — the model cannot pass it.
+  allow_url_import:
+    type: bool
+    default: true
+    description: >-
+      Let import_agent fetch a Bot from an https link. Set false to refuse links before anything is
+      fetched; a template saved as a file still imports. Operator-only — the model cannot pass it.
+  allow_publish:
+    type: bool
+    default: true
+    description: >-
+      Let share_agent post a template as an unlisted gist. Set false to refuse publish=true before
+      anything is written or uploaded; sharing as a file still works. Operator-only — the model
+      cannot pass it.
   suggest_connectors:
     type: bool
     default: true

@@ -221,6 +221,10 @@ def delegate(spec: dict, runner=None) -> dict:
     context = str(spec.get("context") or "").strip()
     may_edit = bool(spec.get("may_edit"))
 
+    if (spec.get("settings") or {}).get("allow_delegate_outside") is False:
+        return {"ok": False, "error": "handing work to Claude Code is switched off on this machine "
+                                      "(plugins.entries.bot-forge.settings.allow_delegate_outside). "
+                                      "Nothing was started."}
     if not task:
         return {"ok": False, "error": "say what the job is — this spawns a whole agent, not a query"}
     if len(task) > MAX_TASK:

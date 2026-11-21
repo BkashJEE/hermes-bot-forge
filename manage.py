@@ -200,7 +200,10 @@ def op_update(s: dict, root: Path, settings: dict) -> dict:
     # plugins from the root profile (the fix for a check_agents "enabled but not installed" flag)
     plugins = None
     if s.get("inherit_plugins") not in (None, False, [], ""):
-        import companion
+        if __package__:
+            from . import companion
+        else:
+            import companion
         carried = companion.inherit_plugins(root, pdir, s["inherit_plugins"])
         if carried["failed"]:
             raise RuntimeError("could not inherit plugins: " + "; ".join(f["error"] for f in carried["failed"]))

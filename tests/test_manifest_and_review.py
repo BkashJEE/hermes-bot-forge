@@ -37,6 +37,18 @@ class Manifest(unittest.TestCase):
         self.assertIn(f"version: {manifest['version']}", skill)
         self.assertIn(f"## [{manifest['version']}]", changelog)
 
+    def test_every_config_schema_key_is_wired_in_register(self):
+        """A setting in plugin.yaml absent from __init__._SETTINGS is silently ignored at runtime."""
+        import ast
+        manifest = yaml.safe_load(Path(ROOT / "plugin.yaml").read_text(encoding="utf-8"))
+        declared = set((manifest.get("config_schema") or {}).keys())
+        tree = ast.parse((ROOT / "__init__.py").read_text(encoding="utf-8"))
+        wired = next(set(ast.literal_eval(node.value)) for node in tree.body
+                     if isinstance(node, ast.Assign) and isinstance(node.targets[0], ast.Name)
+                     and node.targets[0].id == "_SETTINGS")
+        self.assertEqual(declared - wired, set(), "declared in plugin.yaml but missing from _SETTINGS")
+        self.assertEqual(wired - declared, set(), "in _SETTINGS but missing from plugin.yaml")
+
 
 
 # ReviewFollowUps held the two extras/share_login.py tests. The script is gone — a plugin

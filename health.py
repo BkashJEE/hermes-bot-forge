@@ -177,7 +177,10 @@ def check_bot(pdir: Path, gateways: dict, now: float, bundled: set | None = None
                          f"that is how an independent login works, but it is reach worth knowing about")
     if name in gateways and not gateways[name]:
         flags.append(f"gateway is not running — `hermes -p {name} gateway start`")
-    import companion
+    if __package__:
+        from . import companion
+    else:
+        import companion
     inert = companion.inert_plugins(pdir, pdir.parent.parent, bundled)
     if inert:
         flags.append(f"plugins enabled but not installed in this Bot: {', '.join(inert)} — its config names them "

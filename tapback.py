@@ -31,36 +31,55 @@ NEEDS_YOU = "✋"
 # answer exists. First match wins, so the more specific asks come first, and anything unrecognised
 # falls back to 👀 rather than guessing.
 PICKUP = (
-    ("🔧", r"\b(fix|bug|broken|crash|error|failing|fails|debug|regress|not work|doesn'?t work)"),
-    ("🔎", r"\b(research|find|search|look up|look into|investigat|check (on|the|if|whether)|who is|what'?s new|dig into|digging)"),
-    ("✍️", r"\b(write|writing|draft|post|thread|tweet|blog|newsletter|caption|copy|rephrase|reword)"),
-    ("📊", r"\b(report|analys|analyz|metric|number|revenue|cost|budget|compare|forecast|how many|how much)"),
-    ("⏳", r"\b(schedule|remind|every (day|morning|week|monday)|daily|weekly|cron|tomorrow|later|at \d)"),
-    ("📋", r"\b(review|read (this|the|through)|look at|take a look|check this|feedback on|pr #?\d|diff)"),
-    ("🛠️", r"\b(build|create|make me|implement|add|set ?up|ship|deploy|refactor|migrat|install)"),
-    ("👋", r"^\s*(hi|hey|hello|yo|gm|good morning|good evening|thanks|thank you|ta|nice|great|perfect)\b"),
-    ("💬", r"(\?\s*$|^\s*(what|why|how|when|where|who|which|is|are|can|should|do|does|did)\b)"),
+    ("🔧", r"\b(fix|bug|broken|crash|error|failing|fails|debug|regress|not work|doesn'?t work)"
+           r"|(?:أصلح|اصلح|إصلاح|اصلاح|خطأ|عطل|مشكلة|لا يعمل|يتعطل|تصحيح)"),
+    ("🔎", r"\b(research|find|search|look up|look into|investigat|check (on|the|if|whether)"
+           r"|who is|what'?s new|dig into|digging)"
+           r"|(?:ابحث|بحث|تحقق|تأكد|تاكد|افحص|استكشف|ما الجديد)"),
+    ("✍️", r"\b(write|writing|draft|post|thread|tweet|blog|newsletter|caption|copy|rephrase|reword)"
+           r"|(?:اكتب|صغ|مسودة|منشور|تغريدة|مقال|نشرة|أعد صياغة)"),
+    ("📊", r"\b(report|analys|analyz|metric|number|revenue|cost|budget|compare|forecast|how many|how much)"
+           r"|(?:تقرير|حلل|تحليل|إحصائ|احصائ|أرقام|ارقام|ميزانية|قارن|مقارنة|كم )"),
+    ("⏳", r"\b(schedule|remind|every (day|morning|week|monday)|daily|weekly|cron|tomorrow|later|at \d)"
+           r"|(?:جدول|ذكّر|ذكرني|كل يوم|كل صباح|كل أسبوع|يومياً|أسبوعياً|غداً)"),
+    ("📋", r"\b(review|read (this|the|through)|look at|take a look|check this|feedback on|pr #?\d|diff)"
+           r"|(?:راجع|مراجعة|اقرأ|دقق|تدقيق|اطلع على)"),
+    ("🛠️", r"\b(build|create|make me|implement|add|set ?up|ship|deploy|refactor|migrat|install)"
+           r"|(?:ابنِ|ابني|أنشئ|انشئ|اصنع|جهّز|جهز|انشر|نشر|ثبّت|ثبت|طوّر|طور)"),
+    ("👋", r"^\s*(hi|hey|hello|yo|gm|good morning|good evening|thanks|thank you|ta|nice|great|perfect)\b"
+           r"|^\s*(مرحبا|مرحباً|أهلا|أهلاً|السلام عليكم|صباح الخير|مساء الخير|شكراً|شكرا|ممتاز)"),
+    ("💬", r"(\?\s*$|؟\s*$|^\s*(what|why|how|when|where|who|which|is|are|can|should|do|does|did)\b"
+           r"|^\s*(ما|ماذا|لماذا|كيف|متى|أين|من|هل)\s)"),
 )
 
 # Only these surfaces have the reaction tool (tui_gateway/server.py::_gui_surface_toolsets).
 REACTING_PLATFORMS = {"desktop"}
-BLOCKED_HINTS = ("i can't", "i cannot", "unable to", "blocked", "failed", "error")
+BLOCKED_HINTS = ("i can't", "i cannot", "unable to", "blocked", "failed", "error",
+                 "لا أستطيع", "لا استطيع", "تعذر", "تعذّر", "فشل", "محجوب", "خطأ")
 APPROVAL_HINTS = ("your approval", "before i ", "shall i", "do you want me to", "confirm first",
-                  "let me know if you want")
+                  "let me know if you want",
+                  "موافقتك", "قبل أن ", "هل تريد مني", "هل أرسل", "هل أنشر", "أكّد أولاً", "اكد اولا",
+                  "بانتظار موافقتك", "بانتظار تأكيدك")
 
 # How the turn ended, read from the reply — the answer to "and then what happened?". State comes
 # first (blocked, waiting on you), because that matters more than what kind of work it was. Every
 # emoji here is absent from PICKUP on purpose: Hermes clears a reaction when the same one is set
 # twice, so an outcome that could equal its own pickup would erase itself.
 OUTCOME = (
-    ("🚀", r"\b(shipped|deployed|merged|published|posted|released|live now|went out|sent it)\b"),
-    ("📝", r"\b(draft(ed)?|wrote|written|rewrote|here'?s the (post|thread|copy|draft)|word(ed|ing))\b"),
+    ("🚀", r"\b(shipped|deployed|merged|published|posted|released|live now|went out|sent it)\b"
+           r"|(?:تم النشر|تم الإطلاق|تم الدمج|نُشر|أُطلق|تم الإرسال)"),
+    ("📝", r"\b(draft(ed)?|wrote|written|rewrote|here'?s the (post|thread|copy|draft)|word(ed|ing))\b"
+           r"|(?:إليك المسودة|جهّزت المسودة|كتبت المسودة|أعدت صياغة)"),
     # `\d+%` must sit outside the \b-wrapped group: a trailing \b after "%" can never match,
     # because "%" is already a non-word character, and it silently killed the whole alternative.
-    ("📈", r"\d+\s?%|\b(report|breakdown|totals?|averag|trend|grew|dropped|compared|up \d|down \d)\b"),
-    ("🗓️", r"\b(scheduled|booked|set (it )?for|every (day|morning|week)|cron|routine added)\b"),
-    ("💡", r"\b(turns out|found (that|it)|the answer|it looks like|the reason|because)\b"),
-    ("🧹", r"\b(cleaned|removed|deleted|tidied|archived|closed (it|them)|nothing left)\b"),
+    ("📈", r"\d+\s?%|\b(report|breakdown|totals?|averag|trend|grew|dropped|compared|up \d|down \d)\b"
+           r"|(?:التقرير|التفصيل|المتوسط|الإجمالي|ارتفع|انخفض)"),
+    ("🗓️", r"\b(scheduled|booked|set (it )?for|every (day|morning|week)|cron|routine added)\b"
+           r"|(?:تمت الجدولة|تم الحجز|أُضيف الروتين)"),
+    ("💡", r"\b(turns out|found (that|it)|the answer|it looks like|the reason|because)\b"
+           r"|(?:تبيّن أن|تبين أن|السبب هو|وجدت أن)"),
+    ("🧹", r"\b(cleaned|removed|deleted|tidied|archived|closed (it|them)|nothing left)\b"
+           r"|(?:تم التنظيف|تم الحذف|تمت الأرشفة|تم الإغلاق)"),
 )
 
 

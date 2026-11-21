@@ -437,4 +437,15 @@ class TapbackHooks(unittest.TestCase):
         marks.on_turn_end(platform="acp", assistant_response="x")
         self.assertEqual(ctx.calls, [])
 
+    def test_arabic_pickup_and_outcome_reactions(self):
+        """Arabic asks and approval/blocked replies must not misclassify as generic working or done."""
+        import tapback
+        self.assertEqual(tapback.pickup_emoji("أصلح الخطأ في الخادم"), "🔧")
+        self.assertEqual(tapback.pickup_emoji("ابحث عن أحدث التقارير"), "🔎")
+        self.assertEqual(tapback.pickup_emoji("اكتب مسودة منشور"), "✍️")
+        self.assertEqual(tapback.pickup_emoji("جهّز تقرير الأداء"), "📊")
+        self.assertEqual(tapback.outcome_emoji("جهّزت المسودة، بانتظار موافقتك قبل الإرسال."), tapback.NEEDS_YOU)
+        self.assertEqual(tapback.outcome_emoji("تعذر الاتصال بالخادم بسبب خطأ."), tapback.BLOCKED)
+        self.assertEqual(tapback.outcome_emoji("تم النشر بنجاح على الإنتاج."), "🚀")
+
 

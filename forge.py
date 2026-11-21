@@ -930,7 +930,9 @@ def forge(s: dict) -> dict:
         # it already promises rather than trusted to remember it. A Bot that declared no approvals
         # gets the layer with no categories on — see companion.policy_for.
         sentinel = None
-        if s.get("enforce_approvals", True) is not False:
+        enforce_approvals = (s.get("enforce_approvals") if s.get("enforce_approvals") is not None
+                             else settings.get("enforce_approvals", True))
+        if enforce_approvals is not False:
             if __package__:
                 from . import companion
             else:
@@ -947,7 +949,10 @@ def forge(s: dict) -> dict:
         plugins = None
         wanted = s["inherit_plugins"] if s.get("inherit_plugins") is not None else settings.get("inherit_plugins")
         if wanted not in (None, False, [], ""):
-            import companion
+            if __package__:
+                from . import companion
+            else:
+                import companion
 
             carried = companion.inherit_plugins(root, pdir, wanted)
             if carried["failed"]:

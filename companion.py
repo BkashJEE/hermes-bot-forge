@@ -100,7 +100,14 @@ def install_marks(pdir: Path) -> dict:
 # The approval wording create_agent writes -> the category Sentinel knows it by.
 _APPROVAL_CATEGORIES = (("send", "send"), ("post", "send"), ("publish", "send"),
                         ("spend", "spend"), ("buy", "spend"), ("money", "spend"),
-                        ("delete", "delete"), ("remove", "delete"))
+                        ("delete", "delete"), ("remove", "delete"),
+                        # Arabic approval keywords so Sentinel enforces non-English Bot approvals too.
+                        ("إرسال", "send"), ("ارسال", "send"), ("نشر", "send"),
+                        ("تغريد", "send"), ("بريد", "send"), ("رسالة", "send"),
+                        ("إنفاق", "spend"), ("انفاق", "spend"), ("دفع", "spend"),
+                        ("شراء", "spend"), ("تحويل", "spend"), ("مبلغ", "spend"),
+                        ("حذف", "delete"), ("إزالة", "delete"), ("ازالة", "delete"),
+                        ("مسح", "delete"), ("تدمير", "delete"))
 
 
 def policy_for(approvals) -> dict:

@@ -71,3 +71,44 @@ else:
             proc = subprocess.run([sys.executable, "-B", "-c", code], cwd=tmp, env=env,
                                   capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         self.assertEqual(proc.returncode, 0, proc.stderr)
+
+    def test_no_unguarded_bare_in_package_imports(self):
+        """Every deferred or module-level in-package import must guard with `if __package__:`."""
+        import ast
+        mods = {p.stem for p in ROOT.glob("*.py") if p.stem != "__init__"}
+        offenders = []
+        for path in sorted(ROOT.glob("*.py")):
+            tree = ast.parse(path.read_text(encoding="utf-8"))
+            guarded = set()
+            for node in ast.walk(tree):
+                if isinstance(node, ast.If) and isinstance(node.test, ast.Name) and node.test.id == "__package__":
+                    for stmt in node.orelse:
+                        for sub in ast.walk(stmt):
+                            if isinstance(sub, ast.Import):
+                                guarded.add(sub.lineno)
+            for node in ast.walk(tree):
+                if isinstance(node, ast.Import) and node.lineno not in guarded:
+                    for alias in node.names:
+                        top = alias.name.split(".")[0]
+                        if top in mods and alias.name != "tools.react_to_message_tool":
+                            offenders.append(f"{path.name}:{node.lineno}: import {alias.name}")
+        self.assertEqual(offenders, [], "unguarded bare in-package imports: " + repr(offenders))
+
+    def test_health_check_bot_runs_as_package_outside_repository(self):
+        """Regression: health.check_bot used bare `import companion`, crashing under Hermes package loading."""
+        code = (
+            "import importlib, tempfile; from pathlib import Path; "
+            f"h = importlib.import_module({ROOT.name!r} + '.health'); "
+            "t = tempfile.TemporaryDirectory(); "
+            "pdir = Path(t.name) / 'profiles' / 'alpha'; pdir.mkdir(parents=True); "
+            "(pdir / 'config.yaml').write_text('model:\\n  default: test\\n', encoding='utf-8'); "
+            "out = h.check_bot(pdir, {}, 1700000000.0, set()); "
+            "assert out['name'] == 'alpha'; t.cleanup()"
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            env = dict(os.environ)
+            env["PYTHONPATH"] = str(ROOT.parent)
+            env.pop("HERMES_HOME", None)
+            proc = subprocess.run([sys.executable, "-B", "-c", code], cwd=tmp, env=env,
+                                  capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+        self.assertEqual(proc.returncode, 0, proc.stderr)

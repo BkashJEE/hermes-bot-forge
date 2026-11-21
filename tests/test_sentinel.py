@@ -519,3 +519,9 @@ class UpgradingFromTheBrokenLocation(unittest.TestCase):
             "      settings:\n        mode: ask\n",
             approvals=["send, post or publish anything"])
         self.assertEqual(core_get_config(cfg, companion.SENTINEL_NAME, "mode"), "ask")
+
+    def test_arabic_approvals_enable_guard_defaults(self):
+        """Arabic approval wordings must activate Sentinel guard_defaults instead of silently disarming it."""
+        for wording in ("إرسال أي بريد إلكتروني", "نشر أي محتوى", "دفع أو شراء أي مبلغ", "حذف أي ملفات"):
+            pol = companion.policy_for([wording])
+            self.assertTrue(pol["guard_defaults"], wording)
